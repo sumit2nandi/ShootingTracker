@@ -14,19 +14,29 @@ tab bar** on mobile.
 - **Shoot tracking (CRUD)** — a minimal form (title, date, client, coordinator, fee, status) with the rest
   (type, end date/times, venue, location, contacts, notes) tucked under “More details”. Anything that
   doesn't fit a column is preserved in a JSON `extra` field, so you never lose data from a sheet.
+- **Two statuses, everywhere** — a shoot is either **Planned** (still to come) or **Completed** (closed
+  out). Filters, pills, calendar chips, the legend and the donut all speak those two words, and an import
+  that says “booked”, “confirmed”, “postponed” or “cancelled” is folded into the right one.
 - **Earnings** — a per-shoot **payments ledger**. Collected amount, balance and a derived
-  `paid / partial / unpaid` status are computed from the ledger, not hand-typed.
-- **Dashboard** — KPI cards (shoots, total fee value, collected, outstanding, active, completed) plus:
-  - monthly **fee vs collected** bar chart,
+  `paid / partial / unpaid` status are computed from the ledger, not hand-typed. In the shoot
+  drawer the ledger is topped by a single **Collected** checkbox pre-filled with whatever is still
+  due on the fee — tick it, press **Save**, and the balance is booked in one step.
+- **Dashboard** — KPI cards (shoots, total fee value, outstanding, planned, completed) plus:
+  - monthly earnings bar chart (per-day when a month filter is on),
   - status donut,
-  - per-**coordinator** and per-**type** breakdowns,
-  - upcoming shoots.
+  - **upcoming shoots** for the next 7 days, listed as date + title,
+  - per-**coordinator** and per-**type** breakdowns.
   Every widget respects the shared filter bar: **month, coordinator, client, status, type, fee range,
   text search, payment status**.
-- **Calendar** — month grid, every shoot shown on its date (multi-day shoots span their range), color-coded
-  by status. Tap a shoot → detail drawer; tap a day → add a shoot on that date.
-- **Mobile-first UI** — responsive layout, tables drop low-priority columns on small screens, bottom-sheet
-  forms/drawers, safe-area insets, and a floating glass tab bar (Dashboard / Calendar / Shoots).
+- **Calendar** — Google-style month grid: cells share their edges (no gaps), today is highlighted, days from
+  the neighbouring months are dimmed, and every shoot is shown on its date (multi-day shoots span their
+  range) as a status-coloured chip. The legend mirrors those chips and counts the statuses in the month on
+  screen. Tap a shoot → detail drawer; tap a day → add a shoot on that date. A list view is one tap away.
+- **Mobile-first UI** — responsive layout, bottom-sheet forms/drawers, safe-area insets, and a floating glass
+  tab bar (Dashboard / Calendar / Shoots). The **All shoots** table goes edge-to-edge on phones and drops its
+  **Status** and **Payment** columns; the fee itself turns into a **green bubble when paid** and a **red
+  bubble when a balance is due**. A **Show all** button appears whenever a filter is applied, and **Export
+  (CSV)** lives next to the filter icon in the same header.
 - **Import (server-side)** — an **HTML spreadsheet export / CSV / JSON** sheet can be loaded via the REST
   API (`POST /api/import`) or the CLI (`npm run import`). Columns like `date`, `client`, `coordinator`,
   `fee`, `venue`, `status`, `payment` are auto-mapped (many date formats, `Paid`/`50%`/amounts for
@@ -52,6 +62,7 @@ Tables created:
 | `shoots`       | One row per shoot + `extra` JSONB + `dedupe_hash` for imports. |
 | `payments`     | Earnings ledger (amount, date, method) per shoot.              |
 | `media`        | Photo / album / drive links per shoot.                         |
+| `app_users`    | Who may sign in (email, role `owner`/`member`, active flag).    |
 
 Key indexes: shoot date, coordinator, client, status, type, and a GIN index on `extra`.
 
@@ -94,7 +105,20 @@ SESSION_SECRET=use-a-long-random-secret
 
 ### Google-only access
 
-The app and every `/api` endpoint require a Google sign-in. The server verifies Google's signed ID token and accepts only `sumit2nandi@gmail.com` and `sushmitaghosh0099@gmail.com`; the allowlist is enforced on the server, not just by the sign-in screen. Signed-in sessions use an HTTP-only, same-site cookie and expire after seven days.
+The app and every `/api` endpoint require a Google sign-in. The server verifies Google's signed ID token and
+then checks the account against the **`app_users`** table; the allow-list is enforced on the server, not just by
+the sign-in screen. Signed-in sessions use an HTTP-only, same-site cookie and expire after seven days.
+
+Managing who can sign in — **no code changes and no restart needed**:
+
+- From the app: an owner sees the people icon in the top bar → *People with access* (add, activate/deactivate,
+  promote, remove).
+- From the database: `INSERT INTO app_users (email, name, role) VALUES ('new@example.com', 'New', 'member');`
+  or `UPDATE app_users SET is_active = false WHERE lower(email) = '…';`
+
+The two original logins are seeded by the first `npm run migrate` (existing databases pick them up on the next
+migration run). Owners can never demote, deactivate or remove the last active owner, and nobody can remove
+their own access. The allow-list is cached for 20 s, so a change takes effect within half a minute.
 
 1. In Google Cloud Console, configure the Google Identity Services OAuth consent screen and create an **OAuth client ID** of type **Web application**.
 2. Add each hostname where this app runs to **Authorized JavaScript origins** (for local development, `http://localhost:3000`; add your production HTTPS origin too). No redirect URI is needed.

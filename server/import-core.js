@@ -3,7 +3,7 @@
 // or emit a standalone .sql file for manual execution (Aiven web console).
 const { pool } = require('./db');
 
-const STATUSES = ['planned', 'confirmed', 'completed', 'postponed', 'cancelled'];
+const STATUSES = ['planned', 'completed'];
 
 function esc(s) {
   if (s === null || s === undefined) return 'NULL';

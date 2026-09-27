@@ -8,6 +8,7 @@ const {
   SESSION_COOKIE, SESSION_TTL_SECONDS, createSession, cookieOptions, getSession,
   verifyGoogleCredential
 } = require('./auth');
+const users = require('./users');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,9 +19,17 @@ app.set('trust proxy', 1);
 app.use(express.json({ limit: '15mb' }));
 app.use(express.text({ limit: '15mb', type: ['text/*', 'application/*'] }));
 
-function currentUser(req) {
-  return getSession(req, SESSION_SECRET);
+// A valid cookie only proves the session was signed by this server; whether the
+// account may still use the app is decided by the `app_users` table.
+async function currentUser(req) {
+  const session = getSession(req, SESSION_SECRET);
+  if (!session) return null;
+  const row = await users.lookupUser(session.email);
+  if (!row || !row.is_active) return null;
+  return { ...session, role: row.role, name: session.name || row.name };
 }
+
+const ACCESS_HINT = 'Could not read the app_users table. If the database is new, run: npm run migrate';
 
 /* ---------------- sign-in / protected app ---------------- */
 app.get('/api/auth/config', (_req, res) => {
@@ -28,9 +37,11 @@ app.get('/api/auth/config', (_req, res) => {
   res.json({ clientId: process.env.GOOGLE_CLIENT_ID || null });
 });
 
-app.get('/api/auth/me', (req, res) => {
+app.get('/api/auth/me', async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  const user = currentUser(req);
+  let user;
+  try { user = await currentUser(req); }
+  catch (e) { return res.status(503).json({ error: `${ACCESS_HINT} (${e.message})` }); }
   if (!user) return res.status(401).json({ error: 'Sign-in required' });
   res.json({ user });
 });
@@ -56,24 +67,30 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 // The complete API is private, including health and import endpoints.
-app.use('/api', (req, res, next) => {
-  const user = currentUser(req);
+app.use('/api', async (req, res, next) => {
+  let user;
+  try { user = await currentUser(req); }
+  catch (e) { return res.status(503).json({ error: `${ACCESS_HINT} (${e.message})` }); }
   if (!user) return res.status(401).json({ error: 'Sign-in required' });
   req.user = user;
   next();
 });
 
-function sendAppOrLogin(req, res) {
-  const filename = currentUser(req) ? 'index.html' : 'login.html';
+async function sendAppOrLogin(req, res) {
+  let user = null;
+  try { user = await currentUser(req); } catch (e) { user = null; }
+  const filename = user ? 'index.html' : 'login.html';
   res.set('Cache-Control', 'no-store');
   res.sendFile(path.join(__dirname, '..', 'public', filename));
 }
 app.get('/', sendAppOrLogin);
 app.get('/index.html', sendAppOrLogin);
 
-// App code and its stylesheet are not downloadable until an allowlisted session exists.
-app.use(['/css/app.css', '/js/app.js'], (req, res, next) => {
-  if (!currentUser(req)) return res.status(401).type('text/plain').send('Sign-in required');
+// App code and its stylesheet are not downloadable until an allowed session exists.
+app.use(['/css/app.css', '/js/app.js'], async (req, res, next) => {
+  let user = null;
+  try { user = await currentUser(req); } catch (e) { user = null; }
+  if (!user) return res.status(401).type('text/plain').send('Sign-in required');
   next();
 });
 app.use(express.static(path.join(__dirname, '..', 'public'), {
@@ -83,7 +100,7 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
   setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache, must-revalidate')
 }));
 
-const STATUSES = ['planned', 'confirmed', 'completed', 'postponed', 'cancelled'];
+const STATUSES = ['planned', 'completed'];
 
 /* ---------------- filters ---------------- */
 
@@ -154,6 +171,65 @@ WITH base AS (
          ON p.shoot_id = s.id
 )`;
 
+/* ---------------- people with access (app_users) ---------------- */
+// Only owners may change who can sign in. Everyone else is read-only here.
+function requireOwner(req, res, next) {
+  if (req.user && req.user.role === 'owner') return next();
+  res.status(403).json({ error: 'Only an owner can manage access' });
+}
+
+app.get('/api/users', requireOwner, async (_req, res, next) => {
+  try { res.json({ users: await users.listUsers() }); }
+  catch (e) { next(e); }
+});
+
+app.post('/api/users', requireOwner, async (req, res, next) => {
+  const email = String((req.body || {}).email || '').trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return res.status(400).json({ error: 'A valid email address is required' });
+  }
+  try {
+    res.status(201).json({ user: await users.addUser(req.body || {}) });
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'That email is already in the list' });
+    next(e);
+  }
+});
+
+app.patch('/api/users/:id', requireOwner, async (req, res, next) => {
+  try {
+    const before = (await users.listUsers()).find((u) => String(u.id) === req.params.id);
+    if (!before) return res.status(404).json({ error: 'not found' });
+    const patch = req.body || {};
+    const row = await users.updateUser(req.params.id, patch);
+    if (!row) return res.status(404).json({ error: 'not found' });
+    // never let the last owner lock everybody out
+    if ((patch.is_active === false || patch.role === 'member') && before.role === 'owner') {
+      const owners = (await users.listUsers()).filter((u) => u.is_active && u.role === 'owner');
+      if (owners.length === 0) {
+        await users.updateUser(req.params.id, { is_active: true, role: 'owner' });
+        return res.status(409).json({ error: 'At least one active owner is required' });
+      }
+    }
+    res.json({ user: row });
+  } catch (e) { next(e); }
+});
+
+app.delete('/api/users/:id', requireOwner, async (req, res, next) => {
+  try {
+    const all = await users.listUsers();
+    const row = all.find((u) => String(u.id) === req.params.id);
+    if (!row) return res.status(404).json({ error: 'not found' });
+    if (String(row.email).toLowerCase() === String(req.user.email).toLowerCase()) {
+      return res.status(409).json({ error: 'You cannot remove your own access' });
+    }
+    if (row.role === 'owner' && all.filter((u) => u.role === 'owner' && u.is_active).length <= 1) {
+      return res.status(409).json({ error: 'At least one owner is required' });
+    }
+    res.json({ removed: await users.removeUser(req.params.id) });
+  } catch (e) { next(e); }
+});
+
 /* ---------------- meta / dashboard ---------------- */
 
 app.get('/api/health', async (_req, res) => {
@@ -192,7 +268,7 @@ app.get('/api/dashboard', async (req, res, next) => {
              COALESCE(SUM(paid_amount),0)::numeric AS total_paid,
              COALESCE(SUM(fee - LEAST(paid_amount, fee)),0)::numeric AS outstanding,
              COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
-             COUNT(*) FILTER (WHERE status IN ('planned','confirmed'))::int AS active,
+             COUNT(*) FILTER (WHERE status = 'planned')::int AS active,
              COUNT(*) FILTER (WHERE payment_status = 'paid')::int AS paidShoots,
              COUNT(*) FILTER (WHERE payment_status = 'unpaid')::int AS unpaidShoots,
              COUNT(*) FILTER (WHERE fee > 0 AND paid_amount < fee)::int AS outstandingShoots
@@ -226,7 +302,9 @@ app.get('/api/dashboard', async (req, res, next) => {
       ${where ? `FROM base b ${where}` : 'FROM base b'}
       GROUP BY 1 ORDER BY n DESC`, params);
 
-    const upcomingExtra = `b.shoot_date >= CURRENT_DATE AND b.status IN ('planned','confirmed')`;
+    // the dashboard only looks one week ahead; 'confirmed' is kept in the
+    // predicate so rows imported before the two-state model still show up
+    const upcomingExtra = `b.shoot_date >= CURRENT_DATE AND b.shoot_date < (CURRENT_DATE + 7) AND b.status IN ('planned','confirmed')`;
     const upcomingWhere = where ? `${where.replace(/^WHERE\s+/, '')} AND ${upcomingExtra}` : upcomingExtra;
     const upcoming = await query(BASE_CTE + `
       SELECT b.id, b.title, b.client_name, b.shoot_date, b.venue, b.location,

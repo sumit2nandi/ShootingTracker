@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ShootingTracker</title>
-  <link rel="stylesheet" href="css/app.css?v=4" />
+  <link rel="stylesheet" href="css/app.css?v=14" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=4" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=4" />
   <link rel="apple-touch-icon" href="favicon.png?v=4" />
@@ -33,14 +33,13 @@
     </nav>
     <div class="top-right">
       <span id="signed-in-user" class="signed-in-user" aria-label="Signed in account"></span>
+      <button id="btn-access" class="btn btn-ghost signout-btn" title="People with access" aria-label="People with access" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/><circle cx="10" cy="7.5" r="3.5"/><path d="M20 19v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.5 4.2a3.5 3.5 0 0 1 0 6.6"/></svg>
+      </button>
       <button id="btn-signout" class="btn btn-ghost signout-btn" title="Sign out" aria-label="Sign out">Sign out</button>
       <span id="db-status" class="db-pill" title="Checking database…">
         <span class="dot"></span><span class="db-pill-text">DB…</span>
       </span>
-      <button id="btn-export" class="btn btn-ghost" aria-label="Export all data" title="Export all shoots (original calendar CSV format)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-        <span class="btn-label">Export</span>
-      </button>
       <button id="btn-new-shoot" class="btn btn-primary" aria-label="New shoot">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         <span class="btn-label">New shoot</span>
@@ -62,7 +61,7 @@
   <main id="main">
     <section id="view-dashboard" class="view">
       <div class="card">
-        <div class="card-head"><h3>Upcoming shoots</h3></div>
+        <div class="card-head"><h3>Upcoming shoots</h3><span class="muted small">next 7 days</span></div>
         <div id="upcoming-table" class="table-wrap"></div>
       </div>
       <div id="kpi-row" class="kpi-row"></div>
@@ -107,10 +106,12 @@
           <button id="cal-view-list" class="btn btn-ghost" aria-pressed="false">List</button>
         </div>
       </div>
-      <div class="cal-head-row">
-        <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div><div class="cal-dow">Wed</div><div class="cal-dow">Thu</div><div class="cal-dow">Fri</div><div class="cal-dow">Sat</div>
+      <div class="cal-frame">
+        <div class="cal-head-row">
+          <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div><div class="cal-dow">Wed</div><div class="cal-dow">Thu</div><div class="cal-dow">Fri</div><div class="cal-dow">Sat</div>
+        </div>
+        <div id="cal-grid" class="cal-grid"></div>
       </div>
-      <div id="cal-grid" class="cal-grid"></div>
       <div id="cal-list" class="cal-list hidden"></div>
       <div class="cal-mobile-note muted small">Tap a day to add a shoot · tap a shoot to open it</div>
     </section>
@@ -119,10 +120,20 @@
       <div class="card">
         <div class="card-head">
           <h3>All shoots</h3>
-          <span class="muted" id="shoots-count"></span>
-          <button id="btn-shoots-filter" class="btn btn-ghost icon-btn" aria-label="Show filters" aria-expanded="false" title="Show / hide filters">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6.5 8v5.5l-3 2V13L4 5z"/></svg>
-          </button>
+          <div class="card-head-tools">
+            <span class="muted" id="shoots-count"></span>
+            <button id="btn-shoots-reset" class="btn btn-ghost shoots-reset" hidden title="Clear the filters and show every shoot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4.5V10h5.5"/></svg>
+              <span class="btn-label">Show all</span>
+            </button>
+            <button id="btn-shoots-filter" class="btn btn-ghost icon-btn" aria-label="Show filters" aria-expanded="false" title="Show / hide filters">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6.5 8v5.5l-3 2V13L4 5z"/></svg>
+            </button>
+            <button id="btn-export" class="btn btn-ghost" aria-label="Export all data" title="Export all shoots (original calendar CSV format)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+              <span class="btn-label">Export</span>
+            </button>
+          </div>
         </div>
         <div id="shoots-table" class="table-wrap"></div>
       </div>
@@ -134,8 +145,8 @@
     <div class="modal">
       <div class="modal-head">
         <h3 id="shoot-modal-title">New shoot</h3>
-        <button class="icon-btn btn btn-ghost" data-close aria-label="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        <button class="btn popup-close" data-close aria-label="Close" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
       <form id="shoot-form" class="form-grid">
@@ -184,6 +195,35 @@
     </div>
   </div>
 
+  <!-- people with access (owner only) -->
+  <div class="modal-backdrop hidden" id="access-modal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="access-title">People with access</h3>
+        <button class="btn popup-close" data-close aria-label="Close" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="access-body">
+        <p class="muted small access-note">
+          Everyone listed here can sign in with their Google account. Manage the list here, or directly in the
+          <code>app_users</code> table.
+        </p>
+        <div id="access-list" class="access-list"></div>
+        <form id="access-form" class="access-add" autocomplete="off">
+          <input type="email" name="email" placeholder="name@gmail.com" required />
+          <input type="text" name="name" placeholder="Name (optional)" />
+          <select name="role" aria-label="Role">
+            <option value="member">Member</option>
+            <option value="owner">Owner</option>
+          </select>
+          <button class="btn btn-primary" type="submit">Add</button>
+        </form>
+      </div>
+      <div class="modal-foot"><button class="btn btn-ghost" data-close>Close</button></div>
+    </div>
+  </div>
+
   <!-- detail drawer -->
   <div class="drawer-backdrop hidden" id="drawer-backdrop">
     <aside class="drawer" id="drawer"></aside>
@@ -207,6 +247,6 @@
 
   <div id="toasts" class="toasts"></div>
 
-  <script src="js/app.js?v=3"></script>
+  <script src="js/app.js?v=12"></script>
 </body>
 </html>

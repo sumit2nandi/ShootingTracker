@@ -11,9 +11,11 @@ const state = {
   viewFilters: {}, // per-view filter memory
   meta: { statuses: [], coordinators: [], clients: [], types: [], months: [] },
   cal: { year: new Date().getFullYear(), month: new Date().getMonth() },
+  user: null,          // the signed-in account (role decides who can manage access)
   calView: 'grid',
   calShoots: [],
   shootsFiltersOpen: false, // shoots-tab filter bar starts collapsed
+  shootsExpandAll: false,  // set when the user arrives from a dashboard tile
   dbOk: null
 };
 
@@ -47,6 +49,15 @@ function toast(msg, kind = 'ok') {
 /* ---------- formatting ---------- */
 
 const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+/* short form for the labels printed above the chart bars: ₹2.5L, ₹45k, ₹800 */
+const fmtMoneyShort = (n) => {
+  const v = Math.abs(Number(n) || 0);
+  const r1 = (x) => { const t = Math.round(x * 10) / 10; return Number.isInteger(t) ? String(t) : t.toFixed(1); };
+  if (v >= 1e7) return '₹' + r1(v / 1e7) + 'Cr';
+  if (v >= 1e5) return '₹' + r1(v / 1e5) + 'L';
+  if (v >= 1000) return '₹' + Math.round(v / 1000) + 'k';
+  return '₹' + Math.round(v);
+};
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -58,6 +69,14 @@ function fmtDate(s) {
   if (!y || !m || !d) return s;
   return `${d} ${MONTH_SHORT[m - 1]} ${y}`;
 }
+/* "22 Sep" — the month/year already come from the group heading on phones */
+function shortDate(s) {
+  if (!s) return '—';
+  const [, m, d] = String(s).slice(0, 10).split('-').map(Number);
+  if (!m || !d) return String(s);
+  return `${d} ${MONTH_SHORT[m - 1]}`;
+}
+
 function fmtTime(t) {
   if (!t) return '';
   const [h, mi] = String(t).split(':');
@@ -101,12 +120,14 @@ async function loadMeta() {
   } catch { return; }
   fillSelect('#f-month', state.meta.months, '', true);
   fillSelect('#f-coordinator', state.meta.coordinators.map((c) => c.name));
-  // status filter: Planned / Completed (matching the form)
+  // status filter mirrors whatever the API reports (Planned / Completed)
   {
     const el = $('#f-status');
     const cur = el.value;
-    el.innerHTML = '<option value="">All statuses</option><option value="planned">Planned</option><option value="confirmed">Confirmed</option><option value="completed">Completed</option><option value="postponed">Postponed</option><option value="cancelled">Cancelled</option>';
-    if (['planned', 'confirmed', 'completed', 'postponed', 'cancelled'].includes(cur)) el.value = cur;
+    const list = (state.meta.statuses || []).filter((s) => STATUS_ORDER.includes(s));
+    el.innerHTML = '<option value="">All statuses</option>' +
+      list.map((s) => `<option value="${esc(s)}">${esc(statusLabel(s))}</option>`).join('');
+    if (list.includes(cur)) el.value = cur;
   }
   $('#dl-coordinators').innerHTML = state.meta.coordinators.map((c) => `<option value="${esc(c.name)}">`).join('');
   $('#dl-clients').innerHTML = state.meta.clients.map((c) => `<option value="${esc(c)}">`).join('');
@@ -186,6 +207,7 @@ function clearFilters() {
 
 function setView(v) {
   if (state.view !== 'calendar' && v !== state.view) state.viewFilters[state.view] = readFilters();
+  if (v !== 'shoots') state.shootsExpandAll = false;   // the tile-driven expansion is one-shot
   state.view = v;
   $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === v));
   for (const el of $$('.view')) el.classList.toggle('hidden', el.id !== `view-${v}`);
@@ -201,7 +223,7 @@ function restoreViewFilters(v) {
   state.filters = { month: f.month || '', coordinator: f.coordinator || '', status: f.status || '', paymentStatus: f.paymentStatus || '', q: f.q || '' };
   $('#f-month').value = state.filters.month;
   $('#f-coordinator').value = state.filters.coordinator;
-  $('#f-status').value = ['planned', 'confirmed', 'completed', 'postponed', 'cancelled'].includes(state.filters.status) ? state.filters.status : '';
+  $('#f-status').value = (state.meta.statuses || []).includes(state.filters.status) ? state.filters.status : '';
   $('#f-payment').value = ['paid', 'partial', 'unpaid', 'outstanding'].includes(state.filters.paymentStatus) ? state.filters.paymentStatus : '';
   $('#f-q').value = state.filters.q;
 }
@@ -240,7 +262,7 @@ function renderDashboard(d, daily) {
     <div class="kpi accent" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Shoots</div><div class="kpi-value">${k.shoots ?? 0}</div><div class="kpi-sub">${k.completed ?? 0} completed</div></div>
     <div class="kpi violet" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Total fee value</div><div class="kpi-value">${fmtMoney(k.total_fee)}</div><div class="kpi-sub">booked earnings</div></div>
     <div class="kpi amber" data-goto='{"paymentStatus":"outstanding"}' role="button" tabindex="0"><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmtMoney(k.outstanding)}</div><div class="kpi-sub">${k.outstandingshoots ?? 0} shoots with a balance</div></div>
-    <div class="kpi" data-goto='{"status":"planned,confirmed"}' role="button" tabindex="0"><div class="kpi-label">Active (planned/confirmed)</div><div class="kpi-value">${k.active ?? 0}</div><div class="kpi-sub">on the books</div></div>
+    <div class="kpi" data-goto='{"status":"planned"}' role="button" tabindex="0"><div class="kpi-label">Planned</div><div class="kpi-value">${k.active ?? 0}</div><div class="kpi-sub">still to come</div></div>
     <div class="kpi red" data-goto='{"status":"completed"}' role="button" tabindex="0"><div class="kpi-label">Completed</div><div class="kpi-value">${k.completed ?? 0}</div><div class="kpi-sub">of ${k.shoots ?? 0} total</div></div>`;
 
   renderEarnings(d.monthly || [], daily);
@@ -265,7 +287,7 @@ function renderEarnings(monthly, daily) {
     wrap.innerHTML = `<div class="bars">${daily.map((d) => `
       <div class="bar-col">
         <div class="bar-pair">
-          <div class="bar fee" style="height:${(d.fee / max) * 100}%" title="${label(d.date)} — ${fmtMoney(d.fee)}" data-lbl="${label(d.date)}" data-val="${d.fee}"><span class="bar-val">${d.fee ? fmtMoney(d.fee) : ''}</span></div>
+          <div class="bar fee" style="height:${(d.fee / max) * 100}%" title="${label(d.date)} — ${fmtMoney(d.fee)}" data-lbl="${label(d.date)}" data-val="${d.fee}"><span class="bar-val">${d.fee ? fmtMoneyShort(d.fee) : ''}</span></div>
         </div>
         <div class="bar-label">${+d.date.slice(8, 10)}</div>
       </div>`).join('')}</div>`;
@@ -284,22 +306,36 @@ function renderEarnings(monthly, daily) {
   wrap.innerHTML = `<div class="bars">${months.map((m) => `
       <div class="bar-col">
         <div class="bar-pair">
-          <div class="bar fee" style="height:${(m.fee / max) * 100}%" title="${label(m.ym)} — ${fmtMoney(m.fee)}" data-lbl="${label(m.ym)}" data-val="${m.fee}"><span class="bar-val">${m.fee ? fmtMoney(m.fee) : ''}</span></div>
+          <div class="bar fee" style="height:${(m.fee / max) * 100}%" title="${label(m.ym)} — ${fmtMoney(m.fee)}" data-lbl="${label(m.ym)}" data-val="${m.fee}"><span class="bar-val">${m.fee ? fmtMoneyShort(m.fee) : ''}</span></div>
         </div>
         <div class="bar-label">${label(m.ym)}</div>
       </div>`).join('')}</div>`;
   $('#chart-range').textContent = `${label(months[0].ym)} – ${label(months[months.length - 1].ym)}`;
 }
 
-const STATUS_COLORS = { planned: '#7b8ea3', confirmed: '#0e7490', completed: '#15803d', postponed: '#b45309', cancelled: '#dc2626' };
+const STATUS_COLORS = { planned: '#7b8ea3', completed: '#15803d' };
+const STATUS_ORDER = Object.keys(STATUS_COLORS);
+const statusLabel = (s) => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1);
+/* Rows imported before the app settled on two states may still carry
+   "confirmed" / "postponed" / "cancelled"; fold them into Planned or Completed
+   so every screen, filter and legend only ever shows the two real states. */
+const appStatus = (s) => (s === 'completed' || s === 'cancelled' ? 'completed' : 'planned');
+const statusPill = (s) => `<span class="pill ${appStatus(s)}">${statusLabel(appStatus(s))}</span>`;
 
 function renderStatusDonut(byStatus) {
   const wrap = $('#chart-status');
-  const total = byStatus.reduce((a, b) => a + b.n, 0);
+  // fold any legacy status into Planned / Completed before charting
+  const totals = new Map();
+  for (const s of byStatus) {
+    const key = appStatus(s.status);
+    totals.set(key, (totals.get(key) || 0) + s.n);
+  }
+  const rows = STATUS_ORDER.filter((st) => totals.has(st)).map((st) => ({ status: st, n: totals.get(st) }));
+  const total = rows.reduce((a, b) => a + b.n, 0);
   if (!total) { wrap.innerHTML = '<div class="empty">No data for this filter</div>'; return; }
   const R = 56, C = 2 * Math.PI * R;
   let offset = 0;
-  const segs = byStatus.map((s) => {
+  const segs = rows.map((s) => {
     const frac = s.n / total;
     const seg = { color: STATUS_COLORS[s.status] || '#888', dash: `${frac * C} ${C}`, off: -offset * C, status: s.status, n: s.n };
     offset += frac;
@@ -314,7 +350,7 @@ function renderStatusDonut(byStatus) {
       <text x="80" y="97" text-anchor="middle" fill="#8b98ad" font-size="11">shoots</text>
     </svg>
     <div class="donut-legend">
-      ${byStatus.map((s) => `<div class="row"><i style="background:${STATUS_COLORS[s.status] || '#888'}"></i>${esc(s.status.charAt(0).toUpperCase() + s.status.slice(1))}<span class="n">${s.n}</span></div>`).join('')}
+      ${rows.map((s) => `<div class="row"><i style="background:${STATUS_COLORS[s.status] || '#888'}"></i>${esc(statusLabel(s.status))}<span class="n">${s.n}</span></div>`).join('')}
     </div>`;
 }
 
@@ -337,21 +373,12 @@ function renderTypes(list) {
 
 function renderUpcoming(list) {
   const wrap = $('#upcoming-table');
-  if (!list.length) { wrap.innerHTML = '<div class="empty">Nothing upcoming for this filter 🎉</div>'; return; }
+  if (!list.length) { wrap.innerHTML = '<div class="empty">Nothing scheduled in the next 7 days 🎉</div>'; return; }
   wrap.innerHTML = `
-    <table class="upcoming-table"><thead><tr>
-      <th>Date</th><th>Title</th><th>Client</th><th class="col-u-venue">Venue / Location</th>
-      <th class="col-u-coord">Coordinator</th><th class="num">Fee</th><th>Status</th>
-    </tr></thead>
-    <tbody>${list.map((s) => `
+    <table class="upcoming-table"><tbody>${list.map((s) => `
       <tr data-id="${s.id}">
-        <td class="td-mono">${fmtDate(s.shoot_date)}</td>
+        <td class="td-mono td-date">${fmtDate(s.shoot_date)}</td>
         <td>${esc(s.title)}</td>
-        <td>${esc(s.client_name || '—')}</td>
-        <td class="col-u-venue">${esc([s.venue, s.location].filter(Boolean).join(', ') || '—')}</td>
-        <td class="col-u-coord">${esc(s.coordinator || '—')}</td>
-        <td class="num td-mono">${fmtMoney(s.fee)}</td>
-        <td><span class="pill ${s.status}">${s.status}</span></td>
       </tr>`).join('')}</tbody></table>`;
   $$('#upcoming-table tbody tr').forEach((tr) => tr.addEventListener('click', () => openDrawer(+tr.dataset.id)));
 }
@@ -383,9 +410,33 @@ async function loadCalendar() {
       }
     }
     state.calByDate = byDate;
+    state.calShoots = shoots;
+    renderCalLegend();
     if (state.calView === 'list') renderCalendarList();
     else renderCalendarGrid();
   } catch (e) { toast('Calendar: ' + e.message, 'err'); }
+}
+
+/* Legend mirrors the event chips exactly (same colours and left bar) and only
+   lists the statuses that actually occur in the month on screen. */
+function renderCalLegend() {
+  const idsByStatus = new Map();
+  for (const s of state.calShoots || []) {
+    if (!s) continue;
+    const key = appStatus(s.status);
+    if (!idsByStatus.has(key)) idsByStatus.set(key, new Set());
+    idsByStatus.get(key).add(s.id);
+  }
+  const present = STATUS_ORDER.filter((st) => idsByStatus.has(st));
+  const wrap = $('#cal-legend');
+  if (!present.length) {
+    wrap.innerHTML = `<span class="legend-empty">No shoots in ${MONTH_NAMES[state.cal.month]} ${state.cal.year}</span>`;
+    return;
+  }
+  wrap.innerHTML = present.map((st) => {
+    const n = idsByStatus.get(st).size;
+    return `<span class="legend-item"><i class="legend-swatch ${st}"></i>${statusLabel(st)}<span class="legend-n">${n}</span></span>`;
+  }).join('');
 }
 
 function renderCalendarList() {
@@ -404,9 +455,8 @@ function renderCalendarList() {
         <div class="cl-events">
           ${shoots.map((s) => `<div class="cl-event" data-id="${s.id}">
             <span class="cl-title">${esc(s.title)}</span>
-            ${s.coordinator ? `<span class="muted small cl-coord">${esc(s.coordinator)}</span>` : ''}
             <span class="cl-fee td-mono">${fmtMoney(s.fee)}</span>
-            <span class="pill ${s.status}">${s.status}</span>
+            ${statusPill(s.status)}
           </div>`).join('')}
         </div>
       </div>`);
@@ -446,16 +496,14 @@ function renderCalendarGrid() {
     const shown = shoots.slice(0, 3);
     cells.push(`
       <div class="cal-cell ${inMonth ? '' : 'dim'} ${k === todayK ? 'today' : ''}" data-date="${k}">
-        <div class="cal-dayno">${d.getDate()}</div>
+        <div class="cal-dayno"><span>${d.getDate()}</span></div>
         <div class="cal-chips">
-          ${shown.map((s) => `<div class="cal-chip ${s.status}" data-id="${s.id}" title="${esc(s.title)}${s.venue ? ' — ' + esc(s.venue) : ''}">${esc(s.title)}</div>`).join('')}
+          ${shown.map((s) => `<div class="cal-chip ${appStatus(s.status)}" data-id="${s.id}" title="${esc(s.title)}${s.venue ? ' — ' + esc(s.venue) : ''}">${esc(s.title)}</div>`).join('')}
           ${shoots.length > 3 ? `<div class="cal-more" data-date="${k}">+${shoots.length - 3} more…</div>` : ''}
         </div>
       </div>`);
   }
   $('#cal-grid').innerHTML = cells.join('');
-  // legend
-  $('#cal-legend').innerHTML = Object.entries(STATUS_COLORS).map(([status, color]) => `<span class="legend-item"><i style="background:${color}"></i>${status.charAt(0).toUpperCase() + status.slice(1)}</span>`).join('');
   // events
   $$('#cal-grid .cal-chip').forEach((chip) => chip.addEventListener('click', (ev) => { ev.stopPropagation(); openDrawer(+chip.dataset.id); }));
   $$('#cal-grid .cal-cell').forEach((cell) => cell.addEventListener('click', () => openShootModal(null, cell.dataset.date)));
@@ -466,11 +514,18 @@ function openDayPanel(dateK) {
   const shoots = (state.calByDate || {})[dateK] || [];
   const drawer = $('#drawer');
   drawer.innerHTML = `
-    <h2>${fmtDate(dateK)}</h2>
-    <div class="sub">${shoots.length} shoot${shoots.length === 1 ? '' : 's'} on this day</div>
+    <div class="drawer-head">
+      <div class="drawer-head-txt">
+        <h2>${fmtDate(dateK)}</h2>
+        <div class="sub">${shoots.length} shoot${shoots.length === 1 ? '' : 's'} on this day</div>
+      </div>
+      <button class="btn popup-close" data-close aria-label="Close" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
     ${shoots.map((s) => `
       <div class="pay-row" data-id="${s.id}" style="cursor:pointer">
-        <span class="pill ${s.status}">${s.status}</span>
+        ${statusPill(s.status)}
         <span>${esc(s.title)}</span>
         <span class="amt">${fmtMoney(s.fee)}</span>
       </div>`).join('')}
@@ -480,6 +535,7 @@ function openDayPanel(dateK) {
     </div>`;
   $('#drawer-backdrop').classList.remove('hidden');
   $$('#drawer .pay-row[data-id]').forEach((r) => r.addEventListener('click', () => openDrawer(+r.dataset.id)));
+  $$('#drawer [data-close]').forEach((b) => b.addEventListener('click', closeDrawer));
   $('#dp-add').addEventListener('click', () => { $('#drawer-backdrop').classList.add('hidden'); openShootModal(null, dateK); });
 }
 
@@ -488,6 +544,28 @@ $('#cal-next').addEventListener('click', () => { state.cal.month++; if (state.ca
 $('#cal-today').addEventListener('click', () => { const n = new Date(); state.cal.year = n.getFullYear(); state.cal.month = n.getMonth(); loadCalendar(); });
 
 /* ---------- shoots table ---------- */
+
+// Reaching this tab from a dashboard tile (Outstanding, Planned, …) lands on a
+// filtered list, so offer a one-tap way back to every shoot.
+const hasActiveFilters = () => {
+  const f = state.filters;
+  return !!(f.month || f.coordinator || f.status || f.paymentStatus || f.q);
+};
+
+function syncShootsReset() {
+  const btn = $('#btn-shoots-reset');
+  if (btn) btn.hidden = !hasActiveFilters();
+}
+
+function resetShootsFilters() {
+  state.viewFilters.shoots = { month: '', coordinator: '', status: '', paymentStatus: '', q: '' };
+  state.filters = { month: '', coordinator: '', status: '', paymentStatus: '', q: '' };
+  $('#f-month').value = ''; $('#f-coordinator').value = '';
+  $('#f-status').value = ''; $('#f-payment').value = ''; $('#f-q').value = '';
+  syncShootsReset();
+  refreshCurrent(false);
+  toast('Showing all shoots');
+}
 
 async function loadShoots() {
   try {
@@ -498,8 +576,14 @@ async function loadShoots() {
 
 function renderShoots(rows) {
   $('#shoots-count').textContent = `${rows.length} shown`;
+  syncShootsReset();
   const wrap = $('#shoots-table');
-  if (!rows.length) { wrap.innerHTML = '<div class="empty">No shoots match. Clear filters or add one with “+ New shoot”.</div>'; return; }
+  if (!rows.length) {
+    wrap.innerHTML = hasActiveFilters()
+      ? '<div class="empty">No shoots match this filter — tap “Show all” to clear it.</div>'
+      : '<div class="empty">No shoots yet — add one with “+ New shoot”.</div>';
+    return;
+  }
 
   const groups = new Map();
   rows.forEach((shoot) => {
@@ -510,28 +594,35 @@ function renderShoots(rows) {
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const headings = (ym) => ym === 'undated' ? 'Undated' : monthLabel(ym);
+  // arriving from a dashboard tile means "show me everything", so open every group
+  const isOpen = (ym) => state.shootsExpandAll || ym === currentMonth;
   const tableFor = (monthRows) => `
     <table class="shoots-table">
-      <thead><tr><th>Date</th><th>Title</th><th>Coordinator</th><th class="num">Fee</th><th>Payment</th><th>Status</th></tr></thead>
+      <thead><tr><th>Date</th><th>Title</th><th>Coordinator</th><th class="num">Fee</th><th class="col-pay">Payment</th><th class="col-status">Status</th></tr></thead>
       <tbody>${monthRows.map((s) => {
         const paid = s.payment_status === 'paid';
-        const completed = s.status === 'completed';
-        const paymentLabel = s.payment_status === 'partial' ? 'Partially paid' : s.payment_status;
-        const statusLabel = s.status.charAt(0).toUpperCase() + s.status.slice(1);
+        const paymentLabel = s.payment_status === 'partial' ? 'Partially paid' : statusLabel(s.payment_status);
+        const multiDay = s.end_date && s.end_date !== s.shoot_date;
+        const daySpan = multiDay
+          ? Math.max(1, Math.round((new Date(s.end_date) - new Date(s.shoot_date)) / 86400000) + 1)
+          : 0;
+        const fullDate = multiDay ? `${fmtDate(s.shoot_date)} → ${fmtDate(s.end_date)}` : fmtDate(s.shoot_date);
         return `
-          <tr data-id="${s.id}">
-            <td class="td-mono">${fmtDate(s.shoot_date)}${s.end_date && s.end_date !== s.shoot_date ? ` → ${fmtDate(s.end_date)}` : ''}</td>
-            <td>${esc(s.title)}</td>
-            <td>${esc(s.coordinator || '—')}</td>
-            <td class="num td-mono">${fmtMoney(s.fee)}</td>
-            <td class="shoot-payment"><span class="desktop-label">${esc(paymentLabel)}</span><span class="tick-ico ${paid ? 'ok' : 'bad'}" role="img" aria-label="${esc(paymentLabel)}" title="${esc(paymentLabel)}">${paid ? '✓' : '✕'}</span></td>
-            <td class="shoot-status"><span class="desktop-label">${esc(statusLabel)}</span><span class="tick-ico ${completed ? 'ok' : 'bad'}" role="img" aria-label="${esc(statusLabel)}" title="${esc(statusLabel)}">${completed ? '✓' : '✕'}</span></td>
+          <tr data-id="${s.id}" title="${esc(fullDate)}">
+            <td class="td-mono cell-date"><span class="d-full">${fmtDate(s.shoot_date)}</span><span class="d-short">${esc(shortDate(s.shoot_date))}</span>${multiDay ? `<span class="cell-range"> → ${fmtDate(s.end_date)}</span>` : ''}${daySpan > 1 ? `<span class="cell-days" title="${daySpan}-day shoot">+${daySpan - 1}d</span>` : ''}</td>
+            <td class="cell-title">${esc(s.title)}</td>
+            <td class="cell-coord">${esc(s.coordinator || '—')}</td>
+            <td class="num td-mono">
+              <span class="fee-bubble ${paid ? 'paid' : 'due'}" title="${esc(paymentLabel)}" aria-label="${esc(fmtMoney(s.fee))}, ${esc(paymentLabel)}">${fmtMoney(s.fee)}</span>
+            </td>
+            <td class="col-pay"><span class="pill ${s.payment_status}">${esc(paymentLabel)}</span></td>
+            <td class="col-status">${statusPill(s.status)}</td>
           </tr>`;
       }).join('')}</tbody>
     </table>`;
 
   wrap.innerHTML = [...groups.entries()].map(([ym, monthRows]) => `
-    <details class="shoot-month" ${ym === currentMonth ? 'open' : ''}>
+    <details class="shoot-month" ${isOpen(ym) ? 'open' : ''}>
       <summary><span>${esc(headings(ym))}</span><span class="month-count">${monthRows.length} shoot${monthRows.length === 1 ? '' : 's'}</span></summary>
       ${tableFor(monthRows)}
     </details>`).join('');
@@ -560,14 +651,9 @@ function openShootModal(shoot, presetDate) {
     coordNew.value = known ? '' : shoot.coordinator;
   } else { coordSel.value = ''; coordNew.value = ''; }
   coordNew.hidden = coordSel.value !== '__new__';
-  // status: core options are Planned/Completed; keep any other value intact when editing
+  // status: the app only knows Planned and Completed
   const stSel = $('#sel-status');
-  const st = shoot?.status || 'planned';
-  if (st !== 'planned' && st !== 'completed' && ![...stSel.options].some((o) => o.value === st)) {
-    const o = document.createElement('option');
-    o.value = st; o.textContent = st; stSel.appendChild(o);
-  }
-  stSel.value = st;
+  stSel.value = appStatus(shoot?.status);
   $('#shoot-modal').classList.remove('hidden');
   setTimeout(() => f.title.focus(), 50);
 }
@@ -600,6 +686,74 @@ $('#btn-save-shoot').addEventListener('click', async () => {
   } catch (e) { toast('Save failed: ' + e.message, 'err'); }
 });
 
+/* ---------- people with access (owner only) ---------- */
+
+let accessCache = null;
+
+async function openAccess() {
+  $('#access-modal').classList.remove('hidden');
+  $('#access-list').innerHTML = '<div class="empty">Loading…</div>';
+  await refreshAccess();
+}
+
+function closeAccess() { $('#access-modal').classList.add('hidden'); }
+
+async function refreshAccess() {
+  let data;
+  try { data = await api('/api/users'); }
+  catch (e) { $('#access-list').innerHTML = `<div class="empty">Could not load the list: ${esc(e.message)}</div>`; return; }
+  accessCache = data.users || [];
+  const me = String(state.user && state.user.email || '').toLowerCase();
+  const owners = accessCache.filter((u) => u.is_active && u.role === 'owner').length;
+  $('#access-list').innerHTML = accessCache.map((u) => {
+    const isMe = String(u.email).toLowerCase() === me;
+    const isLastOwner = u.role === 'owner' && u.is_active && owners <= 1;
+    return `
+      <div class="access-row${u.is_active ? '' : ' off'}">
+        <div class="access-who">
+          <b>${esc(u.name || u.email)}</b>
+          <span class="muted small">${esc(u.email)}${isMe ? ' · you' : ''}</span>
+        </div>
+        <span class="pill ${u.role === 'owner' ? 'owner' : 'unpaid'}">${u.role === 'owner' ? 'Owner' : 'Member'}</span>
+        <div class="access-actions">
+          <button class="btn btn-ghost" data-toggle="${u.id}" data-active="${u.is_active}"
+            ${u.role === 'owner' && u.is_active && owners <= 1 ? 'disabled title="At least one active owner is required"' : ''}>${u.is_active ? 'Deactivate' : 'Activate'}</button>
+          <button class="btn btn-ghost" data-remove="${u.id}" ${isMe ? 'disabled title="You cannot remove your own access"' : ''}>Remove</button>
+        </div>
+      </div>`;
+  }).join('') || '<div class="empty">Nobody yet.</div>';
+  $$('#access-list [data-toggle]').forEach((b) => b.addEventListener('click', async () => {
+    b.disabled = true;
+    try {
+      await api(`/api/users/${b.dataset.toggle}`, { method: 'PATCH', body: { is_active: b.dataset.active !== 'true' } });
+      toast('Access updated');
+      await refreshAccess();
+    } catch (e) { toast(e.message, 'err'); b.disabled = false; }
+  }));
+  $$('#access-list [data-remove]').forEach((b) => b.addEventListener('click', async () => {
+    if (!confirm('Remove this person from the allow-list?')) return;
+    b.disabled = true;
+    try {
+      await api(`/api/users/${b.dataset.remove}`, { method: 'DELETE' });
+      toast('Access removed');
+      await refreshAccess();
+    } catch (e) { toast(e.message, 'err'); b.disabled = false; }
+  }));
+}
+
+$('#access-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const body = { email: f.email.value.trim(), name: f.name.value.trim(), role: f.role.value };
+  if (!body.email) return;
+  try {
+    await api('/api/users', { body });
+    f.reset();
+    toast(`${body.email} can now sign in`);
+    await refreshAccess();
+  } catch (err) { toast(err.message, 'err'); }
+});
+
 /* ---------- detail drawer ---------- */
 
 async function openDrawer(id) {
@@ -609,56 +763,49 @@ async function openDrawer(id) {
   try {
     const s = await api(`/api/shoots/${id}`);
     const paid = +s.paid_amount, fee = +s.fee;
+    const balance = Math.max(0, Math.round((fee - paid) * 100) / 100);
+    const canCollect = balance > 0;
     drawer.innerHTML = `
-      <h2>${esc(s.title)}</h2>
-      <div class="sub">${fmtDate(s.shoot_date)}${s.end_date && s.end_date !== s.shoot_date ? ` → ${fmtDate(s.end_date)}` : ''}${s.start_time ? ` · ${fmtTime(s.start_time)}` : ''}</div>
-      <div><span class="pill ${s.status}">${s.status}</span> <span class="pill ${s.payment_status}">${s.payment_status}</span></div>
+      <div class="drawer-head">
+        <div class="drawer-head-txt">
+          <h2>${esc(s.title)}</h2>
+          <div class="sub">${fmtDate(s.shoot_date)}${s.end_date && s.end_date !== s.shoot_date ? ` → ${fmtDate(s.end_date)}` : ''}${s.start_time ? ` · ${fmtTime(s.start_time)}` : ''}</div>
+          <div class="drawer-status">
+            ${statusPill(s.status)}<span class="pill ${s.payment_status}">${esc(statusLabel(s.payment_status))}</span>
+          </div>
+        </div>
+        <button class="btn popup-close" data-close aria-label="Close" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
       <div class="section"><h4>Details</h4>
-        <div class="kv">
-          <span class="k">Client</span><span>${esc(s.client_name || '—')}</span>
-          <span class="k">Type</span><span>${esc(s.shoot_type || '—')}</span>
+        <div class="kv kv-lead">
           <span class="k">Coordinator</span><span>${esc(s.coordinator || '—')}</span>
-          <span class="k">Venue</span><span>${esc(s.venue || '—')}</span>
-          <span class="k">Location</span><span>${esc(s.location || '—')}</span>
-          <span class="k">Contact</span><span>${esc(s.contact_name || '—')}${s.contact_phone ? ' · ' + esc(s.contact_phone) : ''}</span>
           <span class="k">Fee</span><span class="td-mono">${fmtMoney(fee)}</span>
           <span class="k">Collected</span><span class="td-mono" style="color:var(--green)">${fmtMoney(paid)}</span>
           <span class="k">Balance</span><span class="td-mono">${fmtMoney(Math.max(0, fee - paid))}</span>
+          <span class="k">Client</span><span>${esc(s.client_name || '—')}</span>
+          <span class="k">Type</span><span>${esc(s.shoot_type || '—')}</span>
+          <span class="k">Venue</span><span>${esc(s.venue || '—')}</span>
+          <span class="k">Location</span><span>${esc(s.location || '—')}</span>
+          <span class="k">Contact</span><span>${esc(s.contact_name || '—')}${s.contact_phone ? ' · ' + esc(s.contact_phone) : ''}</span>
         </div>
         ${s.notes ? `<div class="section"><h4>Notes</h4><div>${esc(s.notes)}</div></div>` : ''}
         ${Object.keys(s.extra || {}).length ? `<div class="section"><h4>Extra fields (from import)</h4><div class="kv">${Object.entries(s.extra).map(([k, v]) => `<span class="k">${esc(k)}</span><span>${esc(v)}</span>`).join('')}</div></div>` : ''}
       </div>
-      <div class="section"><h4>Payments</h4>
+      <div class="section"><h4>Payment</h4>
         <div class="pay-list">
           ${(s.payments || []).map((p) => `
             <div class="pay-row">
               <span class="muted small">${fmtDate(p.paid_on)}</span>
-              <span>${esc(p.method || '')}${p.note ? ` <span class="muted small">· ${esc(p.note)}</span>` : ''}</span>
+              <span>${[p.method, p.note].filter(Boolean).map(esc).join(' <span class="muted small">· </span>')}</span>
               <span class="amt">${fmtMoney(p.amount)}</span>
               <button data-pay-id="${p.id}" title="Delete payment">✕</button>
-            </div>`).join('') || '<div class="muted small">No payments recorded.</div>'}
-        </div>
-        <div class="pay-form">
-          <input type="number" id="pay-amount" min="0" step="0.01" placeholder="Amount ₹" />
-          <input type="date" id="pay-date" value="${dayKey(new Date())}" />
-          <input type="text" id="pay-method" placeholder="method (cash/UPI…)" />
-          <button class="btn btn-primary" id="pay-add">Add</button>
+            </div>`).join('') || `<div class="muted small">${fee ? 'Nothing collected yet.' : 'Set a fee to start collecting.'}</div>`}
         </div>
         <div class="pay-total">Collected <b style="color:var(--green)">${fmtMoney(paid)}</b> of ${fmtMoney(fee)} (${fee ? Math.round((paid / fee) * 100) : 0}%)</div>
-      </div>
-      <div class="section"><h4>Media / deliverables</h4>
-        <div class="pay-list">
-          ${(s.media || []).map((mm) => `
-            <div class="pay-row">
-              <a href="${esc(mm.file_url)}" target="_blank" rel="noopener" class="btn-link" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(mm.caption || mm.file_url)}</a>
-              <button data-media-id="${mm.id}" title="Remove">✕</button>
-            </div>`).join('') || '<div class="muted small">No links yet.</div>'}
-        </div>
-        <div class="pay-form" style="grid-template-columns:2fr 1fr auto">
-          <input type="text" id="media-url" placeholder="https://… (photo / album / drive link)" />
-          <input type="text" id="media-caption" placeholder="caption" />
-          <button class="btn btn-primary" id="media-add">Add</button>
-        </div>
+        <button class="btn btn-primary pay-mark" id="pay-mark" ${canCollect ? '' : 'disabled'}>Mark Paid</button>
+        <div class="muted small pay-hint">${!fee ? 'Set a fee on this shoot first — then it can be marked paid.' : canCollect ? `Books the remaining ${fmtMoney(balance)} as collected today.` : 'Nothing to collect — this shoot is already paid in full.'}</div>
       </div>
       <div class="drawer-actions">
         <button class="btn" id="dr-edit">✏️ Edit</button>
@@ -668,36 +815,24 @@ async function openDrawer(id) {
     $$('#drawer [data-close]').forEach((b) => b.addEventListener('click', closeDrawer));
     $('#dr-edit').addEventListener('click', () => { closeDrawer(); openShootModal(s); });
     $('#dr-delete').addEventListener('click', async () => {
-      if (!confirm(`Delete "${s.title}"? Payments and media will be removed too.`)) return;
+      if (!confirm(`Delete "${s.title}"? Its payments will be removed too.`)) return;
       try { await api(`/api/shoots/${id}`, { method: 'DELETE' }); toast('Shoot deleted'); closeDrawer(); loadMeta(); refreshCurrent(); }
       catch (e) { toast('Delete failed: ' + e.message, 'err'); }
     });
-    $('#pay-add').addEventListener('click', async () => {
-      const amount = $('#pay-amount').value;
-      if (!amount || +amount <= 0) { toast('Enter a payment amount', 'err'); return; }
+    const payMark = $('#pay-mark');
+    payMark.addEventListener('click', async () => {
+      if (!canCollect) return;
+      payMark.disabled = true;
       try {
-        await api(`/api/shoots/${id}/payments`, { body: { amount: +amount, paid_on: $('#pay-date').value || null, method: $('#pay-method').value.trim() || null } });
-        toast('Payment recorded');
+        await api(`/api/shoots/${id}/payments`, { body: { amount: balance, paid_on: dayKey(new Date()), note: 'Collected' } });
+        toast(`Marked ${fmtMoney(balance)} as paid`);
         openDrawer(id);
         refreshCurrent();
-      } catch (e) { toast('Payment failed: ' + e.message, 'err'); }
+      } catch (e) { payMark.disabled = false; toast('Could not save: ' + e.message, 'err'); }
     });
     $$('#drawer [data-pay-id]').forEach((b) => b.addEventListener('click', async () => {
       if (!confirm('Remove this payment?')) return;
       try { await api(`/api/payments/${b.dataset.payId}`, { method: 'DELETE' }); toast('Payment removed'); openDrawer(id); refreshCurrent(); }
-      catch (e) { toast('Failed: ' + e.message, 'err'); }
-    }));
-    $('#media-add').addEventListener('click', async () => {
-      const url = $('#media-url').value.trim();
-      if (!url) { toast('Enter a media URL', 'err'); return; }
-      try {
-        await api(`/api/shoots/${id}/media`, { body: { file_url: url, caption: $('#media-caption').value.trim() || null } });
-        toast('Link added');
-        openDrawer(id);
-      } catch (e) { toast('Failed: ' + e.message, 'err'); }
-    });
-    $$('#drawer [data-media-id]').forEach((b) => b.addEventListener('click', async () => {
-      try { await api(`/api/media/${b.dataset.mediaId}`, { method: 'DELETE' }); toast('Link removed'); openDrawer(id); }
       catch (e) { toast('Failed: ' + e.message, 'err'); }
     }));
   } catch (e) {
@@ -724,7 +859,7 @@ function buildExportCsv(rows) {
   sorted.forEach((s, i) => {
     const [y, m, d] = String(s.shoot_date).slice(0, 10).split('-').map(Number);
     const date = `${d}-${MONTH_NAMES[m - 1]}-${y}`;
-    const status = s.status === 'completed' ? 'Done' : '';
+    const status = appStatus(s.status) === 'completed' ? 'Done' : '';
     const fee = Math.round((+s.fee || 0) * 100) / 100;
     const mt = monthTotals[i];
     const row = [
@@ -767,6 +902,7 @@ $('#kpi-row').addEventListener('click', (e) => {
     month: state.filters.month, coordinator: state.filters.coordinator, status: '', paymentStatus: '', q: '', ...extra
   };
   state.shootsFiltersOpen = true;
+  state.shootsExpandAll = true;   // every month group open, not just this month
   $('#btn-shoots-filter').setAttribute('aria-expanded', 'true');
   $('#btn-shoots-filter').classList.add('active');
   setView('shoots');
@@ -776,6 +912,7 @@ $('#kpi-row').addEventListener('keydown', (e) => {
   const kpi = e.target.closest('.kpi[data-goto]');
   if (kpi) { e.preventDefault(); kpi.click(); }
 });
+$('#btn-shoots-reset').addEventListener('click', resetShootsFilters);
 // shoots tab: filters start hidden, funnel toggles them
 $('#btn-shoots-filter').addEventListener('click', () => {
   state.shootsFiltersOpen = !state.shootsFiltersOpen;
@@ -804,10 +941,13 @@ $('#btn-export').addEventListener('click', async () => {
     toast(`Exported ${rows.length} shoots`);
   } catch (e) { toast('Export failed: ' + e.message, 'err'); }
 });
-$$('.modal-backdrop [data-close]').forEach((b) => b.addEventListener('click', closeShootModal));
+$$('#shoot-modal [data-close]').forEach((b) => b.addEventListener('click', closeShootModal));
+$$('#access-modal [data-close]').forEach((b) => b.addEventListener('click', closeAccess));
+$('#access-modal').addEventListener('click', (e) => { if (e.target.id === 'access-modal') closeAccess(); });
+$('#btn-access').addEventListener('click', openAccess);
 $('#shoot-modal').addEventListener('click', (e) => { if (e.target.id === 'shoot-modal') closeShootModal(); });
 $('#drawer-backdrop').addEventListener('click', (e) => { if (e.target.id === 'drawer-backdrop') closeDrawer(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeShootModal(); closeDrawer(); } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeShootModal(); closeDrawer(); closeAccess(); } });
 ['f-month', 'f-coordinator', 'f-status', 'f-payment'].forEach((id) => $('#' + id).addEventListener('change', onFilterChange));
 $('#f-q').addEventListener('input', onFilterChange);
 $('#f-clear').addEventListener('click', clearFilters);
@@ -822,7 +962,9 @@ $('#btn-signout').addEventListener('click', async () => {
 (async function boot() {
   try {
     const { user } = await api('/api/auth/me');
+    state.user = user;
     $('#signed-in-user').textContent = user.email;
+    $('#btn-access').hidden = user.role !== 'owner';
   } catch (_error) { return; }
   pollHealth();
   await loadMeta();
