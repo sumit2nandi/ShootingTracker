@@ -131,6 +131,10 @@ main { padding: 16px 16px calc(110px + env(safe-area-inset-bottom)); max-width: 
 
 /* ---------- KPIs ---------- */
 .kpi-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+/* clickable tiles → open the matching filtered view in Shoots */
+.kpi[data-goto] { cursor: pointer; transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease; }
+.kpi[data-goto]:hover, .kpi[data-goto]:focus-visible { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-md); outline: none; }
+.kpi[data-goto]:active { transform: translateY(0); }
 @media (min-width: 640px) { .kpi-row { grid-template-columns: repeat(3, 1fr); } }
 @media (min-width: 1100px) { .kpi-row { grid-template-columns: repeat(5, 1fr); } }
 .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 13px 15px; box-shadow: var(--shadow-sm); }
@@ -195,7 +199,11 @@ tbody tr:hover { background: var(--surface-2); }
 .td-mono { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 
-/* mobile: keep ALL columns visible — the table scrolls horizontally */
+/* iOS/Android: 16px controls stop the page zoom when a field is focused */
+@media (max-width: 768px) {
+  #shoot-form input, #shoot-form select, #shoot-form textarea,
+  .cal-select, .filter-group select, .filter-group input { font-size: 16px; }
+}
 @media (max-width: 700px) {
   .shoots-table { min-width: 800px; }
   .upcoming-table { min-width: 620px; }
@@ -251,6 +259,37 @@ tbody tr:hover { background: var(--surface-2); }
 .cal-chip.postponed { border-color: var(--amber); background: var(--amber-soft); }
 .cal-chip.cancelled { border-color: var(--red); background: var(--red-soft); text-decoration: line-through; }
 .cal-more { font-size: 10.5px; color: var(--accent); cursor: pointer; padding: 0 7px; font-weight: 600; }
+/* calendar view toggle */
+.cal-viewtoggle { display: flex; gap: 3px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+.cal-viewtoggle .btn { padding: 5px 12px; font-size: 12.5px; border-radius: 8px; }
+.cal-viewtoggle .btn.active { background: var(--surface); color: var(--accent-strong); box-shadow: var(--shadow-sm); }
+/* calendar list view */
+.cal-list { display: flex; flex-direction: column; gap: 8px; }
+#view-calendar.list-mode .cal-head-row,
+#view-calendar.list-mode #cal-grid,
+#view-calendar.list-mode .cal-mobile-note { display: none; }
+.cal-list-row {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 12px; cursor: pointer; transition: border-color .13s, box-shadow .13s;
+}
+.cal-list-row:hover { border-color: var(--accent); box-shadow: var(--shadow-sm); }
+.cl-date { display: flex; flex-direction: column; align-items: center; min-width: 52px; flex: none; padding-top: 2px; }
+.cl-dow { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); font-weight: 650; }
+.cl-day { font-size: 20px; font-weight: 750; line-height: 1.15; }
+.cl-mon { font-size: 10.5px; color: var(--muted); }
+.cl-events { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.cl-event {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px;
+  padding: 7px 10px; cursor: pointer;
+}
+.cl-event:hover { border-color: var(--accent); }
+.cl-title { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-coord { flex: none; max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cl-fee { margin-left: auto; flex: none; font-size: 13px; font-weight: 650; }
+/* shoots-tab filter toggle */
+#btn-shoots-filter.active { color: var(--accent-strong); background: var(--accent-soft); border-color: rgba(37, 99, 235, .35); }
 .cal-mobile-note { display: block; text-align: center; margin-top: 10px; }
 @media (min-width: 768px) { .cal-mobile-note { display: none; } }
 @media (max-width: 640px) {

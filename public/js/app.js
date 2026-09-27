@@ -7,11 +7,13 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 
 const state = {
   view: 'dashboard',
-  filters: { month: '', coordinator: '', client: '', status: '', type: '', q: '' },
-  viewFilters: {}, // per-view filter memory (dashboard only keeps month + coordinator)
+  filters: { month: '', coordinator: '', status: '', q: '' },
+  viewFilters: {}, // per-view filter memory
   meta: { statuses: [], coordinators: [], clients: [], types: [], months: [] },
   cal: { year: new Date().getFullYear(), month: new Date().getMonth() },
+  calView: 'grid',
   calShoots: [],
+  shootsFiltersOpen: false, // shoots-tab filter bar starts collapsed
   dbOk: null
 };
 
@@ -95,9 +97,13 @@ async function loadMeta() {
   } catch { return; }
   fillSelect('#f-month', state.meta.months, '', true);
   fillSelect('#f-coordinator', state.meta.coordinators.map((c) => c.name));
-  fillSelect('#f-client', state.meta.clients);
-  fillSelect('#f-status', state.meta.statuses);
-  fillSelect('#f-type', state.meta.types);
+  // status filter: Planned / Completed (matching the form)
+  {
+    const el = $('#f-status');
+    const cur = el.value;
+    el.innerHTML = '<option value="">All</option><option value="planned">Planned</option><option value="completed">Completed</option>';
+    if (['planned', 'completed'].includes(cur)) el.value = cur;
+  }
   $('#dl-coordinators').innerHTML = state.meta.coordinators.map((c) => `<option value="${esc(c.name)}">`).join('');
   $('#dl-clients').innerHTML = state.meta.clients.map((c) => `<option value="${esc(c)}">`).join('');
   $('#dl-types').innerHTML = state.meta.types.map((t) => `<option value="${esc(t)}">`).join('');
@@ -161,15 +167,13 @@ function readFilters() {
   state.filters = {
     month: $('#f-month').value,
     coordinator: $('#f-coordinator').value,
-    client: $('#f-client').value,
     status: $('#f-status').value,
-    type: $('#f-type').value,
     q: $('#f-q').value.trim()
   };
 }
 function clearFilters() {
-  $('#f-month').value = ''; $('#f-coordinator').value = ''; $('#f-client').value = '';
-  $('#f-status').value = ''; $('#f-type').value = ''; $('#f-q').value = '';
+  $('#f-month').value = ''; $('#f-coordinator').value = '';
+  $('#f-status').value = ''; $('#f-q').value = '';
   readFilters(); refreshCurrent();
 }
 
@@ -180,25 +184,24 @@ function setView(v) {
   state.view = v;
   $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === v));
   for (const el of $$('.view')) el.classList.toggle('hidden', el.id !== `view-${v}`);
-  $('#filterbar').classList.toggle('hidden', v === 'calendar');
+  const showFilters = v === 'dashboard' || (v === 'shoots' && state.shootsFiltersOpen);
+  $('#filterbar').classList.toggle('hidden', v === 'calendar' || !showFilters);
   $('#filterbar').dataset.for = v;
   restoreViewFilters(v);
-  refreshCurrent();
+  refreshCurrent(false);
 }
 
 function restoreViewFilters(v) {
-  const f = state.viewFilters[v] || { month: '', coordinator: '', client: '', status: '', type: '', q: '' };
-  state.filters = { ...f };
-  $('#f-month').value = f.month || '';
-  $('#f-coordinator').value = f.coordinator || '';
-  $('#f-client').value = f.client || '';
-  $('#f-status').value = f.status || '';
-  $('#f-type').value = f.type || '';
-  $('#f-q').value = f.q || '';
+  const f = state.viewFilters[v] || { month: '', coordinator: '', status: '', q: '' };
+  state.filters = { month: f.month || '', coordinator: f.coordinator || '', status: f.status || '', q: f.q || '' };
+  $('#f-month').value = state.filters.month;
+  $('#f-coordinator').value = state.filters.coordinator;
+  $('#f-status').value = ['planned', 'completed'].includes(state.filters.status) ? state.filters.status : '';
+  $('#f-q').value = state.filters.q;
 }
 
-function refreshCurrent() {
-  readFilters();
+function refreshCurrent(reRead = true) {
+  if (reRead) readFilters();
   if (state.view === 'dashboard') return loadDashboard();
   if (state.view === 'shoots') return loadShoots();
   if (state.view === 'calendar') return loadCalendar();
@@ -226,12 +229,13 @@ async function loadDashboard() {
 
 function renderDashboard(d, daily) {
   const k = d.kpi || {};
+  // tiles are clickable → open the Shoots tab with the matching filter
   $('#kpi-row').innerHTML = `
-    <div class="kpi accent"><div class="kpi-label">Shoots</div><div class="kpi-value">${k.shoots ?? 0}</div><div class="kpi-sub">${k.completed ?? 0} completed</div></div>
-    <div class="kpi violet"><div class="kpi-label">Total fee value</div><div class="kpi-value">${fmtMoney(k.total_fee)}</div><div class="kpi-sub">booked earnings</div></div>
-    <div class="kpi amber"><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmtMoney(k.outstanding)}</div><div class="kpi-sub">${k.unpaidshoots ?? 0} unpaid shoots</div></div>
-    <div class="kpi"><div class="kpi-label">Active (planned/confirmed)</div><div class="kpi-value">${k.active ?? 0}</div><div class="kpi-sub">on the books</div></div>
-    <div class="kpi red"><div class="kpi-label">Completed</div><div class="kpi-value">${k.completed ?? 0}</div><div class="kpi-sub">of ${k.shoots ?? 0} total</div></div>`;
+    <div class="kpi accent" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Shoots</div><div class="kpi-value">${k.shoots ?? 0}</div><div class="kpi-sub">${k.completed ?? 0} completed</div></div>
+    <div class="kpi violet" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Total fee value</div><div class="kpi-value">${fmtMoney(k.total_fee)}</div><div class="kpi-sub">booked earnings</div></div>
+    <div class="kpi amber" data-goto='{"paymentStatus":"unpaid"}' role="button" tabindex="0"><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmtMoney(k.outstanding)}</div><div class="kpi-sub">${k.unpaidshoots ?? 0} unpaid shoots</div></div>
+    <div class="kpi" data-goto='{"status":"planned,confirmed"}' role="button" tabindex="0"><div class="kpi-label">Active (planned/confirmed)</div><div class="kpi-value">${k.active ?? 0}</div><div class="kpi-sub">on the books</div></div>
+    <div class="kpi red" data-goto='{"status":"completed"}' role="button" tabindex="0"><div class="kpi-label">Completed</div><div class="kpi-value">${k.completed ?? 0}</div><div class="kpi-sub">of ${k.shoots ?? 0} total</div></div>`;
 
   renderEarnings(d.monthly || [], daily);
   renderStatusDonut(d.byStatus || []);
@@ -255,7 +259,7 @@ function renderEarnings(monthly, daily) {
     wrap.innerHTML = `<div class="bars">${daily.map((d) => `
       <div class="bar-col">
         <div class="bar-pair">
-          <div class="bar fee" style="height:${(d.fee / max) * 100}%" title="${label(d.date)} — ${fmtMoney(d.fee)}"><span class="bar-val">${d.fee ? fmtMoney(d.fee) : ''}</span></div>
+          <div class="bar fee" style="height:${(d.fee / max) * 100}%" title="${label(d.date)} — ${fmtMoney(d.fee)}" data-lbl="${label(d.date)}" data-val="${d.fee}"><span class="bar-val">${d.fee ? fmtMoney(d.fee) : ''}</span></div>
         </div>
         <div class="bar-label">${+d.date.slice(8, 10)}</div>
       </div>`).join('')}</div>`;
@@ -274,7 +278,7 @@ function renderEarnings(monthly, daily) {
   wrap.innerHTML = `<div class="bars">${months.map((m) => `
       <div class="bar-col">
         <div class="bar-pair">
-          <div class="bar fee" style="height:${(m.fee / max) * 100}%" title="${label(m.ym)} — ${fmtMoney(m.fee)}"><span class="bar-val">${m.fee ? fmtMoney(m.fee) : ''}</span></div>
+          <div class="bar fee" style="height:${(m.fee / max) * 100}%" title="${label(m.ym)} — ${fmtMoney(m.fee)}" data-lbl="${label(m.ym)}" data-val="${m.fee}"><span class="bar-val">${m.fee ? fmtMoney(m.fee) : ''}</span></div>
         </div>
         <div class="bar-label">${label(m.ym)}</div>
       </div>`).join('')}</div>`;
@@ -373,8 +377,51 @@ async function loadCalendar() {
       }
     }
     state.calByDate = byDate;
-    renderCalendarGrid();
+    if (state.calView === 'list') renderCalendarList();
+    else renderCalendarGrid();
   } catch (e) { toast('Calendar: ' + e.message, 'err'); }
+}
+
+function renderCalendarList() {
+  const { year, month } = state.cal;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const wrap = $('#cal-list');
+  const rows = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const k = dayKey(new Date(year, month, d));
+    const shoots = (state.calByDate || {})[k];
+    if (!shoots || !shoots.length) continue;
+    const dt = new Date(year, month, d);
+    rows.push(`
+      <div class="cal-list-row" data-date="${k}">
+        <div class="cl-date"><span class="cl-dow">${DOW[dt.getDay()]}</span><span class="cl-day">${d}</span><span class="cl-mon">${MONTH_SHORT[month]}</span></div>
+        <div class="cl-events">
+          ${shoots.map((s) => `<div class="cl-event" data-id="${s.id}">
+            <span class="cl-title">${esc(s.title)}</span>
+            ${s.coordinator ? `<span class="muted small cl-coord">${esc(s.coordinator)}</span>` : ''}
+            <span class="cl-fee td-mono">${fmtMoney(s.fee)}</span>
+            <span class="pill ${s.status}">${s.status}</span>
+          </div>`).join('')}
+        </div>
+      </div>`);
+  }
+  wrap.innerHTML = rows.length ? rows.join('') :
+    `<div class="empty">No shoots in ${MONTH_NAMES[month]} ${year} — use the Grid view to tap a day and add one.</div>`;
+  $$('#cal-list .cl-event').forEach((el) => el.addEventListener('click', (e) => { e.stopPropagation(); openDrawer(+el.dataset.id); }));
+  $$('#cal-list .cal-list-row').forEach((r) => r.addEventListener('click', () => openShootModal(null, r.dataset.date)));
+}
+
+function setCalView(v) {
+  state.calView = v;
+  const listMode = v === 'list';
+  $('#view-calendar').classList.toggle('list-mode', listMode);
+  $('#cal-list').classList.toggle('hidden', !listMode);
+  $('#cal-view-grid').classList.toggle('active', !listMode);
+  $('#cal-view-list').classList.toggle('active', listMode);
+  $('#cal-view-grid').setAttribute('aria-pressed', String(!listMode));
+  $('#cal-view-list').setAttribute('aria-pressed', String(listMode));
+  if (listMode) renderCalendarList();
+  else renderCalendarGrid();
 }
 
 function renderCalendarGrid() {
@@ -464,8 +511,8 @@ function renderShoots(rows) {
           <td class="col-coord">${esc(s.coordinator || '—')}</td>
           <td class="col-venue">${esc([s.venue, s.location].filter(Boolean).join(', ') || '—')}</td>
           <td class="col-fee num td-mono">${fmtMoney(s.fee)}</td>
-          <td class="col-payst"><span class="pill ${s.payment_status}">${s.payment_status}</span></td>
-          <td class="col-status"><span class="pill ${s.status}">${s.status}</span></td>
+          <td class="col-payst"><span class="pill ${s.payment_status}">${s.payment_status}</span><span class="tick-ico ${s.payment_status === 'paid' ? 'ok' : 'bad'}" title="${s.payment_status === 'paid' ? 'Paid' : 'Not fully paid'}">${s.payment_status === 'paid' ? '✓' : '✕'}</span></td>
+          <td class="col-status"><span class="pill ${s.status}">${s.status}</span><span class="tick-ico ${s.status === 'completed' ? 'ok' : 'bad'}" title="${s.status}">${s.status === 'completed' ? '✓' : '✕'}</span></td>
         </tr>`).join('')}</tbody>
     </table>`;
   $$('#shoots-table tbody tr').forEach((tr) => tr.addEventListener('click', () => openDrawer(+tr.dataset.id)));
@@ -684,6 +731,42 @@ function downloadText(filename, text, type = 'text/csv;charset=utf-8') {
 /* ---------- global wiring ---------- */
 
 $$('.tab').forEach((t) => t.addEventListener('click', () => setView(t.dataset.view)));
+// chart bars: click/tap to show the number
+$('#chart-monthly').addEventListener('click', (e) => {
+  const b = e.target.closest('.bar[data-val]');
+  if (!b) return;
+  toast(`${b.dataset.lbl}: ${fmtMoney(b.dataset.val)}`);
+});
+// dashboard KPI tiles: click → Shoots tab with the matching filter
+$('#kpi-row').addEventListener('click', (e) => {
+  const kpi = e.target.closest('.kpi[data-goto]');
+  if (!kpi) return;
+  let extra = {};
+  try { extra = JSON.parse(kpi.dataset.goto || '{}'); } catch { extra = {}; }
+  state.viewFilters.shoots = {
+    month: state.filters.month, coordinator: state.filters.coordinator, status: '', q: '', ...extra
+  };
+  state.shootsFiltersOpen = true;
+  $('#btn-shoots-filter').setAttribute('aria-expanded', 'true');
+  $('#btn-shoots-filter').classList.add('active');
+  setView('shoots');
+});
+$('#kpi-row').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const kpi = e.target.closest('.kpi[data-goto]');
+  if (kpi) { e.preventDefault(); kpi.click(); }
+});
+// shoots tab: filters start hidden, funnel toggles them
+$('#btn-shoots-filter').addEventListener('click', () => {
+  state.shootsFiltersOpen = !state.shootsFiltersOpen;
+  $('#filterbar').classList.toggle('hidden', !state.shootsFiltersOpen);
+  $('#btn-shoots-filter').setAttribute('aria-expanded', String(state.shootsFiltersOpen));
+  $('#btn-shoots-filter').classList.toggle('active', state.shootsFiltersOpen);
+  if (state.shootsFiltersOpen) readFilters();
+});
+// calendar: grid / list views
+$('#cal-view-grid').addEventListener('click', () => setCalView('grid'));
+$('#cal-view-list').addEventListener('click', () => setCalView('list'));
 $('#sel-coordinator').addEventListener('change', () => {
   const ni = $('#coord-new-input');
   if ($('#sel-coordinator').value === '__new__') { ni.hidden = false; ni.focus(); }
@@ -705,7 +788,7 @@ $$('.modal-backdrop [data-close]').forEach((b) => b.addEventListener('click', cl
 $('#shoot-modal').addEventListener('click', (e) => { if (e.target.id === 'shoot-modal') closeShootModal(); });
 $('#drawer-backdrop').addEventListener('click', (e) => { if (e.target.id === 'drawer-backdrop') closeDrawer(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeShootModal(); closeDrawer(); } });
-['f-month', 'f-coordinator', 'f-client', 'f-status', 'f-type'].forEach((id) => $('#' + id).addEventListener('change', onFilterChange));
+['f-month', 'f-coordinator', 'f-status'].forEach((id) => $('#' + id).addEventListener('change', onFilterChange));
 $('#f-q').addEventListener('input', onFilterChange);
 $('#f-clear').addEventListener('click', clearFilters);
 
