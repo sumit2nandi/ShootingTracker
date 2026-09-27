@@ -1,0 +1,23 @@
+{
+  "name": "shooting-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shoot tracking tool with dashboard, calendar and CRUD, backed by Postgres",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "migrate": "node server/migrate.js",
+    "import": "node server/import.js",
+    "seed:demo": "node server/seed-demo.js",
+    "dev:pg": "node scripts/dev-postgres.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "embedded-postgres": "18.4.0-beta.17"
+  }
+}

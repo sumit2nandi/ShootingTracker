@@ -1,0 +1,614 @@
+'use strict';
+/* ================= ShootingTracker SPA ================= */
+
+const $ = (sel, el = document) => el.querySelector(sel);
+const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const state = {
+  view: 'dashboard',
+  filters: { month: '', coordinator: '', client: '', status: '', type: '', q: '' },
+  meta: { statuses: [], coordinators: [], clients: [], types: [], months: [] },
+  cal: { year: new Date().getFullYear(), month: new Date().getMonth() },
+  calShoots: [],
+  importPayload: null,
+  dbOk: null
+};
+
+/* ---------- api ---------- */
+
+async function api(path, opts = {}) {
+  const init = { method: opts.method || (opts.body ? 'POST' : 'GET') };
+  if (opts.body !== undefined) {
+    if (opts.raw) { init.body = opts.body; }
+    else { init.body = JSON.stringify(opts.body); init.headers = { 'Content-Type': 'application/json' }; }
+  }
+  const res = await fetch(path, init);
+  const isJson = (res.headers.get('content-type') || '').includes('json');
+  const data = isJson ? await res.json() : await res.text();
+  if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+  return data;
+}
+
+function toast(msg, kind = 'ok') {
+  const el = document.createElement('div');
+  el.className = `toast ${kind}`;
+  el.textContent = msg;
+  $('#toasts').appendChild(el);
+  setTimeout(() => { el.classList.add('leaving'); setTimeout(() => el.remove(), 300); }, 4200);
+}
+
+/* ---------- formatting ---------- */
+
+const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+function fmtDate(s) {
+  if (!s) return '—';
+  const [y, m, d] = String(s).slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return s;
+  return `${d} ${MONTH_SHORT[m - 1]} ${y}`;
+}
+function fmtTime(t) {
+  if (!t) return '';
+  const [h, mi] = String(t).split(':');
+  let hh = +h; const ap = hh >= 12 ? 'pm' : 'am'; hh = hh % 12 || 12;
+  return `${hh}:${mi} ${ap}`;
+}
+
+/* ---------- db status ---------- */
+
+async function pollHealth() {
+  const pill = $('#db-status');
+  try {
+    const h = await api('/api/health');
+    state.dbOk = h.ok;
+    pill.className = `db-pill ${h.ok ? 'ok' : 'bad'}`;
+    pill.title = h.ok ? `Connected (${h.latencyMs} ms)` : `DB unreachable: ${h.detail}`;
+    $('.db-pill-text', pill).textContent = h.ok ? 'DB connected' : 'DB unreachable';
+    if (!h.ok) $('#main').insertAdjacentHTML('afterbegin', dbBanner(h.detail));
+  } catch (e) {
+    state.dbOk = false;
+    pill.className = 'db-pill bad';
+    $('.db-pill-text', pill).textContent = 'offline';
+  }
+  if (state.dbOk) { const b = $('#db-banner'); if (b) b.remove(); }
+}
+function dbBanner(detail) {
+  if ($('#db-banner')) return '';
+  return `<div id="db-banner" class="card" style="border-color:rgba(239,93,111,.5)">
+    <b>⚠️ Database unreachable.</b> <span class="muted">${esc(detail)}</span><br/>
+    <span class="muted small">Check <code>.env → DATABASE_URL</code> (Aiven: add this host's IP to the allowlist, and apply
+    <code>server/schema.sql</code> if you haven't). Retrying automatically…</span>
+  </div>`;
+}
+setInterval(pollHealth, 30000);
+
+/* ---------- meta + filters ---------- */
+
+async function loadMeta() {
+  try {
+    state.meta = await api('/api/meta');
+  } catch { return; }
+  fillSelect('#f-month', state.meta.months, '', true);
+  fillSelect('#f-coordinator', state.meta.coordinators.map((c) => c.name));
+  fillSelect('#f-client', state.meta.clients);
+  fillSelect('#f-status', state.meta.statuses);
+  fillSelect('#f-type', state.meta.types);
+  $('#dl-coordinators').innerHTML = state.meta.coordinators.map((c) => `<option value="${esc(c.name)}">`).join('');
+  $('#dl-clients').innerHTML = state.meta.clients.map((c) => `<option value="${esc(c)}">`).join('');
+  $('#dl-types').innerHTML = state.meta.types.map((t) => `<option value="${esc(t)}">`).join('');
+}
+
+function fillSelect(sel, values, selected = '', withAll = false) {
+  const el = $(sel);
+  const cur = el.value;
+  el.innerHTML = (withAll ? '<option value="">All</option>' : '<option value="">All</option>') +
+    values.map((v) => {
+      const label = withAll && v !== 'all' ? monthLabel(v) : v;
+      return `<option value="${esc(v)}" ${v === selected ? 'selected' : ''}>${esc(label)}</option>`;
+    }).join('');
+  if (cur && values.includes(cur) || (withAll && cur === 'all')) el.value = cur;
+}
+function monthLabel(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  return `${MONTH_SHORT[m - 1]} ${y}`;
+}
+
+function filterParams() {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(state.filters)) if (v) p.set(k, v);
+  return p.toString();
+}
+
+let filterTimer = null;
+function onFilterChange() {
+  clearTimeout(filterTimer);
+  filterTimer = setTimeout(() => refreshCurrent(), 180);
+}
+function readFilters() {
+  state.filters = {
+    month: $('#f-month').value,
+    coordinator: $('#f-coordinator').value,
+    client: $('#f-client').value,
+    status: $('#f-status').value,
+    type: $('#f-type').value,
+    q: $('#f-q').value.trim()
+  };
+}
+function clearFilters() {
+  $('#f-month').value = ''; $('#f-coordinator').value = ''; $('#f-client').value = '';
+  $('#f-status').value = ''; $('#f-type').value = ''; $('#f-q').value = '';
+  readFilters(); refreshCurrent();
+}
+
+/* ---------- routing ---------- */
+
+function setView(v) {
+  state.view = v;
+  $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === v));
+  for (const el of $$('.view')) el.classList.toggle('hidden', el.id !== `view-${v}`);
+  $('#filterbar').classList.toggle('hidden', v === 'calendar' || v === 'import');
+  refreshCurrent();
+}
+
+function refreshCurrent() {
+  readFilters();
+  if (state.view === 'dashboard') return loadDashboard();
+  if (state.view === 'shoots') return loadShoots();
+  if (state.view === 'calendar') return loadCalendar();
+}
+
+/* ---------- dashboard ---------- */
+
+async function loadDashboard() {
+  try {
+    const d = await api('/api/dashboard?' + filterParams());
+    renderDashboard(d);
+  } catch (e) { toast('Dashboard: ' + e.message, 'err'); }
+}
+
+function renderDashboard(d) {
+  const k = d.kpi || {};
+  $('#kpi-row').innerHTML = `
+    <div class="kpi accent"><div class="kpi-label">Shoots</div><div class="kpi-value">${k.shoots ?? 0}</div><div class="kpi-sub">${k.completed ?? 0} completed</div></div>
+    <div class="kpi violet"><div class="kpi-label">Total fee value</div><div class="kpi-value">${fmtMoney(k.total_fee)}</div><div class="kpi-sub">booked earnings</div></div>
+    <div class="kpi green"><div class="kpi-label">Collected</div><div class="kpi-value">${fmtMoney(k.total_paid)}</div><div class="kpi-sub">${k.paidshoots ?? 0} fully paid</div></div>
+    <div class="kpi amber"><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmtMoney(k.outstanding)}</div><div class="kpi-sub">${k.unpaidshoots ?? 0} unpaid shoots</div></div>
+    <div class="kpi"><div class="kpi-label">Active (planned/confirmed)</div><div class="kpi-value">${k.active ?? 0}</div><div class="kpi-sub">on the books</div></div>
+    <div class="kpi red"><div class="kpi-label">Completed</div><div class="kpi-value">${k.completed ?? 0}</div><div class="kpi-sub">of ${k.shoots ?? 0} total</div></div>`;
+
+  renderMonthly(d.monthly || []);
+  renderStatusDonut(d.byStatus || []);
+  renderCoordinators(d.byCoordinator || []);
+  renderTypes(d.byType || []);
+  renderUpcoming(d.upcoming || []);
+}
+
+function renderMonthly(monthly) {
+  const months = monthly.slice(-12).reverse().map((m) => ({ ym: m.ym, fee: +m.fee, paid: +m.paid }));
+  const wrap = $('#chart-monthly');
+  if (!months.length) { wrap.innerHTML = '<div class="empty">No data for this filter</div>'; return; }
+  const max = Math.max(...months.map((m) => Math.max(m.fee, m.paid)), 1);
+  const label = (ym) => { const [y, m] = ym.split('-').map(Number); return `${MONTH_SHORT[m - 1]} ${String(y).slice(2)}`; };
+  wrap.innerHTML = `
+    <div class="bars">${months.map((m) => `
+      <div class="bar-col">
+        <div class="bar-pair">
+          <div class="bar fee" style="height:${(m.fee / max) * 100}%" title="${label(m.ym)} — fee ${fmtMoney(m.fee)}"><span class="bar-val">${m.fee ? fmtMoney(m.fee) : ''}</span></div>
+          <div class="bar paid" style="height:${(m.paid / max) * 100}%" title="${label(m.ym)} — collected ${fmtMoney(m.paid)}"><span class="bar-val">${m.paid ? fmtMoney(m.paid) : ''}</span></div>
+        </div>
+        <div class="bar-label">${label(m.ym)}</div>
+      </div>`).join('')}
+    </div>
+    <div class="chart-legend"><span><i style="background:var(--accent)"></i>Fee value</span><span><i style="background:var(--green)"></i>Collected</span></div>`;
+  $('#chart-range').textContent = `${label(months[0].ym)} – ${label(months[months.length - 1].ym)}`;
+}
+
+const STATUS_COLORS = { planned: '#9fb4d8', confirmed: '#38cfd6', completed: '#34c98e', postponed: '#f5b93c', cancelled: '#ef5d6f' };
+
+function renderStatusDonut(byStatus) {
+  const wrap = $('#chart-status');
+  const total = byStatus.reduce((a, b) => a + b.n, 0);
+  if (!total) { wrap.innerHTML = '<div class="empty">No data for this filter</div>'; return; }
+  const R = 56, C = 2 * Math.PI * R;
+  let offset = 0;
+  const segs = byStatus.map((s) => {
+    const frac = s.n / total;
+    const seg = { color: STATUS_COLORS[s.status] || '#888', dash: `${frac * C} ${C}`, off: -offset * C, status: s.status, n: s.n };
+    offset += frac;
+    return seg;
+  });
+  wrap.innerHTML = `
+    <svg width="160" height="160" viewBox="0 0 160 160">
+      <g transform="rotate(-90 80 80)">
+        ${segs.map((s) => `<circle cx="80" cy="80" r="${R}" fill="none" stroke="${s.color}" stroke-width="22" stroke-dasharray="${s.dash}" stroke-dashoffset="${s.off}"></circle>`).join('')}
+      </g>
+      <text x="80" y="76" text-anchor="middle" fill="#e8edf5" font-size="26" font-weight="700">${total}</text>
+      <text x="80" y="97" text-anchor="middle" fill="#8b98ad" font-size="11">shoots</text>
+    </svg>
+    <div class="donut-legend">
+      ${byStatus.map((s) => `<div class="row"><i style="background:${STATUS_COLORS[s.status] || '#888'}"></i>${esc(s.status)}<span class="n">${s.n}</span></div>`).join('')}
+    </div>`;
+}
+
+function renderCoordinators(list) {
+  const wrap = $('#list-coordinators');
+  if (!list.length) { wrap.innerHTML = '<div class="empty">No data for this filter</div>'; return; }
+  const max = Math.max(...list.map((c) => +c.fee), 1);
+  wrap.innerHTML = `<div class="coord-list">` + list.map((c) => `
+    <div class="coord-row">
+      <div class="coord-top"><span>${esc(c.name)}</span><span class="amt">${c.shoots} shoots · ${fmtMoney(c.fee)}</span></div>
+      <div class="coord-track"><div class="coord-fill" style="width:${Math.max(2, (+c.fee / max) * 100)}%"></div></div>
+    </div>`).join('') + `</div>`;
+}
+
+function renderTypes(list) {
+  const wrap = $('#list-types');
+  if (!list.length) { wrap.innerHTML = '<div class="empty">No data for this filter</div>'; return; }
+  wrap.innerHTML = list.map((t) => `<div class="type-chip"><b>${t.shoots}</b> ${esc(t.type)} <span class="amt">${fmtMoney(t.fee)}</span></div>`).join('');
+}
+
+function renderUpcoming(list) {
+  const wrap = $('#upcoming-table');
+  if (!list.length) { wrap.innerHTML = '<div class="empty">Nothing upcoming for this filter 🎉</div>'; return; }
+  wrap.innerHTML = `
+    <table><thead><tr><th>Date</th><th>Title</th><th>Client</th><th>Venue / Location</th><th>Coordinator</th><th class="num">Fee</th><th>Status</th></tr></thead>
+    <tbody>${list.map((s) => `
+      <tr data-id="${s.id}">
+        <td class="td-mono">${fmtDate(s.shoot_date)}</td>
+        <td>${esc(s.title)}</td>
+        <td>${esc(s.client_name || '—')}</td>
+        <td>${esc([s.venue, s.location].filter(Boolean).join(', ') || '—')}</td>
+        <td>${esc(s.coordinator || '—')}</td>
+        <td class="num td-mono">${fmtMoney(s.fee)}</td>
+        <td><span class="pill ${s.status}">${s.status}</span></td>
+      </tr>`).join('')}</tbody></table>`;
+  $$('#upcoming-table tbody tr').forEach((tr) => tr.addEventListener('click', () => openDrawer(+tr.dataset.id)));
+}
+
+/* ---------- calendar ---------- */
+
+async function loadCalendar() {
+  const { year, month } = state.cal;
+  const first = new Date(year, month, 1);
+  const last = new Date(year, month + 1, 0);
+  $('#cal-title').textContent = `${MONTH_NAMES[month]} ${year}`;
+  try {
+    const shoots = await api(`/api/shoots?from=${dayKey(first)}&to=${dayKey(last)}`);
+    // map by date (support multi-day ranges)
+    const byDate = {};
+    for (const s of shoots) {
+      let d = new Date(s.shoot_date + 'T00:00:00');
+      const end = s.end_date ? new Date(s.end_date + 'T00:00:00') : d;
+      for (let i = 0; i < 30 && d <= end; i++) {
+        const k = dayKey(d);
+        (byDate[k] = byDate[k] || []).push(s);
+        d = new Date(d.getTime() + 86400000);
+      }
+    }
+    state.calByDate = byDate;
+    renderCalendarGrid();
+  } catch (e) { toast('Calendar: ' + e.message, 'err'); }
+}
+
+function renderCalendarGrid() {
+  const { year, month } = state.cal;
+  const first = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startDow = first.getDay();
+  const todayK = dayKey(new Date());
+  const cells = [];
+  const totalCells = Math.ceil((startDow + daysInMonth) / 7) * 7;
+  for (let i = 0; i < totalCells; i++) {
+    const d = new Date(year, month, 1 - startDow + i);
+    const k = dayKey(d);
+    const inMonth = d.getMonth() === month;
+    const shoots = (state.calByDate || {})[k] || [];
+    const shown = shoots.slice(0, 3);
+    cells.push(`
+      <div class="cal-cell ${inMonth ? '' : 'dim'} ${k === todayK ? 'today' : ''}" data-date="${k}">
+        <div class="cal-dayno">${d.getDate()}</div>
+        <div class="cal-chips">
+          ${shown.map((s) => `<div class="cal-chip ${s.status}" data-id="${s.id}" title="${esc(s.title)}${s.venue ? ' — ' + esc(s.venue) : ''}">${esc(s.title)}</div>`).join('')}
+          ${shoots.length > 3 ? `<div class="cal-more" data-date="${k}">+${shoots.length - 3} more…</div>` : ''}
+        </div>
+      </div>`);
+  }
+  $('#cal-grid').innerHTML = cells.join('');
+  // legend
+  $('#cal-legend').innerHTML = Object.entries(STATUS_COLORS).map(([s, c]) => `<span><i style="background:${c}"></i>${s}</span>`).join('');
+  // events
+  $$('#cal-grid .cal-chip').forEach((chip) => chip.addEventListener('click', (ev) => { ev.stopPropagation(); openDrawer(+chip.dataset.id); }));
+  $$('#cal-grid .cal-cell').forEach((cell) => cell.addEventListener('click', () => openShootModal(null, cell.dataset.date)));
+  $$('#cal-grid .cal-more').forEach((m) => m.addEventListener('click', (ev) => { ev.stopPropagation(); openDayPanel(ev.currentTarget.dataset.date); }));
+}
+
+function openDayPanel(dateK) {
+  const shoots = (state.calByDate || {})[dateK] || [];
+  const drawer = $('#drawer');
+  drawer.innerHTML = `
+    <h2>${fmtDate(dateK)}</h2>
+    <div class="sub">${shoots.length} shoot${shoots.length === 1 ? '' : 's'} on this day</div>
+    ${shoots.map((s) => `
+      <div class="pay-row" data-id="${s.id}" style="cursor:pointer">
+        <span class="pill ${s.status}">${s.status}</span>
+        <span>${esc(s.title)}</span>
+        <span class="amt">${fmtMoney(s.fee)}</span>
+      </div>`).join('')}
+    <div class="drawer-actions">
+      <button class="btn btn-primary" id="dp-add">+ Add shoot on ${fmtDate(dateK)}</button>
+      <button class="btn btn-ghost" data-close>Close</button>
+    </div>`;
+  $('#drawer-backdrop').classList.remove('hidden');
+  $$('#drawer .pay-row[data-id]').forEach((r) => r.addEventListener('click', () => openDrawer(+r.dataset.id)));
+  $('#dp-add').addEventListener('click', () => { $('#drawer-backdrop').classList.add('hidden'); openShootModal(null, dateK); });
+}
+
+$('#cal-prev').addEventListener('click', () => { state.cal.month--; if (state.cal.month < 0) { state.cal.month = 11; state.cal.year--; } loadCalendar(); });
+$('#cal-next').addEventListener('click', () => { state.cal.month++; if (state.cal.month > 11) { state.cal.month = 0; state.cal.year++; } loadCalendar(); });
+$('#cal-today').addEventListener('click', () => { const n = new Date(); state.cal.year = n.getFullYear(); state.cal.month = n.getMonth(); loadCalendar(); });
+
+/* ---------- shoots table ---------- */
+
+async function loadShoots() {
+  try {
+    const rows = await api('/api/shoots?' + filterParams());
+    renderShoots(rows);
+  } catch (e) { toast('Shoots: ' + e.message, 'err'); }
+}
+
+function renderShoots(rows) {
+  $('#shoots-count').textContent = `${rows.length} shown`;
+  const wrap = $('#shoots-table');
+  if (!rows.length) { wrap.innerHTML = '<div class="empty">No shoots match. Clear filters or add one with “+ New shoot”.</div>'; return; }
+  wrap.innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Date</th><th>Title</th><th>Client</th><th>Type</th><th>Coordinator</th>
+        <th>Venue / Location</th><th class="num">Fee</th><th class="num">Collected</th><th>Payment</th><th>Status</th>
+      </tr></thead>
+      <tbody>${rows.map((s) => `
+        <tr data-id="${s.id}">
+          <td class="td-mono">${fmtDate(s.shoot_date)}${s.end_date && s.end_date !== s.shoot_date ? ` → ${fmtDate(s.end_date)}` : ''}</td>
+          <td>${esc(s.title)}${s.start_time ? `<div class="muted small">${fmtTime(s.start_time)}</div>` : ''}</td>
+          <td>${esc(s.client_name || '—')}</td>
+          <td>${esc(s.shoot_type || '—')}</td>
+          <td>${esc(s.coordinator || '—')}</td>
+          <td>${esc([s.venue, s.location].filter(Boolean).join(', ') || '—')}</td>
+          <td class="num td-mono">${fmtMoney(s.fee)}</td>
+          <td class="num td-mono">${fmtMoney(s.paid_amount)}</td>
+          <td><span class="pill ${s.payment_status}">${s.payment_status}</span></td>
+          <td><span class="pill ${s.status}">${s.status}</span></td>
+        </tr>`).join('')}</tbody>
+    </table>`;
+  $$('#shoots-table tbody tr').forEach((tr) => tr.addEventListener('click', () => openDrawer(+tr.dataset.id)));
+}
+
+/* ---------- shoot modal ---------- */
+
+function openShootModal(shoot, presetDate) {
+  const f = $('#shoot-form');
+  f.reset();
+  $('#shoot-modal-title').textContent = shoot ? 'Edit shoot' : 'New shoot';
+  const set = (name, val) => { f[name].value = val ?? ''; };
+  set('id', shoot?.id); set('title', shoot?.title); set('client_name', shoot?.client_name);
+  set('shoot_type', shoot?.shoot_type); set('shoot_date', shoot?.shoot_date || presetDate || dayKey(new Date()));
+  set('end_date', shoot?.end_date); set('start_time', shoot?.start_time ? String(shoot.start_time).slice(0, 5) : '');
+  set('end_time', shoot?.end_time ? String(shoot.end_time).slice(0, 5) : '');
+  set('venue', shoot?.venue); set('location', shoot?.location);
+  set('coordinator', shoot?.coordinator); set('fee', shoot?.fee ?? 0);
+  set('status', shoot?.status || 'planned'); set('contact_name', shoot?.contact_name);
+  set('contact_phone', shoot?.contact_phone); set('notes', shoot?.notes);
+  $('#shoot-modal').classList.remove('hidden');
+  setTimeout(() => f.title.focus(), 50);
+}
+function closeShootModal() { $('#shoot-modal').classList.add('hidden'); }
+
+$('#btn-new-shoot').addEventListener('click', () => openShootModal(null));
+$('#btn-save-shoot').addEventListener('click', async () => {
+  const f = $('#shoot-form');
+  const body = {
+    title: f.title.value.trim(), client_name: f.client_name.value.trim() || null,
+    shoot_type: f.shoot_type.value.trim() || null, shoot_date: f.shoot_date.value,
+    end_date: f.end_date.value || null, start_time: f.start_time.value || null,
+    end_time: f.end_time.value || null, venue: f.venue.value.trim() || null,
+    location: f.location.value.trim() || null, coordinator: f.coordinator.value.trim() || null,
+    fee: f.fee.value || 0, status: f.status.value, contact_name: f.contact_name.value.trim() || null,
+    contact_phone: f.contact_phone.value.trim() || null, notes: f.notes.value.trim() || null
+  };
+  if (!body.title || !body.shoot_date) { toast('Title and shoot date are required', 'err'); return; }
+  const id = f.id.value;
+  try {
+    if (id) { await api(`/api/shoots/${id}`, { method: 'PUT', body }); toast('Shoot updated'); }
+    else { await api('/api/shoots', { body }); toast('Shoot added'); }
+    closeShootModal();
+    loadMeta();
+    refreshCurrent();
+  } catch (e) { toast('Save failed: ' + e.message, 'err'); }
+});
+
+/* ---------- detail drawer ---------- */
+
+async function openDrawer(id) {
+  const drawer = $('#drawer');
+  drawer.innerHTML = '<div class="empty">Loading…</div>';
+  $('#drawer-backdrop').classList.remove('hidden');
+  try {
+    const s = await api(`/api/shoots/${id}`);
+    const paid = +s.paid_amount, fee = +s.fee;
+    drawer.innerHTML = `
+      <h2>${esc(s.title)}</h2>
+      <div class="sub">${fmtDate(s.shoot_date)}${s.end_date && s.end_date !== s.shoot_date ? ` → ${fmtDate(s.end_date)}` : ''}${s.start_time ? ` · ${fmtTime(s.start_time)}` : ''}</div>
+      <div><span class="pill ${s.status}">${s.status}</span> <span class="pill ${s.payment_status}">${s.payment_status}</span></div>
+      <div class="section"><h4>Details</h4>
+        <div class="kv">
+          <span class="k">Client</span><span>${esc(s.client_name || '—')}</span>
+          <span class="k">Type</span><span>${esc(s.shoot_type || '—')}</span>
+          <span class="k">Coordinator</span><span>${esc(s.coordinator || '—')}</span>
+          <span class="k">Venue</span><span>${esc(s.venue || '—')}</span>
+          <span class="k">Location</span><span>${esc(s.location || '—')}</span>
+          <span class="k">Contact</span><span>${esc(s.contact_name || '—')}${s.contact_phone ? ' · ' + esc(s.contact_phone) : ''}</span>
+          <span class="k">Fee</span><span class="td-mono">${fmtMoney(fee)}</span>
+          <span class="k">Collected</span><span class="td-mono" style="color:var(--green)">${fmtMoney(paid)}</span>
+          <span class="k">Balance</span><span class="td-mono">${fmtMoney(Math.max(0, fee - paid))}</span>
+        </div>
+        ${s.notes ? `<div class="section"><h4>Notes</h4><div>${esc(s.notes)}</div></div>` : ''}
+        ${Object.keys(s.extra || {}).length ? `<div class="section"><h4>Extra fields (from import)</h4><div class="kv">${Object.entries(s.extra).map(([k, v]) => `<span class="k">${esc(k)}</span><span>${esc(v)}</span>`).join('')}</div></div>` : ''}
+      </div>
+      <div class="section"><h4>Payments</h4>
+        <div class="pay-list">
+          ${(s.payments || []).map((p) => `
+            <div class="pay-row">
+              <span class="muted small">${fmtDate(p.paid_on)}</span>
+              <span>${esc(p.method || '')}${p.note ? ` <span class="muted small">· ${esc(p.note)}</span>` : ''}</span>
+              <span class="amt">${fmtMoney(p.amount)}</span>
+              <button data-pay-id="${p.id}" title="Delete payment">✕</button>
+            </div>`).join('') || '<div class="muted small">No payments recorded.</div>'}
+        </div>
+        <div class="pay-form">
+          <input type="number" id="pay-amount" min="0" step="0.01" placeholder="Amount ₹" />
+          <input type="date" id="pay-date" value="${dayKey(new Date())}" />
+          <input type="text" id="pay-method" placeholder="method (cash/UPI…)" />
+          <button class="btn btn-primary" id="pay-add">Add</button>
+        </div>
+        <div class="pay-total">Collected <b style="color:var(--green)">${fmtMoney(paid)}</b> of ${fmtMoney(fee)} (${fee ? Math.round((paid / fee) * 100) : 0}%)</div>
+      </div>
+      <div class="section"><h4>Media / deliverables</h4>
+        <div class="pay-list">
+          ${(s.media || []).map((mm) => `
+            <div class="pay-row">
+              <a href="${esc(mm.file_url)}" target="_blank" rel="noopener" class="btn-link" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(mm.caption || mm.file_url)}</a>
+              <button data-media-id="${mm.id}" title="Remove">✕</button>
+            </div>`).join('') || '<div class="muted small">No links yet.</div>'}
+        </div>
+        <div class="pay-form" style="grid-template-columns:2fr 1fr auto">
+          <input type="text" id="media-url" placeholder="https://… (photo / album / drive link)" />
+          <input type="text" id="media-caption" placeholder="caption" />
+          <button class="btn btn-primary" id="media-add">Add</button>
+        </div>
+      </div>
+      <div class="drawer-actions">
+        <button class="btn" id="dr-edit">✏️ Edit</button>
+        <button class="btn btn-danger" id="dr-delete">🗑 Delete</button>
+        <button class="btn btn-ghost" data-close>Close</button>
+      </div>`;
+    $$('#drawer [data-close]').forEach((b) => b.addEventListener('click', closeDrawer));
+    $('#dr-edit').addEventListener('click', () => { closeDrawer(); openShootModal(s); });
+    $('#dr-delete').addEventListener('click', async () => {
+      if (!confirm(`Delete "${s.title}"? Payments and media will be removed too.`)) return;
+      try { await api(`/api/shoots/${id}`, { method: 'DELETE' }); toast('Shoot deleted'); closeDrawer(); loadMeta(); refreshCurrent(); }
+      catch (e) { toast('Delete failed: ' + e.message, 'err'); }
+    });
+    $('#pay-add').addEventListener('click', async () => {
+      const amount = $('#pay-amount').value;
+      if (!amount || +amount <= 0) { toast('Enter a payment amount', 'err'); return; }
+      try {
+        await api(`/api/shoots/${id}/payments`, { body: { amount: +amount, paid_on: $('#pay-date').value || null, method: $('#pay-method').value.trim() || null } });
+        toast('Payment recorded');
+        openDrawer(id);
+        refreshCurrent();
+      } catch (e) { toast('Payment failed: ' + e.message, 'err'); }
+    });
+    $$('#drawer [data-pay-id]').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm('Remove this payment?')) return;
+      try { await api(`/api/payments/${b.dataset.payId}`, { method: 'DELETE' }); toast('Payment removed'); openDrawer(id); refreshCurrent(); }
+      catch (e) { toast('Failed: ' + e.message, 'err'); }
+    }));
+    $('#media-add').addEventListener('click', async () => {
+      const url = $('#media-url').value.trim();
+      if (!url) { toast('Enter a media URL', 'err'); return; }
+      try {
+        await api(`/api/shoots/${id}/media`, { body: { file_url: url, caption: $('#media-caption').value.trim() || null } });
+        toast('Link added');
+        openDrawer(id);
+      } catch (e) { toast('Failed: ' + e.message, 'err'); }
+    });
+    $$('#drawer [data-media-id]').forEach((b) => b.addEventListener('click', async () => {
+      try { await api(`/api/media/${b.dataset.mediaId}`, { method: 'DELETE' }); toast('Link removed'); openDrawer(id); }
+      catch (e) { toast('Failed: ' + e.message, 'err'); }
+    }));
+  } catch (e) {
+    drawer.innerHTML = `<div class="empty">Could not load shoot: ${esc(e.message)}</div>`;
+  }
+}
+function closeDrawer() { $('#drawer-backdrop').classList.add('hidden'); }
+
+/* ---------- import view ---------- */
+
+const drop = $('#drop-zone');
+$('#import-browse').addEventListener('click', () => $('#import-file').click());
+$('#import-file').addEventListener('change', (e) => handleImportFile(e.target.files[0]));
+['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('hover'); }));
+['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('hover'); }));
+drop.addEventListener('drop', (e) => { if (e.dataTransfer.files[0]) handleImportFile(e.dataTransfer.files[0]); });
+
+async function handleImportFile(file) {
+  if (!file) return;
+  $('#import-filename').textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+  const text = await file.text();
+  $('#import-paste').value = text;
+  $('#import-filename').textContent = file.name;
+}
+
+async function runImport(dryRun) {
+  const content = $('#import-paste').value.trim();
+  if (!content) { toast('Upload a file or paste content first', 'err'); return; }
+  try {
+    const res = await api('/api/import', { body: { content, dryRun } });
+    renderImportResult(res, dryRun);
+    if (!dryRun) { toast(`Imported ${res.inserted} shoots (${res.skipped} skipped as duplicates)`); loadMeta(); }
+  } catch (e) { toast('Import failed: ' + e.message, 'err'); }
+}
+$('#btn-preview').addEventListener('click', () => runImport(true));
+$('#btn-do-import').addEventListener('click', async () => {
+  if (!confirm('Import these rows into the database?')) return;
+  await runImport(false);
+  if (state.view === 'import') { setView('dashboard'); }
+});
+
+function renderImportResult(res, dryRun) {
+  const wrap = $('#import-result');
+  const rows = res.rows || [];
+  $('#btn-do-import').disabled = dryRun || !rows.length;
+  const problems = res.problems ? res.problems.filter((p) => p.reason) : [];
+  wrap.innerHTML = `
+    <p><b>${res.count ?? rows.length}</b> rows parsed as <code>${res.format}</code>.
+    ${res.unmapped && res.unmapped.length ? `Unmapped columns (stored in <code>extra</code>): <span class="tag">${res.unmapped.map(esc).join('</span><span class="tag">')}</span>` : ''}</p>
+    ${problems.length ? `<p class="muted small">⚠ ${problems.length} row(s) skipped: ${problems.slice(0, 5).map((p) => esc(`row ${p.row}: ${p.reason}`)).join('; ')}${problems.length > 5 ? '…' : ''}</p>` : ''}
+    ${rows.length ? `<div class="preview-table"><table>
+      <thead><tr><th>Date</th><th>Title</th><th>Client</th><th>Type</th><th>Coordinator</th><th>Venue</th><th class="num">Fee</th><th class="num">Paid</th><th>Status</th></tr></thead>
+      <tbody>${rows.slice(0, 100).map((r) => `
+        <tr style="cursor:default">
+          <td class="td-mono">${fmtDate(r.shoot_date)}</td><td>${esc(r.title)}</td><td>${esc(r.client_name || '—')}</td>
+          <td>${esc(r.shoot_type || '—')}</td><td>${esc(r.coordinator || '—')}</td><td>${esc(r.venue || '—')}</td>
+          <td class="num td-mono">${fmtMoney(r.fee)}</td>
+          <td class="num td-mono">${fmtMoney((r.payments || []).reduce((a, p) => a + p.amount, 0))}</td>
+          <td><span class="pill ${r.status}">${r.status}</span></td>
+        </tr>`).join('')}</tbody>
+    </table></div>${rows.length > 100 ? `<div class="muted small">…and ${rows.length - 100} more rows</div>` : ''}` : ''}
+    ${!dryRun ? `<p class="ok" style="color:var(--green)">✅ Inserted <b>${res.inserted}</b>, skipped duplicates <b>${res.skipped}</b>, payments <b>${res.payments}</b>. ${res.errors?.length ? `Errors: ${res.errors.length}` : ''}</p>` : ''}`;
+}
+
+/* ---------- global wiring ---------- */
+
+$$('.tab').forEach((t) => t.addEventListener('click', () => setView(t.dataset.view)));
+$$('.modal-backdrop [data-close]').forEach((b) => b.addEventListener('click', closeShootModal));
+$('#shoot-modal').addEventListener('click', (e) => { if (e.target.id === 'shoot-modal') closeShootModal(); });
+$('#drawer-backdrop').addEventListener('click', (e) => { if (e.target.id === 'drawer-backdrop') closeDrawer(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeShootModal(); closeDrawer(); } });
+['f-month', 'f-coordinator', 'f-client', 'f-status', 'f-type'].forEach((id) => $('#' + id).addEventListener('change', onFilterChange));
+$('#f-q').addEventListener('input', onFilterChange);
+$('#f-clear').addEventListener('click', clearFilters);
+
+/* ---------- boot ---------- */
+
+(async function boot() {
+  pollHealth();
+  await loadMeta();
+  setView('dashboard');
+  setInterval(() => { if (state.dbOk === false) { pollHealth(); } }, 45000);
+})();
