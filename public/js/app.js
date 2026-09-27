@@ -13,7 +13,6 @@ const state = {
   cal: { year: new Date().getFullYear(), month: new Date().getMonth() },
   user: null,          // the signed-in account (role decides who can manage access)
   calView: 'grid',
-  calShoots: [],
   shootsFiltersOpen: false, // shoots-tab filter bar starts collapsed
   shootsExpandAll: false,  // set when the user arrives from a dashboard tile
   dbOk: null
@@ -385,19 +384,21 @@ function renderUpcoming(list) {
 
 /* ---------- calendar ---------- */
 
-async function loadCalendar() {
+/* The grid is a horizontal scroller with three pages (prev / current / next
+   month) so phones can swipe between months; each load fetches the whole
+   window and the day map covers it end to end. A sequence token drops stale
+   responses when months change faster than the network. */
+let calSeq = 0;
+
+async function loadCalendar(opts = {}) {
+  syncCalToolbar();
   const { year, month } = state.cal;
-  const first = new Date(year, month, 1);
-  const last = new Date(year, month + 1, 0);
-  const ysel = $('#cal-year'), msel = $('#cal-month');
-  if (ysel && !ysel.querySelector(`option[value="${year}"]`)) {
-    const o = document.createElement('option');
-    o.value = year; o.textContent = year; ysel.appendChild(o);
-  }
-  if (ysel) ysel.value = String(year);
-  if (msel) msel.value = String(month);
+  const from = dayKey(new Date(year, month - 1, 1));
+  const to = dayKey(new Date(year, month + 2, 0));
+  const seq = ++calSeq;
   try {
-    const shoots = await api(`/api/shoots?from=${dayKey(first)}&to=${dayKey(last)}`);
+    const shoots = await api(`/api/shoots?from=${from}&to=${to}`);
+    if (seq !== calSeq) return;
     // map by date (support multi-day ranges)
     const byDate = {};
     for (const s of shoots) {
@@ -410,22 +411,37 @@ async function loadCalendar() {
       }
     }
     state.calByDate = byDate;
-    state.calShoots = shoots;
     renderCalLegend();
     if (state.calView === 'list') renderCalendarList();
-    else renderCalendarGrid();
+    else renderCalendarGrid(opts.recenter !== false);
   } catch (e) { toast('Calendar: ' + e.message, 'err'); }
+}
+
+function syncCalToolbar() {
+  const { year, month } = state.cal;
+  const ysel = $('#cal-year'), msel = $('#cal-month');
+  if (ysel && !ysel.querySelector(`option[value="${year}"]`)) {
+    const o = document.createElement('option');
+    o.value = year; o.textContent = year; ysel.appendChild(o);
+  }
+  if (ysel) ysel.value = String(year);
+  if (msel) msel.value = String(month);
 }
 
 /* Legend mirrors the event chips exactly (same colours and left bar) and only
    lists the statuses that actually occur in the month on screen. */
 function renderCalLegend() {
+  const { year, month } = state.cal;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
   const idsByStatus = new Map();
-  for (const s of state.calShoots || []) {
-    if (!s) continue;
-    const key = appStatus(s.status);
-    if (!idsByStatus.has(key)) idsByStatus.set(key, new Set());
-    idsByStatus.get(key).add(s.id);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const k = dayKey(new Date(year, month, d));
+    for (const s of (state.calByDate || {})[k] || []) {
+      if (!s) continue;
+      const key = appStatus(s.status);
+      if (!idsByStatus.has(key)) idsByStatus.set(key, new Set());
+      idsByStatus.get(key).add(s.id);
+    }
   }
   const present = STATUS_ORDER.filter((st) => idsByStatus.has(st));
   const wrap = $('#cal-legend');
@@ -480,18 +496,21 @@ function setCalView(v) {
   else renderCalendarGrid();
 }
 
-function renderCalendarGrid() {
-  const { year, month } = state.cal;
-  const first = new Date(year, month, 1);
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+/* One month's grid cells as HTML. `month` may sit outside 0–11 so the same
+   builder can paint the neighbouring pages of the swipeable window. */
+function calMonthCells(year, month) {
+  const m = ((month % 12) + 12) % 12;
+  const y = year + Math.floor(month / 12);
+  const first = new Date(y, m, 1);
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
   const startDow = first.getDay();
   const todayK = dayKey(new Date());
   const cells = [];
   const totalCells = Math.ceil((startDow + daysInMonth) / 7) * 7;
   for (let i = 0; i < totalCells; i++) {
-    const d = new Date(year, month, 1 - startDow + i);
+    const d = new Date(y, m, 1 - startDow + i);
     const k = dayKey(d);
-    const inMonth = d.getMonth() === month;
+    const inMonth = d.getMonth() === m && d.getFullYear() === y;
     const shoots = (state.calByDate || {})[k] || [];
     const shown = shoots.slice(0, 3);
     cells.push(`
@@ -503,11 +522,22 @@ function renderCalendarGrid() {
         </div>
       </div>`);
   }
-  $('#cal-grid').innerHTML = cells.join('');
+  return cells.join('');
+}
+
+function renderCalendarGrid(recenter = true) {
+  const { year, month } = state.cal;
+  $$('#cal-scroll .cal-page').forEach((page) => {
+    $('.cal-grid', page).innerHTML = calMonthCells(year, month + Number(page.dataset.delta));
+  });
   // events
-  $$('#cal-grid .cal-chip').forEach((chip) => chip.addEventListener('click', (ev) => { ev.stopPropagation(); openDrawer(+chip.dataset.id); }));
-  $$('#cal-grid .cal-cell').forEach((cell) => cell.addEventListener('click', () => openShootModal(null, cell.dataset.date)));
-  $$('#cal-grid .cal-more').forEach((m) => m.addEventListener('click', (ev) => { ev.stopPropagation(); openDayPanel(ev.currentTarget.dataset.date); }));
+  $$('#cal-scroll .cal-chip').forEach((chip) => chip.addEventListener('click', (ev) => { ev.stopPropagation(); openDrawer(+chip.dataset.id); }));
+  $$('#cal-scroll .cal-cell').forEach((cell) => cell.addEventListener('click', () => openShootModal(null, cell.dataset.date)));
+  $$('#cal-scroll .cal-more').forEach((m) => m.addEventListener('click', (ev) => { ev.stopPropagation(); openDayPanel(ev.currentTarget.dataset.date); }));
+  if (recenter) {
+    const wrap = $('#cal-scroll');
+    if (wrap) wrap.scrollLeft = wrap.clientWidth;   // park on the middle page
+  }
 }
 
 function openDayPanel(dateK) {
@@ -539,9 +569,67 @@ function openDayPanel(dateK) {
   $('#dp-add').addEventListener('click', () => { $('#drawer-backdrop').classList.add('hidden'); openShootModal(null, dateK); });
 }
 
-$('#cal-prev').addEventListener('click', () => { state.cal.month--; if (state.cal.month < 0) { state.cal.month = 11; state.cal.year--; } loadCalendar(); });
-$('#cal-next').addEventListener('click', () => { state.cal.month++; if (state.cal.month > 11) { state.cal.month = 0; state.cal.year++; } loadCalendar(); });
-$('#cal-today').addEventListener('click', () => { const n = new Date(); state.cal.year = n.getFullYear(); state.cal.month = n.getMonth(); loadCalendar(); });
+/* Month navigation is shared by the toolbar buttons, the month/year selects
+   and the horizontal swipe on the grid: jump state, repaint from the cache at
+   once (keeps swiping smooth) and refresh data without touching the scroll
+   position the user is at. */
+function calGoto(year, month) {
+  state.cal.year = year + Math.floor(month / 12);
+  state.cal.month = ((month % 12) + 12) % 12;
+  syncCalToolbar();
+  renderCalLegend();
+  if (state.calView === 'list') renderCalendarList();
+  else renderCalendarGrid(true);
+  loadCalendar({ recenter: false });
+}
+
+function calShift(delta) {
+  calGoto(state.cal.year, state.cal.month + delta);
+}
+
+$('#cal-prev').addEventListener('click', () => calShift(-1));
+$('#cal-next').addEventListener('click', () => calShift(1));
+$('#cal-today').addEventListener('click', () => { const n = new Date(); calGoto(n.getFullYear(), n.getMonth()); });
+
+/* Horizontal swipe pages through months: the scroller holds three pages
+   (prev/current/next) and once it settles on an edge page that month becomes
+   current and the window recenters on it. The 150 ms debounce covers browsers
+   without the `scrollend` event (same routine either way, and a settled
+   middle page is a no-op). */
+function calScrollDelta(scrollLeft, pageWidth) {
+  if (!pageWidth) return 0;
+  if (scrollLeft < pageWidth * 0.5) return -1;
+  if (scrollLeft > pageWidth * 1.5) return 1;
+  return 0;
+}
+
+function calSettle() {
+  const wrap = $('#cal-scroll');
+  if (!wrap) return;
+  const delta = calScrollDelta(wrap.scrollLeft, wrap.clientWidth);
+  if (delta) calShift(delta);
+}
+
+let calSettleTimer = 0;
+$('#cal-scroll').addEventListener('scroll', () => {
+  clearTimeout(calSettleTimer);
+  calSettleTimer = setTimeout(calSettle, 150);
+}, { passive: true });
+$('#cal-scroll').addEventListener('scrollend', () => {
+  clearTimeout(calSettleTimer);
+  calSettle();
+});
+
+let calResizeTimer = 0;
+window.addEventListener('resize', () => {
+  clearTimeout(calResizeTimer);
+  calResizeTimer = setTimeout(() => {
+    if (state.view === 'calendar' && state.calView === 'grid') {
+      const wrap = $('#cal-scroll');
+      if (wrap) wrap.scrollLeft = wrap.clientWidth;
+    }
+  }, 150);
+});
 
 /* ---------- shoots table ---------- */
 
@@ -756,6 +844,14 @@ $('#access-form').addEventListener('submit', async (e) => {
 
 /* ---------- detail drawer ---------- */
 
+/* One key/value row for the drawer. Rows whose value is empty are dropped by the
+   caller, so a popup never prints fields the shoot has no data for. */
+function kvRow(label, value, attrs = '') {
+  return value ? `<span class="k">${label}</span><span${attrs ? ' ' + attrs : ''}>${value}</span>` : '';
+}
+/* Escaped, trimmed text — '' when nothing is stored for that field. */
+const txt = (v) => { const t = String(v ?? '').trim(); return t ? esc(t) : ''; };
+
 async function openDrawer(id) {
   const drawer = $('#drawer');
   drawer.innerHTML = '<div class="empty">Loading…</div>';
@@ -765,6 +861,24 @@ async function openDrawer(id) {
     const paid = +s.paid_amount, fee = +s.fee;
     const balance = Math.max(0, Math.round((fee - paid) * 100) / 100);
     const canCollect = balance > 0;
+    // Only list the details this shoot actually has — no "—" placeholder rows.
+    const contact = [txt(s.contact_name), txt(s.contact_phone)].filter(Boolean).join(' · ');
+    const hasMoney = fee > 0 || paid > 0; // nothing booked → leave the money rows out
+    const detailRows = [
+      kvRow('Coordinator', txt(s.coordinator)),
+      hasMoney ? kvRow('Fee', fmtMoney(fee), 'class="td-mono"') : '',
+      hasMoney ? kvRow('Collected', fmtMoney(paid), 'class="td-mono" style="color:var(--green)"') : '',
+      hasMoney ? kvRow('Balance', fmtMoney(Math.max(0, fee - paid)), 'class="td-mono"') : '',
+      kvRow('Client', txt(s.client_name)),
+      kvRow('Type', txt(s.shoot_type)),
+      kvRow('Venue', txt(s.venue)),
+      kvRow('Location', txt(s.location)),
+      kvRow('Contact', contact)
+    ].join('');
+    const extraRows = Object.entries(s.extra || {})
+      .filter(([, v]) => txt(v))
+      .map(([k, v]) => kvRow(esc(k), txt(v)))
+      .join('');
     drawer.innerHTML = `
       <div class="drawer-head">
         <div class="drawer-head-txt">
@@ -778,21 +892,9 @@ async function openDrawer(id) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
-      <div class="section"><h4>Details</h4>
-        <div class="kv kv-lead">
-          <span class="k">Coordinator</span><span>${esc(s.coordinator || '—')}</span>
-          <span class="k">Fee</span><span class="td-mono">${fmtMoney(fee)}</span>
-          <span class="k">Collected</span><span class="td-mono" style="color:var(--green)">${fmtMoney(paid)}</span>
-          <span class="k">Balance</span><span class="td-mono">${fmtMoney(Math.max(0, fee - paid))}</span>
-          <span class="k">Client</span><span>${esc(s.client_name || '—')}</span>
-          <span class="k">Type</span><span>${esc(s.shoot_type || '—')}</span>
-          <span class="k">Venue</span><span>${esc(s.venue || '—')}</span>
-          <span class="k">Location</span><span>${esc(s.location || '—')}</span>
-          <span class="k">Contact</span><span>${esc(s.contact_name || '—')}${s.contact_phone ? ' · ' + esc(s.contact_phone) : ''}</span>
-        </div>
-        ${s.notes ? `<div class="section"><h4>Notes</h4><div>${esc(s.notes)}</div></div>` : ''}
-        ${Object.keys(s.extra || {}).length ? `<div class="section"><h4>Extra fields (from import)</h4><div class="kv">${Object.entries(s.extra).map(([k, v]) => `<span class="k">${esc(k)}</span><span>${esc(v)}</span>`).join('')}</div></div>` : ''}
-      </div>
+      ${detailRows ? `<div class="section"><h4>Details</h4><div class="kv kv-lead">${detailRows}</div></div>` : ''}
+      ${s.notes ? `<div class="section"><h4>Notes</h4><div>${esc(s.notes)}</div></div>` : ''}
+      ${extraRows ? `<div class="section"><h4>Extra fields (from import)</h4><div class="kv">${extraRows}</div></div>` : ''}
       <div class="section"><h4>Payment</h4>
         <div class="pay-list">
           ${(s.payments || []).map((p) => `
@@ -929,8 +1031,8 @@ $('#sel-coordinator').addEventListener('change', () => {
   if ($('#sel-coordinator').value === '__new__') { ni.hidden = false; ni.focus(); }
   else { ni.hidden = true; }
 });
-$('#cal-year').addEventListener('change', (e) => { state.cal.year = +e.target.value; loadCalendar(); });
-$('#cal-month').addEventListener('change', (e) => { state.cal.month = +e.target.value; loadCalendar(); });
+$('#cal-year').addEventListener('change', (e) => calGoto(+e.target.value, state.cal.month));
+$('#cal-month').addEventListener('change', (e) => calGoto(state.cal.year, +e.target.value));
 $('#btn-export').addEventListener('click', async () => {
   try {
     const rows = await api('/api/shoots');

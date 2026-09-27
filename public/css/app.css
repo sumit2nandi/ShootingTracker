@@ -256,6 +256,11 @@ tbody tr:hover { background: var(--surface-2); }
 .cal-dow { font-size: 11.5px; letter-spacing: .3px; color: var(--muted); text-align: center; padding: 7px 6px; font-weight: 650; box-shadow: inset -1px 0 0 var(--line); }
 .cal-dow:last-child { box-shadow: none; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: clamp(92px, 12vh, 120px); }
+/* month paging: a snap-scrolling strip of prev/current/next month pages, so a
+   horizontal swipe (phones, trackpads) moves between months; scrollbars hidden */
+.cal-scroll { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.cal-scroll::-webkit-scrollbar { display: none; }
+.cal-page { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; }
 /* single 1px separators: right + bottom inset lines, dropped on the outer edges */
 .cal-cell {
   background: var(--surface); box-shadow: inset -1px 0 0 var(--line), inset 0 -1px 0 var(--line);
