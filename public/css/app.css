@@ -205,7 +205,7 @@ tbody tr:hover { background: var(--surface-2); }
   .cal-select, .filter-group select, .filter-group input { font-size: 16px; }
 }
 @media (max-width: 700px) {
-  .shoots-table { min-width: 800px; }
+  .shoots-table { min-width: 0; }
   .upcoming-table { min-width: 620px; }
   .table-wrap { scrollbar-width: thin; }
 }
@@ -457,3 +457,38 @@ tbody tr:hover { background: var(--surface-2); }
 .signed-in-user { color: var(--muted); font-size: 11px; font-weight: 600; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .signout-btn { font-size: 12px; padding: 6px 9px; }
 @media (max-width: 580px) { .signed-in-user { display: none; } .signout-btn { padding: 6px; font-size: 11px; } }
+
+
+/* ---------- grouped shoots table ---------- */
+.shoot-month { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin: 0 0 10px; background: var(--surface); }
+.shoot-month > summary { display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer; padding: 12px 14px; background: var(--surface-2); color: var(--text); font-weight: 700; }
+.shoot-month > summary::-webkit-details-marker { display: none; }
+.shoot-month > summary::before { content: ""; width: 7px; height: 7px; border-right: 1.7px solid var(--muted); border-bottom: 1.7px solid var(--muted); transform: rotate(-45deg); transition: transform .15s; }
+.shoot-month[open] > summary::before { transform: rotate(45deg) translate(-2px,-2px); }
+.shoot-month > summary:hover { background: var(--slate-soft); }
+.month-count { margin-left: auto; color: var(--muted); font-size: 11px; font-weight: 500; }
+.shoot-month .shoots-table { margin: 0; table-layout: auto; }
+.shoot-month .shoots-table th, .shoot-month .shoots-table td { padding: 10px 9px; }
+.shoot-month .shoots-table tbody tr:last-child td { border-bottom: 0; }
+.desktop-label { display: inline; }
+.tick-ico { display: none; }
+.tick-ico.ok, .tick-ico.bad { color: inherit; }
+.legend-item { display: inline-flex; align-items: center; text-transform: capitalize; }
+
+@media (max-width: 640px) {
+  .shoot-month .shoots-table { width: 100%; min-width: 0; table-layout: fixed; font-size: 11px; }
+  .shoot-month .shoots-table th, .shoot-month .shoots-table td { padding: 8px 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .shoot-month .shoots-table th:nth-child(1) { width: 21%; }
+  .shoot-month .shoots-table th:nth-child(2) { width: 24%; }
+  .shoot-month .shoots-table th:nth-child(3) { width: 19%; }
+  .shoot-month .shoots-table th:nth-child(4) { width: 15%; }
+  .shoot-month .shoots-table th:nth-child(5), .shoot-month .shoots-table th:nth-child(6) { width: 10.5%; }
+  .shoot-month .shoots-table th:nth-child(5), .shoot-month .shoots-table th:nth-child(6),
+  .shoot-month .shoots-table td:nth-child(5), .shoot-month .shoots-table td:nth-child(6) { text-align: center; }
+  .desktop-label { display: none; }
+  .tick-ico { display: inline-flex; align-items: center; justify-content: center; width: 21px; height: 21px; border-radius: 50%; font-size: 13px; font-weight: 800; line-height: 1; vertical-align: middle; }
+  .tick-ico.ok { color: #15803d; background: #ecf7f0; }
+  .tick-ico.bad { color: #dc2626; background: #fdecec; }
+  .cal-legend { gap: 8px 11px; }
+  .legend-item { font-size: 10.5px; }
+}

@@ -132,6 +132,7 @@ function buildFilter(clauseAlias = 'b') {
     if (this.paymentStatus === 'paid') add(`(${clauseAlias}.fee > 0 AND ${clauseAlias}.paid_amount >= ${clauseAlias}.fee)`, null);
     if (this.paymentStatus === 'partial') add(`(${clauseAlias}.paid_amount > 0 AND ${clauseAlias}.paid_amount < ${clauseAlias}.fee)`, null);
     if (this.paymentStatus === 'unpaid') add(`(${clauseAlias}.paid_amount = 0)`, null);
+    if (this.paymentStatus === 'outstanding') add(`(${clauseAlias}.fee > 0 AND ${clauseAlias}.paid_amount < ${clauseAlias}.fee)`, null);
   }
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
   return { where, params };
@@ -193,7 +194,8 @@ app.get('/api/dashboard', async (req, res, next) => {
              COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
              COUNT(*) FILTER (WHERE status IN ('planned','confirmed'))::int AS active,
              COUNT(*) FILTER (WHERE payment_status = 'paid')::int AS paidShoots,
-             COUNT(*) FILTER (WHERE payment_status = 'unpaid')::int AS unpaidShoots
+             COUNT(*) FILTER (WHERE payment_status = 'unpaid')::int AS unpaidShoots,
+             COUNT(*) FILTER (WHERE fee > 0 AND paid_amount < fee)::int AS outstandingShoots
       FROM base b ${where}`, params);
 
     const monthly = await query(BASE_CTE + `
