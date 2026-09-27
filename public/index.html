@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ShootingTracker</title>
-  <link rel="stylesheet" href="css/app.css?v=11" />
+  <link rel="stylesheet" href="css/app.css?v=12" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=4" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=4" />
   <link rel="apple-touch-icon" href="favicon.png?v=4" />
@@ -40,10 +40,6 @@
       <span id="db-status" class="db-pill" title="Checking database…">
         <span class="dot"></span><span class="db-pill-text">DB…</span>
       </span>
-      <button id="btn-export" class="btn btn-ghost" aria-label="Export all data" title="Export all shoots (original calendar CSV format)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-        <span class="btn-label">Export</span>
-      </button>
       <button id="btn-new-shoot" class="btn btn-primary" aria-label="New shoot">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         <span class="btn-label">New shoot</span>
@@ -132,6 +128,10 @@
             </button>
             <button id="btn-shoots-filter" class="btn btn-ghost icon-btn" aria-label="Show filters" aria-expanded="false" title="Show / hide filters">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6.5 8v5.5l-3 2V13L4 5z"/></svg>
+            </button>
+            <button id="btn-export" class="btn btn-ghost" aria-label="Export all data" title="Export all shoots (original calendar CSV format)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+              <span class="btn-label">Export</span>
             </button>
           </div>
         </div>
@@ -247,6 +247,6 @@
 
   <div id="toasts" class="toasts"></div>
 
-  <script src="js/app.js?v=9"></script>
+  <script src="js/app.js?v=10"></script>
 </body>
 </html>

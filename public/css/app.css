@@ -432,21 +432,39 @@ tbody tr:hover { background: var(--surface-2); }
   display: flex; gap: 4px;
   width: min(430px, calc(100vw - 24px));
   padding: 7px;
-  background: rgba(255, 255, 255, .66);
-  backdrop-filter: blur(22px) saturate(1.7);
-  -webkit-backdrop-filter: blur(22px) saturate(1.7);
-  border: 1px solid rgba(255, 255, 255, .85);
-  border-radius: 22px;
+  isolation: isolate;
+  /* a thin pane of glass: mostly see-through, tint only at the top and bottom */
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, .58) 0%, rgba(255, 255, 255, .30) 55%, rgba(255, 255, 255, .24) 100%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.06);
+  backdrop-filter: blur(28px) saturate(200%) brightness(1.06);
+  border: 1px solid rgba(255, 255, 255, .5);
+  border-radius: 24px;
   box-shadow:
-    0 12px 32px rgba(23, 43, 77, .18),
-    0 2px 8px rgba(23, 43, 77, .08),
+    0 18px 44px rgba(18, 38, 72, .16),
+    0 6px 16px rgba(18, 38, 72, .09),
+    0 1px 2px rgba(18, 38, 72, .05),
     inset 0 1px 0 rgba(255, 255, 255, .95),
-    inset 0 -1px 0 rgba(23, 43, 77, .04);
+    inset 0 -1px 0 rgba(255, 255, 255, .35);
   z-index: 50;
 }
 .tabbar::before {
-  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-  background: linear-gradient(115deg, rgba(255, 255, 255, .55) 0%, rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0) 62%, rgba(255, 255, 255, .35) 100%);
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
+  background: linear-gradient(118deg,
+    rgba(255, 255, 255, .78) 0%,
+    rgba(255, 255, 255, .10) 28%,
+    rgba(255, 255, 255, 0) 52%,
+    rgba(255, 255, 255, .08) 78%,
+    rgba(255, 255, 255, .58) 100%);
+}
+/* light pooling under the bottom edge, the way a thick pane refracts */
+.tabbar::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
+  background: radial-gradient(130% 90% at 50% 128%, rgba(255, 255, 255, .5), rgba(255, 255, 255, 0) 62%);
+}
+/* where backdrop-filter is missing the pane would be see-through, so go opaque */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .tabbar { background: rgba(255, 255, 255, .92); }
 }
 .tabbar .tab {
   flex: 1; position: relative;
@@ -456,13 +474,13 @@ tbody tr:hover { background: var(--surface-2); }
   border-radius: 16px; cursor: pointer; transition: color .18s, background .18s, transform .12s;
 }
 .tabbar .tab svg { width: 21px; height: 21px; transition: transform .18s; }
-.tabbar .tab:hover { color: var(--text); background: rgba(23, 43, 77, .05); }
+.tabbar .tab:hover { color: var(--text); background: rgba(255, 255, 255, .45); }
 .tabbar .tab:active { transform: scale(.96); }
-.tabbar .tab.active { color: var(--accent-strong); background: var(--accent-soft); }
+.tabbar .tab.active { color: var(--accent-strong); background: rgba(37, 99, 235, .11); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .85); }
 .tabbar .tab.active svg { transform: translateY(-1px); }
 .tabbar .tab.active::after {
   content: ""; position: absolute; top: 3px; width: 14px; height: 3px; border-radius: 2px;
-  background: var(--accent); opacity: .85;
+  background: var(--accent); opacity: .9; box-shadow: 0 0 8px rgba(37, 99, 235, .5);
 }
 @media (min-width: 768px) {
   .tabbar { display: none; }

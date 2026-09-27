@@ -33,7 +33,8 @@ tab bar** on mobile.
 - **Mobile-first UI** — responsive layout, bottom-sheet forms/drawers, safe-area insets, and a floating glass
   tab bar (Dashboard / Calendar / Shoots). The **All shoots** table goes edge-to-edge on phones and drops its
   **Status** and **Payment** columns; the fee itself turns into a **green bubble when paid** and a **red
-  bubble when a balance is due**.
+  bubble when a balance is due**. A **Show all** button appears whenever a filter is applied, and **Export
+  (CSV)** lives next to the filter icon in the same header.
 - **Import (server-side)** — an **HTML spreadsheet export / CSV / JSON** sheet can be loaded via the REST
   API (`POST /api/import`) or the CLI (`npm run import`). Columns like `date`, `client`, `coordinator`,
   `fee`, `venue`, `status`, `payment` are auto-mapped (many date formats, `Paid`/`50%`/amounts for
