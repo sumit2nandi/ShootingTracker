@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ShootingTracker</title>
   <link rel="stylesheet" href="css/app.css" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%B7%3C/text%3E%3C/svg%3E" />
@@ -10,49 +10,44 @@
 <body>
   <header class="topbar">
     <div class="brand">
-      <span class="brand-icon">📷</span>
+      <span class="brand-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      </span>
       <span class="brand-name">ShootingTracker</span>
     </div>
-    <nav class="tabs" id="tabs">
-      <button class="tab active" data-view="dashboard">Dashboard</button>
-      <button class="tab" data-view="calendar">Calendar</button>
-      <button class="tab" data-view="shoots">Shoots</button>
-      <button class="tab" data-view="import">Import</button>
+    <nav class="desktop-tabs" aria-label="Main">
+      <button class="tab active" data-view="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="9" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="1.5"/><rect x="13.5" y="12" width="7.5" height="9" rx="1.5"/><rect x="3" y="15.5" width="7.5" height="5.5" rx="1.5"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="tab" data-view="calendar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M8 2.5v4M16 2.5v4M3 9.5h18"/></svg>
+        <span>Calendar</span>
+      </button>
+      <button class="tab" data-view="shoots">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <span>Shoots</span>
+      </button>
     </nav>
     <div class="top-right">
-      <button id="btn-new-shoot" class="btn btn-primary">+ New shoot</button>
       <span id="db-status" class="db-pill" title="Checking database…">
         <span class="dot"></span><span class="db-pill-text">DB…</span>
       </span>
+      <button id="btn-new-shoot" class="btn btn-primary" aria-label="New shoot">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span class="btn-label">New shoot</span>
+      </button>
     </div>
   </header>
 
   <section id="filterbar" class="filterbar">
-    <div class="filter-group">
-      <label>Month</label>
-      <select id="f-month"></select>
-    </div>
-    <div class="filter-group">
-      <label>Coordinator</label>
-      <select id="f-coordinator"></select>
-    </div>
-    <div class="filter-group">
-      <label>Client</label>
-      <select id="f-client"></select>
-    </div>
-    <div class="filter-group">
-      <label>Status</label>
-      <select id="f-status"></select>
-    </div>
-    <div class="filter-group">
-      <label>Type</label>
-      <select id="f-type"></select>
-    </div>
-    <div class="filter-group grow">
-      <label>Search</label>
-      <input id="f-q" type="search" placeholder="title, client, venue, notes…" />
-    </div>
-    <button id="f-clear" class="btn btn-ghost" title="Clear all filters">✕ Clear</button>
+    <div class="filter-group"><label>Month</label><select id="f-month"></select></div>
+    <div class="filter-group"><label>Coordinator</label><select id="f-coordinator"></select></div>
+    <div class="filter-group"><label>Client</label><select id="f-client"></select></div>
+    <div class="filter-group"><label>Status</label><select id="f-status"></select></div>
+    <div class="filter-group"><label>Type</label><select id="f-type"></select></div>
+    <div class="filter-group grow"><label>Search</label><input id="f-q" type="search" placeholder="Search shoots…" /></div>
+    <button id="f-clear" class="btn btn-ghost">Clear</button>
   </section>
 
   <main id="main">
@@ -87,9 +82,13 @@
     <section id="view-calendar" class="view hidden">
       <div class="cal-toolbar">
         <div class="cal-nav">
-          <button class="btn" id="cal-prev">‹</button>
+          <button class="btn icon-btn" id="cal-prev" aria-label="Previous month">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
           <h2 id="cal-title"></h2>
-          <button class="btn" id="cal-next">›</button>
+          <button class="btn icon-btn" id="cal-next" aria-label="Next month">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
           <button class="btn btn-ghost" id="cal-today">Today</button>
         </div>
         <div class="cal-legend" id="cal-legend"></div>
@@ -98,6 +97,7 @@
         <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div><div class="cal-dow">Wed</div><div class="cal-dow">Thu</div><div class="cal-dow">Fri</div><div class="cal-dow">Sat</div>
       </div>
       <div id="cal-grid" class="cal-grid"></div>
+      <div class="cal-mobile-note muted small">Tap a day to add a shoot · tap a shoot to open it</div>
     </section>
 
     <section id="view-shoots" class="view hidden">
@@ -109,40 +109,6 @@
         <div id="shoots-table" class="table-wrap"></div>
       </div>
     </section>
-
-    <section id="view-import" class="view hidden">
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-head"><h3>1 · Upload a sheet</h3></div>
-          <p class="muted">HTML (spreadsheet export), CSV or JSON. Columns like
-            <code>date</code>, <code>client</code>, <code>coordinator</code>, <code>fee</code>,
-            <code>venue</code>, <code>status</code> are auto-mapped; anything else is stored in an
-            <code>extra</code> JSON field.</p>
-          <div class="drop" id="drop-zone">
-            <input type="file" id="import-file" accept=".html,.htm,.csv,.json,text/html,text/csv,application/json" hidden />
-            <div class="drop-inner">
-              <div class="drop-icon">⬆️</div>
-              <div>Drop a file here or <button class="btn-link" id="import-browse">browse</button></div>
-              <div class="muted small" id="import-filename">no file selected</div>
-            </div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-head"><h3>2 · Or paste content</h3></div>
-          <textarea id="import-paste" rows="9" placeholder="Paste HTML / CSV / JSON here…"></textarea>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-head">
-          <h3>3 · Preview &amp; import</h3>
-          <div class="import-actions">
-            <button class="btn" id="btn-preview">Preview (dry run)</button>
-            <button class="btn btn-primary" id="btn-do-import" disabled>Import into DB</button>
-          </div>
-        </div>
-        <div id="import-result"></div>
-      </div>
-    </section>
   </main>
 
   <!-- shoot form modal -->
@@ -150,21 +116,17 @@
     <div class="modal">
       <div class="modal-head">
         <h3 id="shoot-modal-title">New shoot</h3>
-        <button class="btn btn-ghost" data-close>✕</button>
+        <button class="icon-btn btn btn-ghost" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
       </div>
       <form id="shoot-form" class="form-grid">
         <input type="hidden" name="id" />
-        <div class="field span-2"><label>Title *</label><input name="title" required placeholder="e.g. Wedding — Ananya & Vikram" /></div>
-        <div class="field"><label>Client</label><input name="client_name" list="dl-clients" /></div>
-        <div class="field"><label>Type</label><input name="shoot_type" list="dl-types" placeholder="wedding, fashion…" /></div>
+        <div class="field span-2"><label>Title *</label><input name="title" required placeholder="e.g. Ananya & Vikram — Wedding" /></div>
         <div class="field"><label>Shoot date *</label><input name="shoot_date" type="date" required /></div>
-        <div class="field"><label>End date</label><input name="end_date" type="date" /></div>
-        <div class="field"><label>Start time</label><input name="start_time" type="time" /></div>
-        <div class="field"><label>End time</label><input name="end_time" type="time" /></div>
-        <div class="field"><label>Venue</label><input name="venue" /></div>
-        <div class="field"><label>Location</label><input name="location" /></div>
-        <div class="field"><label>Coordinator</label><input name="coordinator" list="dl-coordinators" /></div>
-        <div class="field"><label>Fee (₹)</label><input name="fee" type="number" min="0" step="0.01" value="0" /></div>
+        <div class="field"><label>Fee (₹)</label><input name="fee" type="number" min="0" step="0.01" inputmode="numeric" value="0" /></div>
+        <div class="field"><label>Client</label><input name="client_name" list="dl-clients" placeholder="Client name" /></div>
+        <div class="field"><label>Coordinator</label><input name="coordinator" list="dl-coordinators" placeholder="Coordinator" /></div>
         <div class="field"><label>Status</label>
           <select name="status">
             <option value="planned">planned</option>
@@ -174,9 +136,20 @@
             <option value="cancelled">cancelled</option>
           </select>
         </div>
-        <div class="field"><label>Contact name</label><input name="contact_name" /></div>
-        <div class="field"><label>Contact phone</label><input name="contact_phone" /></div>
-        <div class="field span-2"><label>Notes</label><textarea name="notes" rows="3"></textarea></div>
+        <div class="field"><label>Type</label><input name="shoot_type" list="dl-types" placeholder="wedding, fashion…" /></div>
+        <details class="field span-2 more-details">
+          <summary>More details</summary>
+          <div class="sub-grid">
+            <div class="field"><label>End date</label><input name="end_date" type="date" /></div>
+            <div class="field"><label>Start time</label><input name="start_time" type="time" /></div>
+            <div class="field"><label>End time</label><input name="end_time" type="time" /></div>
+            <div class="field"><label>Venue</label><input name="venue" placeholder="Hall / studio" /></div>
+            <div class="field"><label>Location</label><input name="location" placeholder="City / area" /></div>
+            <div class="field"><label>Contact name</label><input name="contact_name" /></div>
+            <div class="field"><label>Contact phone</label><input name="contact_phone" inputmode="tel" /></div>
+            <div class="field span-2"><label>Notes</label><textarea name="notes" rows="3"></textarea></div>
+          </div>
+        </details>
       </form>
       <datalist id="dl-coordinators"></datalist>
       <datalist id="dl-clients"></datalist>
@@ -192,6 +165,22 @@
   <div class="drawer-backdrop hidden" id="drawer-backdrop">
     <aside class="drawer" id="drawer"></aside>
   </div>
+
+  <!-- floating bottom tab bar (liquid glass) -->
+  <nav class="tabbar" id="tabs" aria-label="Main">
+    <button class="tab active" data-view="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="9" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="1.5"/><rect x="13.5" y="12" width="7.5" height="9" rx="1.5"/><rect x="3" y="15.5" width="7.5" height="5.5" rx="1.5"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="tab" data-view="calendar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M8 2.5v4M16 2.5v4M3 9.5h18"/></svg>
+      <span>Calendar</span>
+    </button>
+    <button class="tab" data-view="shoots">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      <span>Shoots</span>
+    </button>
+  </nav>
 
   <div id="toasts" class="toasts"></div>
 

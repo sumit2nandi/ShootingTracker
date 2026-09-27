@@ -11,7 +11,6 @@ const state = {
   meta: { statuses: [], coordinators: [], clients: [], types: [], months: [] },
   cal: { year: new Date().getFullYear(), month: new Date().getMonth() },
   calShoots: [],
-  importPayload: null,
   dbOk: null
 };
 
@@ -151,7 +150,7 @@ function setView(v) {
   state.view = v;
   $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === v));
   for (const el of $$('.view')) el.classList.toggle('hidden', el.id !== `view-${v}`);
-  $('#filterbar').classList.toggle('hidden', v === 'calendar' || v === 'import');
+  $('#filterbar').classList.toggle('hidden', v === 'calendar');
   refreshCurrent();
 }
 
@@ -256,14 +255,17 @@ function renderUpcoming(list) {
   const wrap = $('#upcoming-table');
   if (!list.length) { wrap.innerHTML = '<div class="empty">Nothing upcoming for this filter 🎉</div>'; return; }
   wrap.innerHTML = `
-    <table><thead><tr><th>Date</th><th>Title</th><th>Client</th><th>Venue / Location</th><th>Coordinator</th><th class="num">Fee</th><th>Status</th></tr></thead>
+    <table class="upcoming-table"><thead><tr>
+      <th>Date</th><th>Title</th><th>Client</th><th class="col-u-venue">Venue / Location</th>
+      <th class="col-u-coord">Coordinator</th><th class="num">Fee</th><th>Status</th>
+    </tr></thead>
     <tbody>${list.map((s) => `
       <tr data-id="${s.id}">
         <td class="td-mono">${fmtDate(s.shoot_date)}</td>
         <td>${esc(s.title)}</td>
         <td>${esc(s.client_name || '—')}</td>
-        <td>${esc([s.venue, s.location].filter(Boolean).join(', ') || '—')}</td>
-        <td>${esc(s.coordinator || '—')}</td>
+        <td class="col-u-venue">${esc([s.venue, s.location].filter(Boolean).join(', ') || '—')}</td>
+        <td class="col-u-coord">${esc(s.coordinator || '—')}</td>
         <td class="num td-mono">${fmtMoney(s.fee)}</td>
         <td><span class="pill ${s.status}">${s.status}</span></td>
       </tr>`).join('')}</tbody></table>`;
@@ -366,23 +368,25 @@ function renderShoots(rows) {
   const wrap = $('#shoots-table');
   if (!rows.length) { wrap.innerHTML = '<div class="empty">No shoots match. Clear filters or add one with “+ New shoot”.</div>'; return; }
   wrap.innerHTML = `
-    <table>
+    <table class="shoots-table">
       <thead><tr>
-        <th>Date</th><th>Title</th><th>Client</th><th>Type</th><th>Coordinator</th>
-        <th>Venue / Location</th><th class="num">Fee</th><th class="num">Collected</th><th>Payment</th><th>Status</th>
+        <th class="col-date">Date</th><th class="col-title">Title</th><th class="col-client">Client</th>
+        <th class="col-type">Type</th><th class="col-coord">Coordinator</th>
+        <th class="col-venue">Venue / Location</th><th class="col-fee num">Fee</th>
+        <th class="col-paid num">Collected</th><th class="col-payst">Payment</th><th class="col-status">Status</th>
       </tr></thead>
       <tbody>${rows.map((s) => `
         <tr data-id="${s.id}">
-          <td class="td-mono">${fmtDate(s.shoot_date)}${s.end_date && s.end_date !== s.shoot_date ? ` → ${fmtDate(s.end_date)}` : ''}</td>
-          <td>${esc(s.title)}${s.start_time ? `<div class="muted small">${fmtTime(s.start_time)}</div>` : ''}</td>
-          <td>${esc(s.client_name || '—')}</td>
-          <td>${esc(s.shoot_type || '—')}</td>
-          <td>${esc(s.coordinator || '—')}</td>
-          <td>${esc([s.venue, s.location].filter(Boolean).join(', ') || '—')}</td>
-          <td class="num td-mono">${fmtMoney(s.fee)}</td>
-          <td class="num td-mono">${fmtMoney(s.paid_amount)}</td>
-          <td><span class="pill ${s.payment_status}">${s.payment_status}</span></td>
-          <td><span class="pill ${s.status}">${s.status}</span></td>
+          <td class="col-date td-mono">${fmtDate(s.shoot_date)}${s.end_date && s.end_date !== s.shoot_date ? ` → ${fmtDate(s.end_date)}` : ''}</td>
+          <td class="col-title">${esc(s.title)}${s.start_time ? `<div class="muted small">${fmtTime(s.start_time)}</div>` : ''}</td>
+          <td class="col-client">${esc(s.client_name || '—')}</td>
+          <td class="col-type">${esc(s.shoot_type || '—')}</td>
+          <td class="col-coord">${esc(s.coordinator || '—')}</td>
+          <td class="col-venue">${esc([s.venue, s.location].filter(Boolean).join(', ') || '—')}</td>
+          <td class="col-fee num td-mono">${fmtMoney(s.fee)}</td>
+          <td class="col-paid num td-mono">${fmtMoney(s.paid_amount)}</td>
+          <td class="col-payst"><span class="pill ${s.payment_status}">${s.payment_status}</span></td>
+          <td class="col-status"><span class="pill ${s.status}">${s.status}</span></td>
         </tr>`).join('')}</tbody>
     </table>`;
   $$('#shoots-table tbody tr').forEach((tr) => tr.addEventListener('click', () => openDrawer(+tr.dataset.id)));
@@ -536,62 +540,6 @@ async function openDrawer(id) {
   }
 }
 function closeDrawer() { $('#drawer-backdrop').classList.add('hidden'); }
-
-/* ---------- import view ---------- */
-
-const drop = $('#drop-zone');
-$('#import-browse').addEventListener('click', () => $('#import-file').click());
-$('#import-file').addEventListener('change', (e) => handleImportFile(e.target.files[0]));
-['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('hover'); }));
-['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('hover'); }));
-drop.addEventListener('drop', (e) => { if (e.dataTransfer.files[0]) handleImportFile(e.dataTransfer.files[0]); });
-
-async function handleImportFile(file) {
-  if (!file) return;
-  $('#import-filename').textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-  const text = await file.text();
-  $('#import-paste').value = text;
-  $('#import-filename').textContent = file.name;
-}
-
-async function runImport(dryRun) {
-  const content = $('#import-paste').value.trim();
-  if (!content) { toast('Upload a file or paste content first', 'err'); return; }
-  try {
-    const res = await api('/api/import', { body: { content, dryRun } });
-    renderImportResult(res, dryRun);
-    if (!dryRun) { toast(`Imported ${res.inserted} shoots (${res.skipped} skipped as duplicates)`); loadMeta(); }
-  } catch (e) { toast('Import failed: ' + e.message, 'err'); }
-}
-$('#btn-preview').addEventListener('click', () => runImport(true));
-$('#btn-do-import').addEventListener('click', async () => {
-  if (!confirm('Import these rows into the database?')) return;
-  await runImport(false);
-  if (state.view === 'import') { setView('dashboard'); }
-});
-
-function renderImportResult(res, dryRun) {
-  const wrap = $('#import-result');
-  const rows = res.rows || [];
-  $('#btn-do-import').disabled = dryRun || !rows.length;
-  const problems = res.problems ? res.problems.filter((p) => p.reason) : [];
-  wrap.innerHTML = `
-    <p><b>${res.count ?? rows.length}</b> rows parsed as <code>${res.format}</code>.
-    ${res.unmapped && res.unmapped.length ? `Unmapped columns (stored in <code>extra</code>): <span class="tag">${res.unmapped.map(esc).join('</span><span class="tag">')}</span>` : ''}</p>
-    ${problems.length ? `<p class="muted small">⚠ ${problems.length} row(s) skipped: ${problems.slice(0, 5).map((p) => esc(`row ${p.row}: ${p.reason}`)).join('; ')}${problems.length > 5 ? '…' : ''}</p>` : ''}
-    ${rows.length ? `<div class="preview-table"><table>
-      <thead><tr><th>Date</th><th>Title</th><th>Client</th><th>Type</th><th>Coordinator</th><th>Venue</th><th class="num">Fee</th><th class="num">Paid</th><th>Status</th></tr></thead>
-      <tbody>${rows.slice(0, 100).map((r) => `
-        <tr style="cursor:default">
-          <td class="td-mono">${fmtDate(r.shoot_date)}</td><td>${esc(r.title)}</td><td>${esc(r.client_name || '—')}</td>
-          <td>${esc(r.shoot_type || '—')}</td><td>${esc(r.coordinator || '—')}</td><td>${esc(r.venue || '—')}</td>
-          <td class="num td-mono">${fmtMoney(r.fee)}</td>
-          <td class="num td-mono">${fmtMoney((r.payments || []).reduce((a, p) => a + p.amount, 0))}</td>
-          <td><span class="pill ${r.status}">${r.status}</span></td>
-        </tr>`).join('')}</tbody>
-    </table></div>${rows.length > 100 ? `<div class="muted small">…and ${rows.length - 100} more rows</div>` : ''}` : ''}
-    ${!dryRun ? `<p class="ok" style="color:var(--green)">✅ Inserted <b>${res.inserted}</b>, skipped duplicates <b>${res.skipped}</b>, payments <b>${res.payments}</b>. ${res.errors?.length ? `Errors: ${res.errors.length}` : ''}</p>` : ''}`;
-}
 
 /* ---------- global wiring ---------- */
 

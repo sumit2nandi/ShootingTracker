@@ -1,18 +1,19 @@
 # 📷 ShootingTracker
 
-A self-hosted tool to **track every shoot**, with a **filterable earnings dashboard** and a **calendar
-linked to each shoot** — all backed by **PostgreSQL** (your Aiven `defaultdb`).
+A self-hosted, **mobile-first** tool to **track every shoot**, with a **filterable earnings dashboard**
+and a **calendar linked to each shoot** — all backed by **PostgreSQL** (your Aiven `defaultdb`).
 
 Built with a small **Node.js + Express + `pg`** API and a dependency-free frontend (vanilla JS, no build
-step), so it runs anywhere Node runs.
+step), so it runs anywhere Node runs. Professional **light theme**, with a floating **liquid-glass bottom
+tab bar** on mobile.
 
 ---
 
 ## Features
 
-- **Shoot tracking (CRUD)** — title, client, type, date (with optional end date / time), venue, location,
-  coordinator, fee, status, contact, notes. Anything that doesn't fit a column is preserved in a JSON
-  `extra` field, so you never lose data from a sheet.
+- **Shoot tracking (CRUD)** — a minimal form (title, date, client, coordinator, fee, status) with the rest
+  (type, end date/times, venue, location, contacts, notes) tucked under “More details”. Anything that
+  doesn't fit a column is preserved in a JSON `extra` field, so you never lose data from a sheet.
 - **Earnings** — a per-shoot **payments ledger**. Collected amount, balance and a derived
   `paid / partial / unpaid` status are computed from the ledger, not hand-typed.
 - **Dashboard** — KPI cards (shoots, total fee value, collected, outstanding, active, completed) plus:
@@ -23,10 +24,13 @@ step), so it runs anywhere Node runs.
   Every widget respects the shared filter bar: **month, coordinator, client, status, type, fee range,
   text search, payment status**.
 - **Calendar** — month grid, every shoot shown on its date (multi-day shoots span their range), color-coded
-  by status. Click a shoot → detail drawer; click a day → add a shoot on that date.
-- **Import** — paste or upload an **HTML spreadsheet export / CSV / JSON**. Columns like `date`, `client`,
-  `coordinator`, `fee`, `venue`, `status`, `payment` are auto-mapped (many date formats, `Paid`/`50%`/
-  amounts for payments). Unmapped columns are stored in `extra`. **Re-imports are idempotent** (dedupe hash).
+  by status. Tap a shoot → detail drawer; tap a day → add a shoot on that date.
+- **Mobile-first UI** — responsive layout, tables drop low-priority columns on small screens, bottom-sheet
+  forms/drawers, safe-area insets, and a floating glass tab bar (Dashboard / Calendar / Shoots).
+- **Import (server-side)** — an **HTML spreadsheet export / CSV / JSON** sheet can be loaded via the REST
+  API (`POST /api/import`) or the CLI (`npm run import`). Columns like `date`, `client`, `coordinator`,
+  `fee`, `venue`, `status`, `payment` are auto-mapped (many date formats, `Paid`/`50%`/amounts for
+  payments). Unmapped columns are stored in `extra`. **Re-imports are idempotent** (dedupe hash).
 - **DB status pill** — shows connectivity; a banner explains what to do if the DB is unreachable.
 
 ---
