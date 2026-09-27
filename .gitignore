@@ -1,0 +1,14 @@
+node_modules/
+.env
+data/uploads/
+!data/.gitkeep
+*.log
+dev-data/
+
+# user data files (never commit business data)
+data/shooting-*.csv
+data/*.csv
+data/upload-*
+data/import-*.sql
+__pycache__/
+public/import-*.sql
