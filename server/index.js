@@ -374,6 +374,18 @@ app.post('/api/coordinators', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+app.delete('/api/coordinators/:id', async (req, res, next) => {
+  try {
+    const used = await query('SELECT count(*)::int AS n FROM shoots WHERE coordinator_id = $1', [req.params.id]);
+    if (used.rows[0].n > 0) {
+      return res.status(409).json({ error: `coordinator has ${used.rows[0].n} shoot(s) and cannot be deleted` });
+    }
+    const r = await query('DELETE FROM coordinators WHERE id = $1 RETURNING id, name', [req.params.id]);
+    if (!r.rows[0]) return res.status(404).json({ error: 'not found' });
+    res.json({ ok: true, deleted: r.rows[0] });
+  } catch (e) { next(e); }
+});
+
 /* ---------------- import ---------------- */
 
 app.post('/api/import', async (req, res, next) => {

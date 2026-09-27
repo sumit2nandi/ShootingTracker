@@ -55,7 +55,8 @@ check("month filter all April", all(r["shoot_date"].startswith("2026-04") for r 
 
 s, meta = call("GET", "/api/meta")
 coord_names = [c["name"] for c in meta.get("coordinators", [])]
-rc_name = coord_names[0] if coord_names else "Riya Saha"
+# pick a coordinator that actually has shoots (byCoordinator is ordered by fee desc)
+rc_name = (d.get("byCoordinator") or [{}])[0].get("name") or (coord_names[0] if coord_names else "Riya Saha")
 s, rc = call("GET", "/api/shoots?coordinator=" + urllib.parse.quote(rc_name))
 check("coordinator filter works", s == 200 and len(rc) >= 1)
 check("coordinator filter correct", all((r.get("coordinator") or "") == rc_name for r in rc))
@@ -134,6 +135,32 @@ check("import commit processed rows", s == 200 and (ic.get("inserted", 0) + ic.g
 # idempotency
 s, ic2 = call("POST", "/api/import", {"content": html, "dryRun": False})
 check("re-import is idempotent (0 new)", s == 200 and ic2.get("inserted", 0) == 0 and ic2.get("skipped", 0) >= 1)
+
+# ---------------- cleanup ----------------
+# Keep the database pure: remove everything this suite created (sample-sheet
+# rows, test coordinator). Payments/media cascade with the shoot; a
+# coordinator only deletes when no shoot references it (else 409, ignored —
+# protects real data that happens to share a name).
+print("\n-- cleanup --")
+SAMPLE_CLIENTS = {"Ananya & Vikram", "Debojit & Shreya", "Rohit Industries",
+                  "Meera Kapoor", "Sanket Jewellers", "Ishita & Arindam",
+                  "Kunal & Ritu", "Lakshmi Sarees"}
+s, allrows = call("GET", "/api/shoots")
+sample_ids = [r["id"] for r in allrows if (r.get("client_name") or "") in SAMPLE_CLIENTS]
+for i in sample_ids:
+    call("DELETE", f"/api/shoots/{i}")
+s, after = call("GET", "/api/shoots")
+left = [r["id"] for r in after if (r.get("client_name") or "") in SAMPLE_CLIENTS]
+check("sample import rows removed", s == 200 and not left)
+
+TEST_COORDS = {"New Coord", "Riya Saha", "Arjun Mukherjee", "Priyanka Dutta", "Sameer Khan"}
+s, m2 = call("GET", "/api/meta")
+for c in m2.get("coordinators", []):
+    if c["name"] in TEST_COORDS:
+        call("DELETE", f"/api/coordinators/{c['id']}")
+s, m3 = call("GET", "/api/meta")
+left_coords = [c["name"] for c in m3.get("coordinators", []) if c["name"] in TEST_COORDS]
+check("test coordinators removed", s == 200 and not left_coords)
 
 print(f"\nRESULT: {len(passed)} passed, {len(failed)} failed")
 if failed:

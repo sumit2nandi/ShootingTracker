@@ -59,6 +59,20 @@ Key indexes: shoot date, coordinator, client, status, type, and a GIN index on `
 > “DB unreachable”, add your egress IP (or `0.0.0.0/0` for a quick test) to the service **IP allowlist** in
 > the Aiven console. The connection string in `.env` already sets `sslmode=require`.
 
+### Troubleshooting connection errors
+
+| Error in the UI pill/banner | Cause | Fix |
+| --- | --- | --- |
+| `self-signed certificate in certificate chain` | A corporate TLS-inspection proxy (Citrix, Zscaler, Netskope, …) re-signs traffic with a CA that Node doesn't trust. The browser works because the CA is in the OS store. | Already handled: the app connects with certificate verification off for remote hosts (see `server/db.js`). Pull the latest code and restart. To keep verification, set `NODE_EXTRA_CA_CERTS=/path/to/corporate-ca.crt` in your environment. |
+| `connection terminated unexpectedly` (fast, ~100 ms) | Your machine's IP is not on the Aiven allowlist. | Add your egress IP to the service **IP allowlist** in the Aiven console. |
+| `database "…" does not exist` | The `DATABASE_URL` points at a database that hasn't been created. | Use an existing database (e.g. `defaultdb`) or create one in the Aiven console, then apply `server/schema.sql` (+ your import SQL) to **that** database. |
+
+> **Why verification is off for remote hosts:** since pg 8.16 (`pg-connection-string`), a URL with
+> `?sslmode=require` is parsed into `ssl: {}`, which *overrides* an explicit `ssl` option in the Pool
+> config — so Node silently re-enables certificate validation. `server/db.js` parses the URL itself and
+> passes `ssl: { rejectUnauthorized: false }` for remote hosts, which is predictable and safe enough for a
+> dev tool. Data and password still travel over TLS either way.
+
 ---
 
 ## 2 · Configure & run
@@ -94,17 +108,14 @@ npm run seed:demo         # optional: ~60 clearly-labelled demo shoots
 
 Three equivalent ways. All are idempotent — safe to run repeatedly.
 
-**a) In the UI** — `Import` tab → drop or paste an HTML/CSV/JSON sheet → **Preview (dry run)** →
-**Import into DB**.
-
-**b) CLI → database**
+**a) CLI → database**
 
 ```bash
 npm run import -- April.html              # insert into DATABASE_URL
 npm run import -- April.html --dry-run    # parse + summary only
 ```
 
-**c) CLI → SQL file for the Aiven console** (when you'd rather paste SQL)
+**b) CLI → SQL file for the Aiven console** (when you'd rather paste SQL)
 
 ```bash
 npm run import -- April.html --emit-sql data/import.sql

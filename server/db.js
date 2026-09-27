@@ -10,16 +10,50 @@ pg.types.setTypeParser(1083, (v) => v); // time
 pg.types.setTypeParser(1114, (v) => v); // timestamp
 pg.types.setTypeParser(1184, (v) => v); // timestamptz
 
-const url = process.env.DATABASE_URL || '';
-const isRemote = url.includes('aivencloud.com') || url.includes('sslmode');
+/**
+ * Build pg Pool options from DATABASE_URL.
+ *
+ * We parse the URL ourselves instead of passing `connectionString` to pg:
+ * pg >= 8.16 (pg-connection-string) parses `?sslmode=require` into `ssl: {}`,
+ * and that object OVERRIDES an explicit `ssl` option (see pg
+ * lib/connection-parameters.js: Object.assign(config, parse(connectionString))).
+ * Result: Node silently validates the certificate chain, which breaks behind
+ * corporate TLS-inspection proxies ("self-signed certificate in certificate
+ * chain"). Parsing explicitly keeps `rejectUnauthorized: false` in effect.
+ *
+ * TLS note: for remote hosts we skip certificate verification (convenience for
+ * dev tools behind corporate proxies). If you want strict verification, point
+ * Node at the issuing CA instead:  NODE_EXTRA_CA_CERTS=/path/to/ca.crt
+ */
+function buildPoolConfig(url) {
+  const base = {
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 30000,
+    max: 10
+  };
+  if (!url) return base;
 
-const pool = new Pool({
-  connectionString: url || undefined,
-  ssl: isRemote ? { rejectUnauthorized: false } : undefined,
-  connectionTimeoutMillis: 10000,
-  idleTimeoutMillis: 30000,
-  max: 10
-});
+  let u;
+  try {
+    u = new URL(url);
+  } catch (e) {
+    throw new Error(`DATABASE_URL is not a valid URL: ${e.message}`);
+  }
+
+  const isRemote = u.hostname.includes('aivencloud.com') || url.includes('sslmode');
+  return {
+    ...base,
+    host: u.hostname,
+    port: u.port ? Number(u.port) : 5432,
+    user: u.username ? decodeURIComponent(u.username) : undefined,
+    password: u.password ? decodeURIComponent(u.password) : undefined,
+    database: u.pathname.replace(/^\//, '') || undefined,
+    ssl: isRemote ? { rejectUnauthorized: false } : undefined
+  };
+}
+
+const url = process.env.DATABASE_URL || '';
+const pool = new Pool(buildPoolConfig(url));
 
 pool.on('error', (e) => {
   console.error('[db] idle client error:', e.message);
@@ -58,4 +92,4 @@ async function checkHealth(timeoutMs = 5000) {
   });
 }
 
-module.exports = { pool, query, checkHealth };
+module.exports = { pool, query, checkHealth, buildPoolConfig };
