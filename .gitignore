@@ -10,3 +10,4 @@ data/shooting-*.csv
 data/*.csv
 data/upload-*
 data/import-*.sql
+__pycache__/
