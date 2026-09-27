@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f5f7fb" />
+  <title>Sign in · ShootingTracker</title>
+  <link rel="stylesheet" href="/css/login.css" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="/js/login.js" defer></script>
+</head>
+<body>
+  <main class="login-layout">
+    <section class="login-story" aria-label="ShootingTracker">
+      <a class="wordmark" href="/" aria-label="ShootingTracker home">
+        <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg></span>
+        <span>ShootingTracker</span>
+      </a>
+      <div class="story-copy">
+        <span class="eyebrow"><i></i> YOUR STUDIO, IN FOCUS</span>
+        <h1>Every shoot.<br /><span>One clear view.</span></h1>
+        <p>Keep your schedule, clients and payments perfectly in frame.</p>
+      </div>
+      <div class="visual" aria-hidden="true">
+        <div class="orb orb-one"></div><div class="orb orb-two"></div>
+        <div class="frame frame-back"><span></span><i></i></div>
+        <div class="frame frame-main">
+          <div class="frame-top"><span class="live-dot"></span><span>STUDIO OVERVIEW</span><b>•••</b></div>
+          <div class="frame-photo"><div class="sun"></div><div class="horizon"></div><div class="hill hill-a"></div><div class="hill hill-b"></div><div class="photo-subject"></div></div>
+          <div class="frame-caption"><span>Next up</span><strong>Summer editorial</strong><small>Tomorrow · 9:30 AM</small></div>
+          <div class="frame-check">✓</div>
+        </div>
+        <div class="float-card"><span class="mini-icon">↗</span><div><b>All in sync</b><small>Your work, at a glance</small></div></div>
+        <div class="visual-caption"><span>01 — 03</span><span>PLAN · SHOOT · GROW</span></div>
+      </div>
+      <div class="story-footer"><span>Made for the moments worth capturing.</span><span class="footer-line"></span></div>
+    </section>
+
+    <section class="login-panel" aria-labelledby="welcome-title">
+      <div class="panel-inner">
+        <span class="panel-kicker">PRIVATE WORKSPACE</span>
+        <h2 id="welcome-title">Welcome back</h2>
+        <p class="panel-copy">Sign in with your authorized Google account to continue.</p>
+        <div class="access-note"><span class="lock-icon" aria-hidden="true">⌑</span><div><strong>Access is restricted</strong><span>Only invited studio members can sign in.</span></div></div>
+        <div id="google-button" class="google-button" aria-label="Sign in with Google"></div>
+        <p id="auth-message" class="auth-message" role="status" aria-live="polite">Preparing secure sign-in…</p>
+        <div class="panel-rule"><span></span><i>PRIVATE BY DESIGN</i><span></span></div>
+        <p class="privacy-copy">Your account is used only to verify access to this workspace. Your Google password is never shared with ShootingTracker.</p>
+      </div>
+      <footer class="panel-footer"><span>© ShootingTracker</span><span><i></i> Secure sign-in</span></footer>
+    </section>
+  </main>
+</body>
+</html>

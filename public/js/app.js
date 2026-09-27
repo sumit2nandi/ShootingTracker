@@ -28,6 +28,10 @@ async function api(path, opts = {}) {
   const res = await fetch(path, init);
   const isJson = (res.headers.get('content-type') || '').includes('json');
   const data = isJson ? await res.json() : await res.text();
+  if (res.status === 401) {
+    window.location.replace('/');
+    throw new Error('Your session has expired. Please sign in again.');
+  }
   if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
   return data;
 }
@@ -794,7 +798,16 @@ $('#f-clear').addEventListener('click', clearFilters);
 
 /* ---------- boot ---------- */
 
+$('#btn-signout').addEventListener('click', async () => {
+  try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); }
+  finally { window.location.replace('/'); }
+});
+
 (async function boot() {
+  try {
+    const { user } = await api('/api/auth/me');
+    $('#signed-in-user').textContent = user.email;
+  } catch (_error) { return; }
   pollHealth();
   await loadMeta();
   setView('dashboard');

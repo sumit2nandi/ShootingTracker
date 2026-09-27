@@ -4,13 +4,80 @@ const express = require('express');
 const { pool, query, checkHealth } = require('./db');
 const { parseSheet, detectFormat } = require('./parse');
 const { importRows } = require('./import-core');
+const {
+  SESSION_COOKIE, SESSION_TTL_SECONDS, createSession, cookieOptions, getSession,
+  verifyGoogleCredential
+} = require('./auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SESSION_SECRET = process.env.SESSION_SECRET || require('crypto').randomBytes(32).toString('hex');
+if (!process.env.SESSION_SECRET) console.warn('[auth] SESSION_SECRET is unset; sessions will reset when the server restarts');
 app.disable('x-powered-by');
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '15mb' }));
 app.use(express.text({ limit: '15mb', type: ['text/*', 'application/*'] }));
+
+function currentUser(req) {
+  return getSession(req, SESSION_SECRET);
+}
+
+/* ---------------- sign-in / protected app ---------------- */
+app.get('/api/auth/config', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ clientId: process.env.GOOGLE_CLIENT_ID || null });
+});
+
+app.get('/api/auth/me', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const user = currentUser(req);
+  if (!user) return res.status(401).json({ error: 'Sign-in required' });
+  res.json({ user });
+});
+
+app.post('/api/auth/google', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    return res.status(503).json({ error: 'Google sign-in is not configured. Set GOOGLE_CLIENT_ID on the server.' });
+  }
+  try {
+    const user = await verifyGoogleCredential(req.body && req.body.credential, process.env.GOOGLE_CLIENT_ID);
+    res.cookie(SESSION_COOKIE, createSession(user, SESSION_SECRET), cookieOptions(req, SESSION_TTL_SECONDS * 1000));
+    res.json({ user });
+  } catch (error) {
+    const denied = /not allowed/.test(error.message);
+    res.status(denied ? 403 : 401).json({ error: denied ? error.message : 'Google sign-in could not be verified. Please try again.' });
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie(SESSION_COOKIE, cookieOptions(req, 0));
+  res.json({ ok: true });
+});
+
+// The complete API is private, including health and import endpoints.
+app.use('/api', (req, res, next) => {
+  const user = currentUser(req);
+  if (!user) return res.status(401).json({ error: 'Sign-in required' });
+  req.user = user;
+  next();
+});
+
+function sendAppOrLogin(req, res) {
+  const filename = currentUser(req) ? 'index.html' : 'login.html';
+  res.set('Cache-Control', 'no-store');
+  res.sendFile(path.join(__dirname, '..', 'public', filename));
+}
+app.get('/', sendAppOrLogin);
+app.get('/index.html', sendAppOrLogin);
+
+// App code and its stylesheet are not downloadable until an allowlisted session exists.
+app.use(['/css/app.css', '/js/app.js'], (req, res, next) => {
+  if (!currentUser(req)) return res.status(401).type('text/plain').send('Sign-in required');
+  next();
+});
 app.use(express.static(path.join(__dirname, '..', 'public'), {
+  index: false,
   etag: false,
   lastModified: false,
   setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache, must-revalidate')
