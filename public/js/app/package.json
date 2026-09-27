@@ -1,0 +1,4 @@
+{
+  "type": "module",
+  "//": "Marks this folder as ES modules so Node's test runner can import the browser code directly. Browsers never request this file."
+}

@@ -82,13 +82,13 @@ Key indexes: shoot date, coordinator, client, status, type, and a GIN index on `
 
 | Error in the UI pill/banner | Cause | Fix |
 | --- | --- | --- |
-| `self-signed certificate in certificate chain` | A corporate TLS-inspection proxy (Citrix, Zscaler, Netskope, …) re-signs traffic with a CA that Node doesn't trust. The browser works because the CA is in the OS store. | Already handled: the app connects with certificate verification off for remote hosts (see `server/db.js`). Pull the latest code and restart. To keep verification, set `NODE_EXTRA_CA_CERTS=/path/to/corporate-ca.crt` in your environment. |
+| `self-signed certificate in certificate chain` | A corporate TLS-inspection proxy (Citrix, Zscaler, Netskope, …) re-signs traffic with a CA that Node doesn't trust. The browser works because the CA is in the OS store. | Already handled: the app connects with certificate verification off for remote hosts (see `server/persistence/pool-config.js`). Pull the latest code and restart. To keep verification, set `NODE_EXTRA_CA_CERTS=/path/to/corporate-ca.crt` in your environment. |
 | `connection terminated unexpectedly` (fast, ~100 ms) | Your machine's IP is not on the Aiven allowlist. | Add your egress IP to the service **IP allowlist** in the Aiven console. |
 | `database "…" does not exist` | The `DATABASE_URL` points at a database that hasn't been created. | Use an existing database (e.g. `defaultdb`) or create one in the Aiven console, then apply `server/schema.sql` (+ your import SQL) to **that** database. |
 
 > **Why verification is off for remote hosts:** since pg 8.16 (`pg-connection-string`), a URL with
 > `?sslmode=require` is parsed into `ssl: {}`, which *overrides* an explicit `ssl` option in the Pool
-> config — so Node silently re-enables certificate validation. `server/db.js` parses the URL itself and
+> config — so Node silently re-enables certificate validation. `server/persistence/pool-config.js` parses the URL itself and
 > passes `ssl: { rejectUnauthorized: false }` for remote hosts, which is predictable and safe enough for a
 > dev tool. Data and password still travel over TLS either way.
 
@@ -110,6 +110,20 @@ PORT=3000
 GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 SESSION_SECRET=use-a-long-random-secret
 ```
+
+Everything the server reads from the environment is declared and validated in
+`server/config/index.js`; a bad value fails at startup with a clear message
+instead of at the first request. Optional settings:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `LOG_LEVEL` | `debug` (`info` in production) | `silent` · `error` · `warn` · `info` · `debug` |
+| `SESSION_TTL_SECONDS` | `604800` (7 days) | Session lifetime |
+| `ALLOWLIST_CACHE_MS` | `20000` | How long an allow-list lookup is cached |
+| `DB_POOL_MAX`, `DB_CONNECTION_TIMEOUT_MS`, `DB_IDLE_TIMEOUT_MS` | `10`, `10000`, `30000` | Pool tuning |
+| `SHOOT_LIST_MAX_ROWS` | `2000` | Safety limit on `GET /api/shoots` |
+| `FRAME_OPTIONS` | `SAMEORIGIN` | `none` to allow embedding the app in an iframe |
+| `DEV_SIGN_IN_EMAIL` | — | **Development only.** Treat every request as this account so the app can be opened without Google credentials. The account must still be active in `app_users`, and the server refuses to start with it set when `NODE_ENV=production`. |
 
 ### Google-only access
 
@@ -187,8 +201,16 @@ Anything else is captured in `extra` and shown under “Extra fields” in the s
 
 Base: `http://localhost:3000`
 
+Every `/api` route except `/api/auth/config`, `/api/auth/google` and
+`/api/auth/logout` requires a signed-in session; without one they answer
+`401 {"error":"Sign-in required"}`.
+
 | Method & path                              | Description                                        |
 | ------------------------------------------ | -------------------------------------------------- |
+| `GET /api/auth/config`                     | Public Google client ID for the sign-in page       |
+| `GET /api/auth/me`                         | The signed-in account (email, name, role)          |
+| `POST /api/auth/google`                    | Exchange a Google credential for a session cookie  |
+| `POST /api/auth/logout`                    | Clear the session cookie                           |
 | `GET /api/health`                          | DB connectivity + latency                          |
 | `GET /api/meta`                            | Coordinator/client/type/month lists for filters    |
 | `GET /api/dashboard`                       | KPIs + aggregates (honours all filters)            |
@@ -203,6 +225,14 @@ Base: `http://localhost:3000`
 | `DELETE /api/media/:id`                    | Remove a media link                                |
 | `POST /api/import`                         | `{ content, format?, dryRun }` → parse/import      |
 | `POST /api/coordinators`                   | Upsert a coordinator                               |
+| `DELETE /api/coordinators/:id`             | Delete one (409 while shoots still reference it)   |
+| `GET/POST /api/users`, `PATCH/DELETE /api/users/:id` | Manage the allow-list (owners only)      |
+
+**Error shape.** Every failure is `{ "error": "…" }` with a meaningful status:
+`400` validation, `401` no session, `403` not an owner, `404` unknown id, `409`
+a rule would be broken (last owner, coordinator in use), `503` the database is
+unreachable. Unexpected failures are logged server-side and answered with a
+generic `500` — internal details are never returned.
 
 **Filter query params** (any combination): `month=YYYY-MM`, `year`, `from`, `to`, `coordinator` (name or id),
 `client`, `status` (csv), `type`, `minFee`, `maxFee`, `paymentStatus=paid|partial|unpaid`, `q=…`.
@@ -212,31 +242,71 @@ Base: `http://localhost:3000`
 ## 5 · Tests
 
 ```bash
-npm start &          # (or dev:pg + seeded)
-python3 scripts/api-test.py            # 36 end-to-end checks: filters, CRUD, payments, media, import
+npm test             # 128 unit + integration tests — no database, no network
 ```
+
+`npm test` uses the built-in Node test runner (no dependencies) and covers the
+domain rules, the import pipeline, sessions and Google token verification, the
+services (against in-memory repositories), the whole Express stack over HTTP,
+and the browser modules.
+
+End-to-end, against a running server and a real database:
+
+```bash
+npm run dev:pg                                    # throwaway Postgres (another shell)
+DATABASE_URL=… npm run migrate && npm run seed:demo
+DATABASE_URL=… npm start &
+ST_COOKIE=$(npm run --silent dev:session) npm run api-test    # 47 checks
+```
+
+`npm run dev:session` mints a signed session cookie from your `SESSION_SECRET`
+so scripts can call the API without going through Google. The account still has
+to be active in `app_users`.
 
 ---
 
 ## Project layout
 
+The code is layered — routes → services → repositories → database — with
+dependencies injected from a single composition root. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the rules and for a worked
+example of adding a feature.
+
 ```
 server/
-  index.js        # Express app + REST API
-  db.js           # pg pool, type parsers, health check
-  schema.sql      # idempotent DDL (paste into Aiven)
-  migrate.js      # applies schema.sql
-  parse.js        # HTML/CSV/JSON → normalized shoot rows
-  import-core.js  # idempotent DB import + standalone .sql emitter
-  import.js       # CLI importer
-  seed-demo.js    # demo data
+  index.js          # process entry point: listen + graceful shutdown
+  app.js            # Express composition (middleware, routers, error handler)
+  bootstrap.js      # .env → config → logger → container
+  container.js      # composition root: builds and wires everything
+  config/           # the only reader of process.env; validated + frozen
+  core/             # error hierarchy, logger, TTL cache, async handler
+  domain/           # pure rules: filters, shoot input, access policy, statuses
+  repositories/     # one SQL module per table/aggregate
+  persistence/      # pg pool, type parsers, schema bootstrap, error translation
+  services/         # use cases: shoots, payments, media, access, auth, import
+  import/           # format detection, HTML/CSV/JSON readers, header + value mapping
+  http/             # middleware (auth, errors, security headers) + one router per resource
+  schema.sql        # idempotent DDL (paste into Aiven)
+  migrate.js · import.js · seed-demo.js   # CLIs, all built on the same container
 public/
-  index.html      # SPA shell
-  css/app.css     # light + dark theme
-  js/app.js       # dashboard, calendar, CRUD, import UI
+  index.html        # SPA shell
+  css/app.css       # light + dark theme
+  js/app/           # ES modules, no build step:
+    main.js         #   composition root, routing, action mediator
+    core/           #   dom, formatting, store, event bus, theme
+    data/           #   ApiClient (transport) + ShootingTrackerApi (use cases)
+    domain/         #   filter criteria, status vocabulary, CSV export
+    ui/             #   one class per screen: dashboard, calendar, shoots, drawer, …
+test/
+  unit/             # domain, services, import, auth, frontend modules
+  integration/      # the Express app over HTTP with stub services
+  helpers/          # fakes and a test-app factory
 scripts/
-  dev-postgres.js # embedded local Postgres for dev
-  api-test.py     # e2e API test suite
+  dev-postgres.js   # embedded local Postgres for dev
+  dev-session.js    # mint a session cookie for local API testing
+  api-test.py       # e2e API test suite
+docs/
+  ARCHITECTURE.md   # layers, SOLID rationale, how to add a feature
 data/
   sample-sheet.html
 ```

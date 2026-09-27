@@ -6,10 +6,14 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
+    "test": "node --test \"test/**/*.test.js\"",
+    "test:watch": "node --test --watch \"test/**/*.test.js\"",
     "migrate": "node server/migrate.js",
     "import": "node server/import.js",
     "seed:demo": "node server/seed-demo.js",
-    "dev:pg": "node scripts/dev-postgres.js"
+    "dev:pg": "node scripts/dev-postgres.js",
+    "dev:session": "node scripts/dev-session.js",
+    "api-test": "python3 scripts/api-test.py"
   },
   "dependencies": {
     "cheerio": "^1.0.0",
@@ -19,5 +23,8 @@
   },
   "devDependencies": {
     "embedded-postgres": "18.4.0-beta.17"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
