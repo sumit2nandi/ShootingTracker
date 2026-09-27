@@ -8,6 +8,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const state = {
   view: 'dashboard',
   filters: { month: '', coordinator: '', client: '', status: '', type: '', q: '' },
+  viewFilters: {}, // per-view filter memory (dashboard only keeps month + coordinator)
   meta: { statuses: [], coordinators: [], clients: [], types: [], months: [] },
   cal: { year: new Date().getFullYear(), month: new Date().getMonth() },
   calShoots: [],
@@ -100,6 +101,34 @@ async function loadMeta() {
   $('#dl-coordinators').innerHTML = state.meta.coordinators.map((c) => `<option value="${esc(c.name)}">`).join('');
   $('#dl-clients').innerHTML = state.meta.clients.map((c) => `<option value="${esc(c)}">`).join('');
   $('#dl-types').innerHTML = state.meta.types.map((t) => `<option value="${esc(t)}">`).join('');
+  fillFormCoordinators();
+  fillCalSelects();
+}
+
+function fillFormCoordinators() {
+  const sel = $('#sel-coordinator');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML =
+    '<option value="">— none —</option>' +
+    state.meta.coordinators.map((c) => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('') +
+    '<option value="__new__">➕ New coordinator…</option>';
+  if (cur && [...sel.options].some((o) => o.value === cur)) sel.value = cur;
+}
+
+function fillCalSelects() {
+  const ysel = $('#cal-year'), msel = $('#cal-month');
+  if (!ysel) return;
+  const years = new Set((state.meta.months || []).map((m) => +String(m).slice(0, 4)));
+  years.add(new Date().getFullYear());
+  const list = [...years].sort((a, b) => a - b);
+  const lo = Math.min(...list) - 1, hi = Math.max(...list) + 1;
+  const keep = ysel.value;
+  ysel.innerHTML = [];
+  for (let y = lo; y <= hi; y++) ysel.innerHTML += `<option value="${y}">${y}</option>`;
+  if (keep && ysel.querySelector(`option[value="${keep}"]`)) ysel.value = keep;
+  msel.innerHTML = MONTH_NAMES.map((m, i) => `<option value="${i}">${m}</option>`).join('');
+  msel.value = String(state.cal.month);
 }
 
 function fillSelect(sel, values, selected = '', withAll = false) {
@@ -147,11 +176,25 @@ function clearFilters() {
 /* ---------- routing ---------- */
 
 function setView(v) {
+  if (state.view !== 'calendar' && v !== state.view) state.viewFilters[state.view] = readFilters();
   state.view = v;
   $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === v));
   for (const el of $$('.view')) el.classList.toggle('hidden', el.id !== `view-${v}`);
   $('#filterbar').classList.toggle('hidden', v === 'calendar');
+  $('#filterbar').dataset.for = v;
+  restoreViewFilters(v);
   refreshCurrent();
+}
+
+function restoreViewFilters(v) {
+  const f = state.viewFilters[v] || { month: '', coordinator: '', client: '', status: '', type: '', q: '' };
+  state.filters = { ...f };
+  $('#f-month').value = f.month || '';
+  $('#f-coordinator').value = f.coordinator || '';
+  $('#f-client').value = f.client || '';
+  $('#f-status').value = f.status || '';
+  $('#f-type').value = f.type || '';
+  $('#f-q').value = f.q || '';
 }
 
 function refreshCurrent() {
@@ -166,44 +209,75 @@ function refreshCurrent() {
 async function loadDashboard() {
   try {
     const d = await api('/api/dashboard?' + filterParams());
-    renderDashboard(d);
+    let daily = null;
+    if (state.filters.month) {
+      // month selected → earnings chart shows per-day earnings for that month
+      const rows = await api('/api/shoots?' + filterParams());
+      const byDay = {};
+      for (const s of rows) {
+        const k = String(s.shoot_date).slice(0, 10);
+        byDay[k] = (byDay[k] || 0) + (+s.fee || 0);
+      }
+      daily = Object.entries(byDay).sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([date, fee]) => ({ date, fee }));
+    }
+    renderDashboard(d, daily);
   } catch (e) { toast('Dashboard: ' + e.message, 'err'); }
 }
 
-function renderDashboard(d) {
+function renderDashboard(d, daily) {
   const k = d.kpi || {};
   $('#kpi-row').innerHTML = `
     <div class="kpi accent"><div class="kpi-label">Shoots</div><div class="kpi-value">${k.shoots ?? 0}</div><div class="kpi-sub">${k.completed ?? 0} completed</div></div>
     <div class="kpi violet"><div class="kpi-label">Total fee value</div><div class="kpi-value">${fmtMoney(k.total_fee)}</div><div class="kpi-sub">booked earnings</div></div>
-    <div class="kpi green"><div class="kpi-label">Collected</div><div class="kpi-value">${fmtMoney(k.total_paid)}</div><div class="kpi-sub">${k.paidshoots ?? 0} fully paid</div></div>
     <div class="kpi amber"><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmtMoney(k.outstanding)}</div><div class="kpi-sub">${k.unpaidshoots ?? 0} unpaid shoots</div></div>
     <div class="kpi"><div class="kpi-label">Active (planned/confirmed)</div><div class="kpi-value">${k.active ?? 0}</div><div class="kpi-sub">on the books</div></div>
     <div class="kpi red"><div class="kpi-label">Completed</div><div class="kpi-value">${k.completed ?? 0}</div><div class="kpi-sub">of ${k.shoots ?? 0} total</div></div>`;
 
-  renderMonthly(d.monthly || []);
+  renderEarnings(d.monthly || [], daily);
   renderStatusDonut(d.byStatus || []);
   renderCoordinators(d.byCoordinator || []);
   renderTypes(d.byType || []);
   renderUpcoming(d.upcoming || []);
 }
 
-function renderMonthly(monthly) {
-  const months = monthly.slice(-12).reverse().map((m) => ({ ym: m.ym, fee: +m.fee, paid: +m.paid }));
+function renderEarnings(monthly, daily) {
   const wrap = $('#chart-monthly');
-  if (!months.length) { wrap.innerHTML = '<div class="empty">No data for this filter</div>'; return; }
-  const max = Math.max(...months.map((m) => Math.max(m.fee, m.paid)), 1);
-  const label = (ym) => { const [y, m] = ym.split('-').map(Number); return `${MONTH_SHORT[m - 1]} ${String(y).slice(2)}`; };
-  wrap.innerHTML = `
-    <div class="bars">${months.map((m) => `
+  const title = $('#chart-title');
+  if (daily) {
+    title.textContent = 'Earnings by day';
+    if (!daily.length) {
+      wrap.innerHTML = '<div class="empty">No shoots in this month</div>';
+      $('#chart-range').textContent = '';
+      return;
+    }
+    const max = Math.max(...daily.map((d) => d.fee), 1);
+    const label = (d) => { const [, m, dd] = d.split('-').map(Number); return `${MONTH_SHORT[m - 1]} ${dd}`; };
+    wrap.innerHTML = `<div class="bars">${daily.map((d) => `
       <div class="bar-col">
         <div class="bar-pair">
-          <div class="bar fee" style="height:${(m.fee / max) * 100}%" title="${label(m.ym)} — fee ${fmtMoney(m.fee)}"><span class="bar-val">${m.fee ? fmtMoney(m.fee) : ''}</span></div>
-          <div class="bar paid" style="height:${(m.paid / max) * 100}%" title="${label(m.ym)} — collected ${fmtMoney(m.paid)}"><span class="bar-val">${m.paid ? fmtMoney(m.paid) : ''}</span></div>
+          <div class="bar fee" style="height:${(d.fee / max) * 100}%" title="${label(d.date)} — ${fmtMoney(d.fee)}"><span class="bar-val">${d.fee ? fmtMoney(d.fee) : ''}</span></div>
+        </div>
+        <div class="bar-label">${+d.date.slice(8, 10)}</div>
+      </div>`).join('')}</div>`;
+    $('#chart-range').textContent = `${label(daily[0].date)} – ${label(daily[daily.length - 1].date)}`;
+    return;
+  }
+  title.textContent = 'Earnings by month';
+  const months = (monthly || []).slice(-12).reverse().map((m) => ({ ym: m.ym, fee: +m.fee }));
+  if (!months.length) {
+    wrap.innerHTML = '<div class="empty">No data for this filter</div>';
+    $('#chart-range').textContent = '';
+    return;
+  }
+  const max = Math.max(...months.map((m) => m.fee), 1);
+  const label = (ym) => { const [y, m] = ym.split('-').map(Number); return `${MONTH_SHORT[m - 1]} ${String(y).slice(2)}`; };
+  wrap.innerHTML = `<div class="bars">${months.map((m) => `
+      <div class="bar-col">
+        <div class="bar-pair">
+          <div class="bar fee" style="height:${(m.fee / max) * 100}%" title="${label(m.ym)} — ${fmtMoney(m.fee)}"><span class="bar-val">${m.fee ? fmtMoney(m.fee) : ''}</span></div>
         </div>
         <div class="bar-label">${label(m.ym)}</div>
-      </div>`).join('')}
-    </div>
-    <div class="chart-legend"><span><i style="background:var(--accent)"></i>Fee value</span><span><i style="background:var(--green)"></i>Collected</span></div>`;
+      </div>`).join('')}</div>`;
   $('#chart-range').textContent = `${label(months[0].ym)} – ${label(months[months.length - 1].ym)}`;
 }
 
@@ -278,7 +352,13 @@ async function loadCalendar() {
   const { year, month } = state.cal;
   const first = new Date(year, month, 1);
   const last = new Date(year, month + 1, 0);
-  $('#cal-title').textContent = `${MONTH_NAMES[month]} ${year}`;
+  const ysel = $('#cal-year'), msel = $('#cal-month');
+  if (ysel && !ysel.querySelector(`option[value="${year}"]`)) {
+    const o = document.createElement('option');
+    o.value = year; o.textContent = year; ysel.appendChild(o);
+  }
+  if (ysel) ysel.value = String(year);
+  if (msel) msel.value = String(month);
   try {
     const shoots = await api(`/api/shoots?from=${dayKey(first)}&to=${dayKey(last)}`);
     // map by date (support multi-day ranges)
@@ -373,7 +453,7 @@ function renderShoots(rows) {
         <th class="col-date">Date</th><th class="col-title">Title</th><th class="col-client">Client</th>
         <th class="col-type">Type</th><th class="col-coord">Coordinator</th>
         <th class="col-venue">Venue / Location</th><th class="col-fee num">Fee</th>
-        <th class="col-paid num">Collected</th><th class="col-payst">Payment</th><th class="col-status">Status</th>
+        <th class="col-payst">Payment</th><th class="col-status">Status</th>
       </tr></thead>
       <tbody>${rows.map((s) => `
         <tr data-id="${s.id}">
@@ -384,7 +464,6 @@ function renderShoots(rows) {
           <td class="col-coord">${esc(s.coordinator || '—')}</td>
           <td class="col-venue">${esc([s.venue, s.location].filter(Boolean).join(', ') || '—')}</td>
           <td class="col-fee num td-mono">${fmtMoney(s.fee)}</td>
-          <td class="col-paid num td-mono">${fmtMoney(s.paid_amount)}</td>
           <td class="col-payst"><span class="pill ${s.payment_status}">${s.payment_status}</span></td>
           <td class="col-status"><span class="pill ${s.status}">${s.status}</span></td>
         </tr>`).join('')}</tbody>
@@ -404,11 +483,30 @@ function openShootModal(shoot, presetDate) {
   set('end_date', shoot?.end_date); set('start_time', shoot?.start_time ? String(shoot.start_time).slice(0, 5) : '');
   set('end_time', shoot?.end_time ? String(shoot.end_time).slice(0, 5) : '');
   set('venue', shoot?.venue); set('location', shoot?.location);
-  set('coordinator', shoot?.coordinator); set('fee', shoot?.fee ?? 0);
-  set('status', shoot?.status || 'planned'); set('contact_name', shoot?.contact_name);
+  set('fee', shoot?.fee ?? 0); set('contact_name', shoot?.contact_name);
   set('contact_phone', shoot?.contact_phone); set('notes', shoot?.notes);
+  // coordinator: existing → dropdown option; unknown → "new" mode with text field
+  const coordSel = $('#sel-coordinator'), coordNew = $('#coord-new-input');
+  const known = shoot?.coordinator && state.meta.coordinators.some((c) => c.name === shoot.coordinator);
+  if (shoot?.coordinator) {
+    coordSel.value = known ? shoot.coordinator : '__new__';
+    coordNew.value = known ? '' : shoot.coordinator;
+  } else { coordSel.value = ''; coordNew.value = ''; }
+  coordNew.hidden = coordSel.value !== '__new__';
+  // status: core options are Planned/Completed; keep any other value intact when editing
+  const stSel = $('#sel-status');
+  const st = shoot?.status || 'planned';
+  if (st !== 'planned' && st !== 'completed' && ![...stSel.options].some((o) => o.value === st)) {
+    const o = document.createElement('option');
+    o.value = st; o.textContent = st; stSel.appendChild(o);
+  }
+  stSel.value = st;
   $('#shoot-modal').classList.remove('hidden');
   setTimeout(() => f.title.focus(), 50);
+}
+function formCoordinatorValue() {
+  const sel = $('#sel-coordinator');
+  return sel.value === '__new__' ? $('#coord-new-input').value.trim() : sel.value;
 }
 function closeShootModal() { $('#shoot-modal').classList.add('hidden'); }
 
@@ -420,7 +518,7 @@ $('#btn-save-shoot').addEventListener('click', async () => {
     shoot_type: f.shoot_type.value.trim() || null, shoot_date: f.shoot_date.value,
     end_date: f.end_date.value || null, start_time: f.start_time.value || null,
     end_time: f.end_time.value || null, venue: f.venue.value.trim() || null,
-    location: f.location.value.trim() || null, coordinator: f.coordinator.value.trim() || null,
+    location: f.location.value.trim() || null, coordinator: formCoordinatorValue() || null,
     fee: f.fee.value || 0, status: f.status.value, contact_name: f.contact_name.value.trim() || null,
     contact_phone: f.contact_phone.value.trim() || null, notes: f.notes.value.trim() || null
   };
@@ -541,9 +639,68 @@ async function openDrawer(id) {
 }
 function closeDrawer() { $('#drawer-backdrop').classList.add('hidden'); }
 
+/* ---------- export (original calendar CSV format) ---------- */
+
+function buildExportCsv(rows) {
+  const cell = (v) => { const s = String(v ?? ''); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  const sorted = [...rows].sort((a, b) => (a.shoot_date < b.shoot_date ? -1 : a.shoot_date > b.shoot_date ? 1 : a.id - b.id));
+  const [fy, fm] = String(sorted[0].shoot_date).slice(0, 7).split('-').map(Number);
+  // Month/Total side block: 12 consecutive months from the earliest month, like the original sheet
+  const monthTotals = [];
+  for (let i = 0; i < 12; i++) {
+    const dt = new Date(fy, fm - 1 + i, 1);
+    const ym = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    const total = sorted.reduce((a, s) => (String(s.shoot_date).slice(0, 7) === ym ? a + (+s.fee || 0) : a), 0);
+    monthTotals.push({ name: MONTH_NAMES[dt.getMonth()], total });
+  }
+  const lines = ['Date,Description,Coordinator ,Remuneration,Status,,Month,Total,,Advance,,'];
+  sorted.forEach((s, i) => {
+    const [y, m, d] = String(s.shoot_date).slice(0, 10).split('-').map(Number);
+    const date = `${d}-${MONTH_NAMES[m - 1]}-${y}`;
+    const status = s.status === 'completed' ? 'Done' : '';
+    const fee = Math.round((+s.fee || 0) * 100) / 100;
+    const mt = monthTotals[i];
+    const row = [
+      date, cell(s.title), cell(s.coordinator || ''), fee, status, '',
+      mt ? mt.name : '', mt ? mt.total : '', '',
+      i === 0 ? 'Description ' : '', i === 0 ? 'Amount ' : '', i === 0 ? 'Date' : ''
+    ];
+    lines.push(row.join(','));
+  });
+  return lines.join('\n');
+}
+
+function downloadText(filename, text, type = 'text/csv;charset=utf-8') {
+  const blob = new Blob([text], { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
 /* ---------- global wiring ---------- */
 
 $$('.tab').forEach((t) => t.addEventListener('click', () => setView(t.dataset.view)));
+$('#sel-coordinator').addEventListener('change', () => {
+  const ni = $('#coord-new-input');
+  if ($('#sel-coordinator').value === '__new__') { ni.hidden = false; ni.focus(); }
+  else { ni.hidden = true; }
+});
+$('#cal-year').addEventListener('change', (e) => { state.cal.year = +e.target.value; loadCalendar(); });
+$('#cal-month').addEventListener('change', (e) => { state.cal.month = +e.target.value; loadCalendar(); });
+$('#btn-export').addEventListener('click', async () => {
+  try {
+    const rows = await api('/api/shoots');
+    if (!rows.length) { toast('Nothing to export yet — add some shoots first', 'err'); return; }
+    const csv = buildExportCsv(rows);
+    const year = rows.reduce((m, s) => (String(s.shoot_date).slice(0, 4) < m ? String(s.shoot_date).slice(0, 4) : m), '9999');
+    downloadText(`Shooting-Calendar-${year}.csv`, csv);
+    toast(`Exported ${rows.length} shoots`);
+  } catch (e) { toast('Export failed: ' + e.message, 'err'); }
+});
 $$('.modal-backdrop [data-close]').forEach((b) => b.addEventListener('click', closeShootModal));
 $('#shoot-modal').addEventListener('click', (e) => { if (e.target.id === 'shoot-modal') closeShootModal(); });
 $('#drawer-backdrop').addEventListener('click', (e) => { if (e.target.id === 'drawer-backdrop') closeDrawer(); });

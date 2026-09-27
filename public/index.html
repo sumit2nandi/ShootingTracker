@@ -4,8 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ShootingTracker</title>
-  <link rel="stylesheet" href="css/app.css?v=3" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%B7%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/app.css?v=4" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=4" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=4" />
+  <link rel="apple-touch-icon" href="favicon.png?v=4" />
 </head>
 <body>
   <header class="topbar">
@@ -33,6 +35,10 @@
       <span id="db-status" class="db-pill" title="Checking database…">
         <span class="dot"></span><span class="db-pill-text">DB…</span>
       </span>
+      <button id="btn-export" class="btn btn-ghost" aria-label="Export all data" title="Export all shoots (original calendar CSV format)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        <span class="btn-label">Export</span>
+      </button>
       <button id="btn-new-shoot" class="btn btn-primary" aria-label="New shoot">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         <span class="btn-label">New shoot</span>
@@ -40,22 +46,26 @@
     </div>
   </header>
 
-  <section id="filterbar" class="filterbar">
+  <section id="filterbar" class="filterbar" data-for="dashboard">
     <div class="filter-group"><label>Month</label><select id="f-month"></select></div>
     <div class="filter-group"><label>Coordinator</label><select id="f-coordinator"></select></div>
-    <div class="filter-group"><label>Client</label><select id="f-client"></select></div>
-    <div class="filter-group"><label>Status</label><select id="f-status"></select></div>
-    <div class="filter-group"><label>Type</label><select id="f-type"></select></div>
-    <div class="filter-group grow"><label>Search</label><input id="f-q" type="search" placeholder="Search shoots…" /></div>
+    <div class="filter-group extra"><label>Client</label><select id="f-client"></select></div>
+    <div class="filter-group extra"><label>Status</label><select id="f-status"></select></div>
+    <div class="filter-group extra"><label>Type</label><select id="f-type"></select></div>
+    <div class="filter-group grow extra"><label>Search</label><input id="f-q" type="search" placeholder="Search shoots…" /></div>
     <button id="f-clear" class="btn btn-ghost">Clear</button>
   </section>
 
   <main id="main">
     <section id="view-dashboard" class="view">
+      <div class="card">
+        <div class="card-head"><h3>Upcoming shoots</h3></div>
+        <div id="upcoming-table" class="table-wrap"></div>
+      </div>
       <div id="kpi-row" class="kpi-row"></div>
       <div class="grid-2">
         <div class="card">
-          <div class="card-head"><h3>Earnings by month</h3><span class="muted" id="chart-range"></span></div>
+          <div class="card-head"><h3 id="chart-title">Earnings by month</h3><span class="muted" id="chart-range"></span></div>
           <div id="chart-monthly" class="chart-area"></div>
         </div>
         <div class="card">
@@ -68,14 +78,10 @@
           <div class="card-head"><h3>By coordinator</h3></div>
           <div id="list-coordinators"></div>
         </div>
-        <div class="card">
-          <div class="card-head"><h3>By shoot type</h3></div>
-          <div id="list-types" class="type-chips"></div>
-        </div>
-      </div>
       <div class="card">
-        <div class="card-head"><h3>Upcoming shoots</h3></div>
-        <div id="upcoming-table" class="table-wrap"></div>
+        <div class="card-head"><h3>By shoot type</h3></div>
+        <div id="list-types" class="type-chips"></div>
+      </div>
       </div>
     </section>
 
@@ -85,7 +91,8 @@
           <button class="btn icon-btn" id="cal-prev" aria-label="Previous month">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
-          <h2 id="cal-title"></h2>
+          <select id="cal-month" class="cal-select" aria-label="Month"></select>
+          <select id="cal-year" class="cal-select" aria-label="Year"></select>
           <button class="btn icon-btn" id="cal-next" aria-label="Next month">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
           </button>
@@ -122,24 +129,29 @@
       </div>
       <form id="shoot-form" class="form-grid">
         <input type="hidden" name="id" />
+        <!-- core fields -->
         <div class="field span-2"><label>Title *</label><input name="title" required placeholder="e.g. Ananya & Vikram — Wedding" /></div>
         <div class="field"><label>Shoot date *</label><input name="shoot_date" type="date" required /></div>
         <div class="field"><label>Fee (₹)</label><input name="fee" type="number" min="0" step="0.01" inputmode="numeric" value="0" /></div>
-        <div class="field"><label>Client</label><input name="client_name" list="dl-clients" placeholder="Client name" /></div>
-        <div class="field"><label>Coordinator</label><input name="coordinator" list="dl-coordinators" placeholder="Coordinator" /></div>
+        <div class="field"><label>Coordinator</label>
+          <select name="coordinator" id="sel-coordinator">
+            <option value="">— none —</option>
+            <option value="__new__">➕ New coordinator…</option>
+          </select>
+          <input name="coordinator_new" id="coord-new-input" placeholder="Type new coordinator name" hidden />
+        </div>
         <div class="field"><label>Status</label>
-          <select name="status">
-            <option value="planned">planned</option>
-            <option value="confirmed">confirmed</option>
-            <option value="completed">completed</option>
-            <option value="postponed">postponed</option>
-            <option value="cancelled">cancelled</option>
+          <select name="status" id="sel-status">
+            <option value="planned">Planned</option>
+            <option value="completed">Completed</option>
           </select>
         </div>
-        <div class="field"><label>Type</label><input name="shoot_type" list="dl-types" placeholder="wedding, fashion…" /></div>
+        <!-- details -->
         <details class="field span-2 more-details">
           <summary>More details</summary>
           <div class="sub-grid">
+            <div class="field"><label>Client</label><input name="client_name" list="dl-clients" placeholder="Client name" /></div>
+            <div class="field"><label>Type</label><input name="shoot_type" list="dl-types" placeholder="wedding, fashion…" /></div>
             <div class="field"><label>End date</label><input name="end_date" type="date" /></div>
             <div class="field"><label>Start time</label><input name="start_time" type="time" /></div>
             <div class="field"><label>End time</label><input name="end_time" type="time" /></div>
