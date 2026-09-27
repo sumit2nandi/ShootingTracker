@@ -49,6 +49,15 @@ function toast(msg, kind = 'ok') {
 /* ---------- formatting ---------- */
 
 const fmtMoney = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+/* short form for the labels printed above the chart bars: ₹2.5L, ₹45k, ₹800 */
+const fmtMoneyShort = (n) => {
+  const v = Math.abs(Number(n) || 0);
+  const r1 = (x) => { const t = Math.round(x * 10) / 10; return Number.isInteger(t) ? String(t) : t.toFixed(1); };
+  if (v >= 1e7) return '₹' + r1(v / 1e7) + 'Cr';
+  if (v >= 1e5) return '₹' + r1(v / 1e5) + 'L';
+  if (v >= 1000) return '₹' + Math.round(v / 1000) + 'k';
+  return '₹' + Math.round(v);
+};
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -278,7 +287,7 @@ function renderEarnings(monthly, daily) {
     wrap.innerHTML = `<div class="bars">${daily.map((d) => `
       <div class="bar-col">
         <div class="bar-pair">
-          <div class="bar fee" style="height:${(d.fee / max) * 100}%" title="${label(d.date)} — ${fmtMoney(d.fee)}" data-lbl="${label(d.date)}" data-val="${d.fee}"><span class="bar-val">${d.fee ? fmtMoney(d.fee) : ''}</span></div>
+          <div class="bar fee" style="height:${(d.fee / max) * 100}%" title="${label(d.date)} — ${fmtMoney(d.fee)}" data-lbl="${label(d.date)}" data-val="${d.fee}"><span class="bar-val">${d.fee ? fmtMoneyShort(d.fee) : ''}</span></div>
         </div>
         <div class="bar-label">${+d.date.slice(8, 10)}</div>
       </div>`).join('')}</div>`;
@@ -297,7 +306,7 @@ function renderEarnings(monthly, daily) {
   wrap.innerHTML = `<div class="bars">${months.map((m) => `
       <div class="bar-col">
         <div class="bar-pair">
-          <div class="bar fee" style="height:${(m.fee / max) * 100}%" title="${label(m.ym)} — ${fmtMoney(m.fee)}" data-lbl="${label(m.ym)}" data-val="${m.fee}"><span class="bar-val">${m.fee ? fmtMoney(m.fee) : ''}</span></div>
+          <div class="bar fee" style="height:${(m.fee / max) * 100}%" title="${label(m.ym)} — ${fmtMoney(m.fee)}" data-lbl="${label(m.ym)}" data-val="${m.fee}"><span class="bar-val">${m.fee ? fmtMoneyShort(m.fee) : ''}</span></div>
         </div>
         <div class="bar-label">${label(m.ym)}</div>
       </div>`).join('')}</div>`;

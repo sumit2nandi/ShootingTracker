@@ -150,15 +150,22 @@ main { padding: 16px 16px calc(110px + env(safe-area-inset-bottom)); max-width: 
 /* ---------- charts ---------- */
 .chart-area { min-height: 200px; overflow-x: auto; }
 @media (max-width: 700px) { .bar-col { min-width: 26px; } .bars { min-width: max-content; } }
-.bars { display: flex; align-items: flex-end; gap: 3px; height: 205px; padding-top: 10px; }
+/* padding-top leaves room for the value printed above the tallest bar */
+.bars { display: flex; align-items: flex-end; gap: 3px; height: 205px; padding-top: 24px; }
 .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
-.bar-pair { display: flex; align-items: flex-end; gap: 2px; height: 165px; width: 100%; justify-content: center; }
+.bar-pair { display: flex; align-items: flex-end; gap: 2px; height: 152px; width: 100%; justify-content: center; }
 .bar { width: 45%; max-width: 24px; border-radius: 4px 4px 0 0; transition: height .35s ease; position: relative; }
 .bar.fee { background: linear-gradient(180deg, #5b8def, var(--accent)); }
 .bar.paid { background: linear-gradient(180deg, #4ade80, #16a34a); }
 .bar:hover { filter: brightness(1.08); }
-.bar-val { font-size: 10px; color: var(--text); opacity: 0; position: absolute; top: -18px; left: 50%; transform: translateX(-50%); white-space: nowrap; }
-.bar:hover .bar-val { opacity: 1; }
+.bar-col:hover .bar.fee { background: linear-gradient(180deg, #6f9bf3, var(--accent-strong)); }
+/* the amount sits above every bar at all times — no hover, no click */
+.bar-val {
+  font-size: 9px; line-height: 1; font-weight: 650; color: var(--muted); letter-spacing: -.2px;
+  position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+  white-space: nowrap; pointer-events: none; font-variant-numeric: tabular-nums;
+}
+.bar:hover .bar-val, .bar-col:hover .bar-val { color: var(--text); }
 .bar-label { font-size: 10px; color: var(--muted); white-space: nowrap; }
 .chart-legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 10px; justify-content: center; }
 .chart-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; }
@@ -200,10 +207,12 @@ tbody tr:hover { background: var(--surface-2); }
 .td-mono { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 
-/* iOS/Android: 16px controls stop the page zoom when a field is focused */
+/* iOS/Android: 16px controls stop the page zoom when a field is focused.
+   The calendar month/year selects are deliberately excluded — they are pickers,
+   not typing fields, and 16px made the calendar toolbar overflow on phones. */
 @media (max-width: 768px) {
   #shoot-form input, #shoot-form select, #shoot-form textarea,
-  .cal-select, .filter-group select, .filter-group input { font-size: 16px; }
+  .filter-group select, .filter-group input { font-size: 16px; }
 }
 @media (max-width: 700px) {
   .table-wrap { scrollbar-width: thin; }
@@ -221,16 +230,18 @@ tbody tr:hover { background: var(--surface-2); }
 
 /* ---------- calendar ---------- */
 .cal-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
-.cal-nav { display: flex; align-items: center; gap: 8px; }
+.cal-nav { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.cal-nav .icon-btn { padding: 6px; }
+.cal-nav #cal-today { padding: 6px 10px; font-size: 12.5px; }
 .cal-select {
-  font-size: 14px; font-weight: 650; color: var(--text);
-  padding: 6px 26px 6px 9px; border-radius: 9px; border: 1px solid var(--line-2);
+  font-size: 13px; font-weight: 650; color: var(--text);
+  padding: 5px 22px 5px 8px; border-radius: 8px; border: 1px solid var(--line-2);
   background-color: var(--surface); font-family: inherit;
   flex: none;   /* the toolbar must not squeeze the month name out of view */
 }
-/* just wide enough for the longest month name plus the caret */
-#cal-month { min-width: 108px; }
-#cal-year { min-width: 0; }
+/* just wide enough for the longest month name ("September") plus the caret */
+#cal-month { min-width: 92px; }
+#cal-year { min-width: 0; padding-right: 20px; }
 .cal-select:focus { outline: none; border-color: var(--accent); }
 .cal-legend { display: flex; align-items: center; gap: 7px 14px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -310,7 +321,7 @@ tbody tr:hover { background: var(--surface-2); }
 @media (min-width: 768px) { .cal-mobile-note { display: none; } }
 @media (max-width: 768px) {
   .cal-frame { border-radius: 10px; }
-  #cal-month { min-width: 100px; }
+  #cal-month { min-width: 88px; }
   .cal-grid { grid-auto-rows: clamp(74px, 10.5vh, 100px); }
   .cal-cell { padding: 3px 4px 4px; }
   .cal-dow { padding: 6px 5px; font-size: 10.5px; }
