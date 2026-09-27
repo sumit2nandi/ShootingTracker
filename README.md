@@ -23,10 +23,14 @@ tab bar** on mobile.
   - upcoming shoots.
   Every widget respects the shared filter bar: **month, coordinator, client, status, type, fee range,
   text search, payment status**.
-- **Calendar** — month grid, every shoot shown on its date (multi-day shoots span their range), color-coded
-  by status. Tap a shoot → detail drawer; tap a day → add a shoot on that date.
-- **Mobile-first UI** — responsive layout, tables drop low-priority columns on small screens, bottom-sheet
-  forms/drawers, safe-area insets, and a floating glass tab bar (Dashboard / Calendar / Shoots).
+- **Calendar** — Google-style month grid: cells share their edges (no gaps), today is highlighted, days from
+  the neighbouring months are dimmed, and every shoot is shown on its date (multi-day shoots span their
+  range) as a status-coloured chip. The legend mirrors those chips and counts the statuses in the month on
+  screen. Tap a shoot → detail drawer; tap a day → add a shoot on that date. A list view is one tap away.
+- **Mobile-first UI** — responsive layout, bottom-sheet forms/drawers, safe-area insets, and a floating glass
+  tab bar (Dashboard / Calendar / Shoots). The **All shoots** table goes edge-to-edge on phones and drops its
+  **Status** and **Payment** columns; the fee itself turns into a **green bubble when paid** and a **red
+  bubble when a balance is due**.
 - **Import (server-side)** — an **HTML spreadsheet export / CSV / JSON** sheet can be loaded via the REST
   API (`POST /api/import`) or the CLI (`npm run import`). Columns like `date`, `client`, `coordinator`,
   `fee`, `venue`, `status`, `payment` are auto-mapped (many date formats, `Paid`/`50%`/amounts for

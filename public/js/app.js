@@ -58,6 +58,14 @@ function fmtDate(s) {
   if (!y || !m || !d) return s;
   return `${d} ${MONTH_SHORT[m - 1]} ${y}`;
 }
+/* "22 Sep" — the month/year already come from the group heading on phones */
+function shortDate(s) {
+  if (!s) return '—';
+  const [, m, d] = String(s).slice(0, 10).split('-').map(Number);
+  if (!m || !d) return String(s);
+  return `${d} ${MONTH_SHORT[m - 1]}`;
+}
+
 function fmtTime(t) {
   if (!t) return '';
   const [h, mi] = String(t).split(':');
@@ -292,6 +300,8 @@ function renderEarnings(monthly, daily) {
 }
 
 const STATUS_COLORS = { planned: '#7b8ea3', confirmed: '#0e7490', completed: '#15803d', postponed: '#b45309', cancelled: '#dc2626' };
+const STATUS_ORDER = Object.keys(STATUS_COLORS);
+const statusLabel = (s) => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1);
 
 function renderStatusDonut(byStatus) {
   const wrap = $('#chart-status');
@@ -351,7 +361,7 @@ function renderUpcoming(list) {
         <td class="col-u-venue">${esc([s.venue, s.location].filter(Boolean).join(', ') || '—')}</td>
         <td class="col-u-coord">${esc(s.coordinator || '—')}</td>
         <td class="num td-mono">${fmtMoney(s.fee)}</td>
-        <td><span class="pill ${s.status}">${s.status}</span></td>
+        <td><span class="pill ${s.status}">${esc(statusLabel(s.status))}</span></td>
       </tr>`).join('')}</tbody></table>`;
   $$('#upcoming-table tbody tr').forEach((tr) => tr.addEventListener('click', () => openDrawer(+tr.dataset.id)));
 }
@@ -383,9 +393,32 @@ async function loadCalendar() {
       }
     }
     state.calByDate = byDate;
+    state.calShoots = shoots;
+    renderCalLegend();
     if (state.calView === 'list') renderCalendarList();
     else renderCalendarGrid();
   } catch (e) { toast('Calendar: ' + e.message, 'err'); }
+}
+
+/* Legend mirrors the event chips exactly (same colours and left bar) and only
+   lists the statuses that actually occur in the month on screen. */
+function renderCalLegend() {
+  const idsByStatus = new Map();
+  for (const s of state.calShoots || []) {
+    if (!s) continue;
+    if (!idsByStatus.has(s.status)) idsByStatus.set(s.status, new Set());
+    idsByStatus.get(s.status).add(s.id);
+  }
+  const present = STATUS_ORDER.filter((st) => idsByStatus.has(st));
+  const wrap = $('#cal-legend');
+  if (!present.length) {
+    wrap.innerHTML = `<span class="legend-empty">No shoots in ${MONTH_NAMES[state.cal.month]} ${state.cal.year}</span>`;
+    return;
+  }
+  wrap.innerHTML = present.map((st) => {
+    const n = idsByStatus.get(st).size;
+    return `<span class="legend-item"><i class="legend-swatch ${st}"></i>${statusLabel(st)}<span class="legend-n">${n}</span></span>`;
+  }).join('');
 }
 
 function renderCalendarList() {
@@ -406,7 +439,7 @@ function renderCalendarList() {
             <span class="cl-title">${esc(s.title)}</span>
             ${s.coordinator ? `<span class="muted small cl-coord">${esc(s.coordinator)}</span>` : ''}
             <span class="cl-fee td-mono">${fmtMoney(s.fee)}</span>
-            <span class="pill ${s.status}">${s.status}</span>
+            <span class="pill ${s.status}">${esc(statusLabel(s.status))}</span>
           </div>`).join('')}
         </div>
       </div>`);
@@ -446,7 +479,7 @@ function renderCalendarGrid() {
     const shown = shoots.slice(0, 3);
     cells.push(`
       <div class="cal-cell ${inMonth ? '' : 'dim'} ${k === todayK ? 'today' : ''}" data-date="${k}">
-        <div class="cal-dayno">${d.getDate()}</div>
+        <div class="cal-dayno"><span>${d.getDate()}</span></div>
         <div class="cal-chips">
           ${shown.map((s) => `<div class="cal-chip ${s.status}" data-id="${s.id}" title="${esc(s.title)}${s.venue ? ' — ' + esc(s.venue) : ''}">${esc(s.title)}</div>`).join('')}
           ${shoots.length > 3 ? `<div class="cal-more" data-date="${k}">+${shoots.length - 3} more…</div>` : ''}
@@ -454,8 +487,6 @@ function renderCalendarGrid() {
       </div>`);
   }
   $('#cal-grid').innerHTML = cells.join('');
-  // legend
-  $('#cal-legend').innerHTML = Object.entries(STATUS_COLORS).map(([status, color]) => `<span class="legend-item"><i style="background:${color}"></i>${status.charAt(0).toUpperCase() + status.slice(1)}</span>`).join('');
   // events
   $$('#cal-grid .cal-chip').forEach((chip) => chip.addEventListener('click', (ev) => { ev.stopPropagation(); openDrawer(+chip.dataset.id); }));
   $$('#cal-grid .cal-cell').forEach((cell) => cell.addEventListener('click', () => openShootModal(null, cell.dataset.date)));
@@ -470,7 +501,7 @@ function openDayPanel(dateK) {
     <div class="sub">${shoots.length} shoot${shoots.length === 1 ? '' : 's'} on this day</div>
     ${shoots.map((s) => `
       <div class="pay-row" data-id="${s.id}" style="cursor:pointer">
-        <span class="pill ${s.status}">${s.status}</span>
+        <span class="pill ${s.status}">${esc(statusLabel(s.status))}</span>
         <span>${esc(s.title)}</span>
         <span class="amt">${fmtMoney(s.fee)}</span>
       </div>`).join('')}
@@ -512,20 +543,25 @@ function renderShoots(rows) {
   const headings = (ym) => ym === 'undated' ? 'Undated' : monthLabel(ym);
   const tableFor = (monthRows) => `
     <table class="shoots-table">
-      <thead><tr><th>Date</th><th>Title</th><th>Coordinator</th><th class="num">Fee</th><th>Payment</th><th>Status</th></tr></thead>
+      <thead><tr><th>Date</th><th>Title</th><th>Coordinator</th><th class="num">Fee</th><th class="col-pay">Payment</th><th class="col-status">Status</th></tr></thead>
       <tbody>${monthRows.map((s) => {
         const paid = s.payment_status === 'paid';
-        const completed = s.status === 'completed';
-        const paymentLabel = s.payment_status === 'partial' ? 'Partially paid' : s.payment_status;
-        const statusLabel = s.status.charAt(0).toUpperCase() + s.status.slice(1);
+        const paymentLabel = s.payment_status === 'partial' ? 'Partially paid' : statusLabel(s.payment_status);
+        const multiDay = s.end_date && s.end_date !== s.shoot_date;
+        const daySpan = multiDay
+          ? Math.max(1, Math.round((new Date(s.end_date) - new Date(s.shoot_date)) / 86400000) + 1)
+          : 0;
+        const fullDate = multiDay ? `${fmtDate(s.shoot_date)} → ${fmtDate(s.end_date)}` : fmtDate(s.shoot_date);
         return `
-          <tr data-id="${s.id}">
-            <td class="td-mono">${fmtDate(s.shoot_date)}${s.end_date && s.end_date !== s.shoot_date ? ` → ${fmtDate(s.end_date)}` : ''}</td>
-            <td>${esc(s.title)}</td>
-            <td>${esc(s.coordinator || '—')}</td>
-            <td class="num td-mono">${fmtMoney(s.fee)}</td>
-            <td class="shoot-payment"><span class="desktop-label">${esc(paymentLabel)}</span><span class="tick-ico ${paid ? 'ok' : 'bad'}" role="img" aria-label="${esc(paymentLabel)}" title="${esc(paymentLabel)}">${paid ? '✓' : '✕'}</span></td>
-            <td class="shoot-status"><span class="desktop-label">${esc(statusLabel)}</span><span class="tick-ico ${completed ? 'ok' : 'bad'}" role="img" aria-label="${esc(statusLabel)}" title="${esc(statusLabel)}">${completed ? '✓' : '✕'}</span></td>
+          <tr data-id="${s.id}" title="${esc(fullDate)}">
+            <td class="td-mono cell-date"><span class="d-full">${fmtDate(s.shoot_date)}</span><span class="d-short">${esc(shortDate(s.shoot_date))}</span>${multiDay ? `<span class="cell-range"> → ${fmtDate(s.end_date)}</span>` : ''}${daySpan > 1 ? `<span class="cell-days" title="${daySpan}-day shoot">+${daySpan - 1}d</span>` : ''}</td>
+            <td class="cell-title">${esc(s.title)}</td>
+            <td class="cell-coord">${esc(s.coordinator || '—')}</td>
+            <td class="num td-mono">
+              <span class="fee-bubble ${paid ? 'paid' : 'due'}" title="${esc(paymentLabel)}" aria-label="${esc(fmtMoney(s.fee))}, ${esc(paymentLabel)}">${fmtMoney(s.fee)}</span>
+            </td>
+            <td class="col-pay"><span class="pill ${s.payment_status}">${esc(paymentLabel)}</span></td>
+            <td class="col-status"><span class="pill ${s.status}">${esc(statusLabel(s.status))}</span></td>
           </tr>`;
       }).join('')}</tbody>
     </table>`;
@@ -612,7 +648,7 @@ async function openDrawer(id) {
     drawer.innerHTML = `
       <h2>${esc(s.title)}</h2>
       <div class="sub">${fmtDate(s.shoot_date)}${s.end_date && s.end_date !== s.shoot_date ? ` → ${fmtDate(s.end_date)}` : ''}${s.start_time ? ` · ${fmtTime(s.start_time)}` : ''}</div>
-      <div><span class="pill ${s.status}">${s.status}</span> <span class="pill ${s.payment_status}">${s.payment_status}</span></div>
+      <div><span class="pill ${s.status}">${esc(statusLabel(s.status))}</span> <span class="pill ${s.payment_status}">${esc(statusLabel(s.payment_status))}</span></div>
       <div class="section"><h4>Details</h4>
         <div class="kv">
           <span class="k">Client</span><span>${esc(s.client_name || '—')}</span>
