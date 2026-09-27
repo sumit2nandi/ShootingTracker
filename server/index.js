@@ -10,7 +10,11 @@ const PORT = process.env.PORT || 3000;
 app.disable('x-powered-by');
 app.use(express.json({ limit: '15mb' }));
 app.use(express.text({ limit: '15mb', type: ['text/*', 'application/*'] }));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public'), {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache, must-revalidate')
+}));
 
 const STATUSES = ['planned', 'confirmed', 'completed', 'postponed', 'cancelled'];
 
