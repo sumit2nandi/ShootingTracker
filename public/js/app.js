@@ -514,8 +514,15 @@ function openDayPanel(dateK) {
   const shoots = (state.calByDate || {})[dateK] || [];
   const drawer = $('#drawer');
   drawer.innerHTML = `
-    <h2>${fmtDate(dateK)}</h2>
-    <div class="sub">${shoots.length} shoot${shoots.length === 1 ? '' : 's'} on this day</div>
+    <div class="drawer-head">
+      <div class="drawer-head-txt">
+        <h2>${fmtDate(dateK)}</h2>
+        <div class="sub">${shoots.length} shoot${shoots.length === 1 ? '' : 's'} on this day</div>
+      </div>
+      <button class="btn popup-close" data-close aria-label="Close" title="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
     ${shoots.map((s) => `
       <div class="pay-row" data-id="${s.id}" style="cursor:pointer">
         ${statusPill(s.status)}
@@ -528,6 +535,7 @@ function openDayPanel(dateK) {
     </div>`;
   $('#drawer-backdrop').classList.remove('hidden');
   $$('#drawer .pay-row[data-id]').forEach((r) => r.addEventListener('click', () => openDrawer(+r.dataset.id)));
+  $$('#drawer [data-close]').forEach((b) => b.addEventListener('click', closeDrawer));
   $('#dp-add').addEventListener('click', () => { $('#drawer-backdrop').classList.add('hidden'); openShootModal(null, dateK); });
 }
 
@@ -762,12 +770,14 @@ async function openDrawer(id) {
         <div class="drawer-head-txt">
           <h2>${esc(s.title)}</h2>
           <div class="sub">${fmtDate(s.shoot_date)}${s.end_date && s.end_date !== s.shoot_date ? ` → ${fmtDate(s.end_date)}` : ''}${s.start_time ? ` · ${fmtTime(s.start_time)}` : ''}</div>
+          <div class="drawer-status">
+            ${statusPill(s.status)}<span class="pill ${s.payment_status}">${esc(statusLabel(s.payment_status))}</span>
+          </div>
         </div>
-        <button class="icon-btn btn btn-ghost" data-close aria-label="Close" title="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        <button class="btn popup-close" data-close aria-label="Close" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
-      <div>${statusPill(s.status)} <span class="pill ${s.payment_status}">${esc(statusLabel(s.payment_status))}</span></div>
       <div class="section"><h4>Details</h4>
         <div class="kv kv-lead">
           <span class="k">Coordinator</span><span>${esc(s.coordinator || '—')}</span>
@@ -794,14 +804,8 @@ async function openDrawer(id) {
             </div>`).join('') || `<div class="muted small">${fee ? 'Nothing collected yet.' : 'Set a fee to start collecting.'}</div>`}
         </div>
         <div class="pay-total">Collected <b style="color:var(--green)">${fmtMoney(paid)}</b> of ${fmtMoney(fee)} (${fee ? Math.round((paid / fee) * 100) : 0}%)</div>
-        <div class="pay-collect">
-          <label class="pay-check">
-            <input type="checkbox" id="pay-collected" ${canCollect ? '' : 'checked disabled'} />
-            <span>${canCollect ? `Collected <b>${fmtMoney(balance)}</b>` : fee ? 'Fee fully collected' : 'Nothing to collect'}</span>
-          </label>
-          <button class="btn btn-primary" id="pay-save" disabled>Save</button>
-        </div>
-        <div class="muted small pay-hint">${!fee ? 'Add a fee to this shoot, then tick the box to collect it.' : canCollect ? 'The amount is pre-filled from the fee — tick the box and save.' : 'Tick nothing: this shoot is already paid in full.'}</div>
+        <button class="btn btn-primary pay-mark" id="pay-mark" ${canCollect ? '' : 'disabled'}>Mark Paid</button>
+        <div class="muted small pay-hint">${!fee ? 'Set a fee on this shoot first — then it can be marked paid.' : canCollect ? `Books the remaining ${fmtMoney(balance)} as collected today.` : 'Nothing to collect — this shoot is already paid in full.'}</div>
       </div>
       <div class="drawer-actions">
         <button class="btn" id="dr-edit">✏️ Edit</button>
@@ -815,18 +819,16 @@ async function openDrawer(id) {
       try { await api(`/api/shoots/${id}`, { method: 'DELETE' }); toast('Shoot deleted'); closeDrawer(); loadMeta(); refreshCurrent(); }
       catch (e) { toast('Delete failed: ' + e.message, 'err'); }
     });
-    const payBox = $('#pay-collected');
-    const paySave = $('#pay-save');
-    payBox.addEventListener('change', () => { paySave.disabled = !payBox.checked; });
-    paySave.addEventListener('click', async () => {
-      if (!payBox.checked) return;
-      paySave.disabled = true;
+    const payMark = $('#pay-mark');
+    payMark.addEventListener('click', async () => {
+      if (!canCollect) return;
+      payMark.disabled = true;
       try {
         await api(`/api/shoots/${id}/payments`, { body: { amount: balance, paid_on: dayKey(new Date()), note: 'Collected' } });
-        toast(`Marked ${fmtMoney(balance)} as collected`);
+        toast(`Marked ${fmtMoney(balance)} as paid`);
         openDrawer(id);
         refreshCurrent();
-      } catch (e) { paySave.disabled = false; toast('Could not save: ' + e.message, 'err'); }
+      } catch (e) { payMark.disabled = false; toast('Could not save: ' + e.message, 'err'); }
     });
     $$('#drawer [data-pay-id]').forEach((b) => b.addEventListener('click', async () => {
       if (!confirm('Remove this payment?')) return;
