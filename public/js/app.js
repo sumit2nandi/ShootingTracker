@@ -540,6 +540,28 @@ $('#cal-today').addEventListener('click', () => { const n = new Date(); state.ca
 
 /* ---------- shoots table ---------- */
 
+// Reaching this tab from a dashboard tile (Outstanding, Planned, …) lands on a
+// filtered list, so offer a one-tap way back to every shoot.
+const hasActiveFilters = () => {
+  const f = state.filters;
+  return !!(f.month || f.coordinator || f.status || f.paymentStatus || f.q);
+};
+
+function syncShootsReset() {
+  const btn = $('#btn-shoots-reset');
+  if (btn) btn.hidden = !hasActiveFilters();
+}
+
+function resetShootsFilters() {
+  state.viewFilters.shoots = { month: '', coordinator: '', status: '', paymentStatus: '', q: '' };
+  state.filters = { month: '', coordinator: '', status: '', paymentStatus: '', q: '' };
+  $('#f-month').value = ''; $('#f-coordinator').value = '';
+  $('#f-status').value = ''; $('#f-payment').value = ''; $('#f-q').value = '';
+  syncShootsReset();
+  refreshCurrent(false);
+  toast('Showing all shoots');
+}
+
 async function loadShoots() {
   try {
     const rows = await api('/api/shoots?' + filterParams());
@@ -549,8 +571,14 @@ async function loadShoots() {
 
 function renderShoots(rows) {
   $('#shoots-count').textContent = `${rows.length} shown`;
+  syncShootsReset();
   const wrap = $('#shoots-table');
-  if (!rows.length) { wrap.innerHTML = '<div class="empty">No shoots match. Clear filters or add one with “+ New shoot”.</div>'; return; }
+  if (!rows.length) {
+    wrap.innerHTML = hasActiveFilters()
+      ? '<div class="empty">No shoots match this filter — tap “Show all” to clear it.</div>'
+      : '<div class="empty">No shoots yet — add one with “+ New shoot”.</div>';
+    return;
+  }
 
   const groups = new Map();
   rows.forEach((shoot) => {
@@ -898,6 +926,7 @@ $('#kpi-row').addEventListener('keydown', (e) => {
   const kpi = e.target.closest('.kpi[data-goto]');
   if (kpi) { e.preventDefault(); kpi.click(); }
 });
+$('#btn-shoots-reset').addEventListener('click', resetShootsFilters);
 // shoots tab: filters start hidden, funnel toggles them
 $('#btn-shoots-filter').addEventListener('click', () => {
   state.shootsFiltersOpen = !state.shootsFiltersOpen;
