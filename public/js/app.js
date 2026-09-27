@@ -756,6 +756,14 @@ $('#access-form').addEventListener('submit', async (e) => {
 
 /* ---------- detail drawer ---------- */
 
+/* One key/value row for the drawer. Rows whose value is empty are dropped by the
+   caller, so a popup never prints fields the shoot has no data for. */
+function kvRow(label, value, attrs = '') {
+  return value ? `<span class="k">${label}</span><span${attrs ? ' ' + attrs : ''}>${value}</span>` : '';
+}
+/* Escaped, trimmed text — '' when nothing is stored for that field. */
+const txt = (v) => { const t = String(v ?? '').trim(); return t ? esc(t) : ''; };
+
 async function openDrawer(id) {
   const drawer = $('#drawer');
   drawer.innerHTML = '<div class="empty">Loading…</div>';
@@ -765,6 +773,24 @@ async function openDrawer(id) {
     const paid = +s.paid_amount, fee = +s.fee;
     const balance = Math.max(0, Math.round((fee - paid) * 100) / 100);
     const canCollect = balance > 0;
+    // Only list the details this shoot actually has — no "—" placeholder rows.
+    const contact = [txt(s.contact_name), txt(s.contact_phone)].filter(Boolean).join(' · ');
+    const hasMoney = fee > 0 || paid > 0; // nothing booked → leave the money rows out
+    const detailRows = [
+      kvRow('Coordinator', txt(s.coordinator)),
+      hasMoney ? kvRow('Fee', fmtMoney(fee), 'class="td-mono"') : '',
+      hasMoney ? kvRow('Collected', fmtMoney(paid), 'class="td-mono" style="color:var(--green)"') : '',
+      hasMoney ? kvRow('Balance', fmtMoney(Math.max(0, fee - paid)), 'class="td-mono"') : '',
+      kvRow('Client', txt(s.client_name)),
+      kvRow('Type', txt(s.shoot_type)),
+      kvRow('Venue', txt(s.venue)),
+      kvRow('Location', txt(s.location)),
+      kvRow('Contact', contact)
+    ].join('');
+    const extraRows = Object.entries(s.extra || {})
+      .filter(([, v]) => txt(v))
+      .map(([k, v]) => kvRow(esc(k), txt(v)))
+      .join('');
     drawer.innerHTML = `
       <div class="drawer-head">
         <div class="drawer-head-txt">
@@ -778,21 +804,9 @@ async function openDrawer(id) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
       </div>
-      <div class="section"><h4>Details</h4>
-        <div class="kv kv-lead">
-          <span class="k">Coordinator</span><span>${esc(s.coordinator || '—')}</span>
-          <span class="k">Fee</span><span class="td-mono">${fmtMoney(fee)}</span>
-          <span class="k">Collected</span><span class="td-mono" style="color:var(--green)">${fmtMoney(paid)}</span>
-          <span class="k">Balance</span><span class="td-mono">${fmtMoney(Math.max(0, fee - paid))}</span>
-          <span class="k">Client</span><span>${esc(s.client_name || '—')}</span>
-          <span class="k">Type</span><span>${esc(s.shoot_type || '—')}</span>
-          <span class="k">Venue</span><span>${esc(s.venue || '—')}</span>
-          <span class="k">Location</span><span>${esc(s.location || '—')}</span>
-          <span class="k">Contact</span><span>${esc(s.contact_name || '—')}${s.contact_phone ? ' · ' + esc(s.contact_phone) : ''}</span>
-        </div>
-        ${s.notes ? `<div class="section"><h4>Notes</h4><div>${esc(s.notes)}</div></div>` : ''}
-        ${Object.keys(s.extra || {}).length ? `<div class="section"><h4>Extra fields (from import)</h4><div class="kv">${Object.entries(s.extra).map(([k, v]) => `<span class="k">${esc(k)}</span><span>${esc(v)}</span>`).join('')}</div></div>` : ''}
-      </div>
+      ${detailRows ? `<div class="section"><h4>Details</h4><div class="kv kv-lead">${detailRows}</div></div>` : ''}
+      ${s.notes ? `<div class="section"><h4>Notes</h4><div>${esc(s.notes)}</div></div>` : ''}
+      ${extraRows ? `<div class="section"><h4>Extra fields (from import)</h4><div class="kv">${extraRows}</div></div>` : ''}
       <div class="section"><h4>Payment</h4>
         <div class="pay-list">
           ${(s.payments || []).map((p) => `
