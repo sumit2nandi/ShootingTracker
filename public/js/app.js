@@ -18,6 +18,44 @@ const state = {
   dbOk: null
 };
 
+/* ---------- theme (light / dark) ---------- */
+
+const THEME_KEY = 'shootingtracker-theme';
+const themeMedia = window.matchMedia('(prefers-color-scheme: dark)');
+
+/* Stored choice wins; with nothing stored we follow the operating system. */
+function currentTheme() {
+  let stored = null;
+  try { stored = localStorage.getItem(THEME_KEY); } catch (_e) { /* storage blocked */ }
+  if (stored === 'light' || stored === 'dark') return stored;
+  return themeMedia.matches ? 'dark' : 'light';
+}
+
+function applyTheme(theme, persist) {
+  const dark = theme === 'dark';
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  if (persist) {
+    try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (_e) { /* ignore */ }
+  }
+  const meta = $('#meta-theme-color');
+  if (meta) meta.setAttribute('content', dark ? '#0b1220' : '#f7f9fc');
+  const btn = $('#btn-theme');
+  if (btn) {
+    const label = dark ? 'Switch to light mode' : 'Switch to dark mode';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+  }
+}
+
+function toggleTheme() { applyTheme(currentTheme() === 'dark' ? 'light' : 'dark', true); }
+
+/* the OS flipped and the user never picked a side, so follow it */
+themeMedia.addEventListener('change', (e) => {
+  let stored = null;
+  try { stored = localStorage.getItem(THEME_KEY); } catch (_e) { /* storage blocked */ }
+  if (!stored) applyTheme(e.matches ? 'dark' : 'light');
+});
+
 /* ---------- api ---------- */
 
 async function api(path, opts = {}) {
@@ -205,6 +243,7 @@ function clearFilters() {
 /* ---------- routing ---------- */
 
 function setView(v) {
+  closeProfile();   // leaving for another tab closes the profile sheet
   if (state.view !== 'calendar' && v !== state.view) state.viewFilters[state.view] = readFilters();
   if (v !== 'shoots') state.shootsExpandAll = false;   // the tile-driven expansion is one-shot
   state.view = v;
@@ -348,8 +387,8 @@ function renderStatusDonut(byStatus) {
       <g transform="rotate(-90 80 80)">
         ${segs.map((s) => `<circle cx="80" cy="80" r="${R}" fill="none" stroke="${s.color}" stroke-width="22" stroke-dasharray="${s.dash}" stroke-dashoffset="${s.off}"></circle>`).join('')}
       </g>
-      <text x="80" y="76" text-anchor="middle" fill="#e8edf5" font-size="26" font-weight="700">${total}</text>
-      <text x="80" y="97" text-anchor="middle" fill="#8b98ad" font-size="11">shoots</text>
+      <text x="80" y="76" text-anchor="middle" style="fill:var(--text)" font-size="26" font-weight="700">${total}</text>
+      <text x="80" y="97" text-anchor="middle" style="fill:var(--muted)" font-size="11">shoots</text>
     </svg>
     <div class="donut-legend">
       ${rows.map((s) => `<div class="row"><i style="background:${STATUS_COLORS[s.status] || '#888'}"></i>${esc(statusLabel(s.status))}<span class="n">${s.n}</span></div>`).join('')}
@@ -845,6 +884,38 @@ $('#access-form').addEventListener('submit', async (e) => {
   } catch (err) { toast(err.message, 'err'); }
 });
 
+/* ---------- profile menu (bottom tab bar) ---------- */
+
+const profileModal = $('#profile-modal');
+const profileTab = $('#tab-profile');
+
+function openProfile() {
+  profileModal.classList.remove('hidden');
+  profileTab.classList.add('is-open');
+  profileTab.setAttribute('aria-expanded', 'true');
+  document.body.classList.add('profile-open');
+}
+function closeProfile() {
+  profileModal.classList.add('hidden');
+  profileTab.classList.remove('is-open');
+  profileTab.setAttribute('aria-expanded', 'false');
+  document.body.classList.remove('profile-open');
+}
+
+/* the avatar carries the first letter of the account name (or its email) */
+const profileInitial = (u) => String((u && (u.name || u.email)) || '?').trim().charAt(0).toUpperCase() || '?';
+
+function renderProfile(user) {
+  const initial = profileInitial(user);
+  $('#profile-logo').textContent = initial;
+  $('#profile-avatar').textContent = initial;
+  $('#profile-name').textContent = (user && user.name) || (user && user.email) || 'Signed in';
+  $('#profile-email').textContent = (user && user.email) || '';
+  const role = (user && user.role) === 'owner' ? 'Owner' : 'Member';
+  $('#profile-role').textContent = role;
+  $('#profile-role').classList.toggle('owner', role === 'Owner');
+}
+
 /* ---------- detail drawer ---------- */
 
 /* One key/value row for the drawer. Rows whose value is empty are dropped by the
@@ -990,7 +1061,8 @@ function downloadText(filename, text, type = 'text/csv;charset=utf-8') {
 
 /* ---------- global wiring ---------- */
 
-$$('.tab').forEach((t) => t.addEventListener('click', () => setView(t.dataset.view)));
+// the profile entry opens a menu instead of switching views, so only real views bind here
+$$('.tab[data-view]').forEach((t) => t.addEventListener('click', () => setView(t.dataset.view)));
 // chart bars: click/tap to show the number
 $('#chart-monthly').addEventListener('click', (e) => {
   const b = e.target.closest('.bar[data-val]');
@@ -1049,17 +1121,26 @@ $('#btn-export').addEventListener('click', async () => {
 $$('#shoot-modal [data-close]').forEach((b) => b.addEventListener('click', closeShootModal));
 $$('#access-modal [data-close]').forEach((b) => b.addEventListener('click', closeAccess));
 $('#access-modal').addEventListener('click', (e) => { if (e.target.id === 'access-modal') closeAccess(); });
-$('#btn-access').addEventListener('click', openAccess);
+$('#btn-access').addEventListener('click', () => { closeProfile(); openAccess(); });
 $('#shoot-modal').addEventListener('click', (e) => { if (e.target.id === 'shoot-modal') closeShootModal(); });
 $('#drawer-backdrop').addEventListener('click', (e) => { if (e.target.id === 'drawer-backdrop') closeDrawer(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeShootModal(); closeDrawer(); closeAccess(); } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeShootModal(); closeDrawer(); closeAccess(); closeProfile(); } });
 ['f-month', 'f-coordinator', 'f-status', 'f-payment'].forEach((id) => $('#' + id).addEventListener('change', onFilterChange));
 $('#f-q').addEventListener('input', onFilterChange);
 $('#f-clear').addEventListener('click', clearFilters);
 
 /* ---------- boot ---------- */
 
+$('#tab-profile').addEventListener('click', () => {
+  if (profileModal.classList.contains('hidden')) openProfile(); else closeProfile();
+});
+$('#btn-theme').addEventListener('click', toggleTheme);
+$('#profile-modal').addEventListener('click', (e) => { if (e.target.id === 'profile-modal') closeProfile(); });
+$$('#profile-modal [data-close]').forEach((b) => b.addEventListener('click', closeProfile));
+applyTheme(currentTheme());
+
 $('#btn-signout').addEventListener('click', async () => {
+  document.body.classList.remove('profile-open');
   try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); }
   finally { window.location.replace('/'); }
 });
@@ -1068,7 +1149,7 @@ $('#btn-signout').addEventListener('click', async () => {
   try {
     const { user } = await api('/api/auth/me');
     state.user = user;
-    $('#signed-in-user').textContent = user.email;
+    renderProfile(user);
     $('#btn-access').hidden = user.role !== 'owner';
   } catch (_error) { return; }
   pollHealth();
