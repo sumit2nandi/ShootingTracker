@@ -59,6 +59,7 @@ Tables created:
 | `shoots`       | One row per shoot + `extra` JSONB + `dedupe_hash` for imports. |
 | `payments`     | Earnings ledger (amount, date, method) per shoot.              |
 | `media`        | Photo / album / drive links per shoot.                         |
+| `app_users`    | Who may sign in (email, role `owner`/`member`, active flag).    |
 
 Key indexes: shoot date, coordinator, client, status, type, and a GIN index on `extra`.
 
@@ -101,7 +102,20 @@ SESSION_SECRET=use-a-long-random-secret
 
 ### Google-only access
 
-The app and every `/api` endpoint require a Google sign-in. The server verifies Google's signed ID token and accepts only `sumit2nandi@gmail.com` and `sushmitaghosh0099@gmail.com`; the allowlist is enforced on the server, not just by the sign-in screen. Signed-in sessions use an HTTP-only, same-site cookie and expire after seven days.
+The app and every `/api` endpoint require a Google sign-in. The server verifies Google's signed ID token and
+then checks the account against the **`app_users`** table; the allow-list is enforced on the server, not just by
+the sign-in screen. Signed-in sessions use an HTTP-only, same-site cookie and expire after seven days.
+
+Managing who can sign in — **no code changes and no restart needed**:
+
+- From the app: an owner sees the people icon in the top bar → *People with access* (add, activate/deactivate,
+  promote, remove).
+- From the database: `INSERT INTO app_users (email, name, role) VALUES ('new@example.com', 'New', 'member');`
+  or `UPDATE app_users SET is_active = false WHERE lower(email) = '…';`
+
+The two original logins are seeded by the first `npm run migrate` (existing databases pick them up on the next
+migration run). Owners can never demote, deactivate or remove the last active owner, and nobody can remove
+their own access. The allow-list is cached for 20 s, so a change takes effect within half a minute.
 
 1. In Google Cloud Console, configure the Google Identity Services OAuth consent screen and create an **OAuth client ID** of type **Web application**.
 2. Add each hostname where this app runs to **Authorized JavaScript origins** (for local development, `http://localhost:3000`; add your production HTTPS origin too). No redirect URI is needed.

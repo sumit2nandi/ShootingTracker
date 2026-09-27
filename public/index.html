@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ShootingTracker</title>
-  <link rel="stylesheet" href="css/app.css?v=6" />
+  <link rel="stylesheet" href="css/app.css?v=7" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=4" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=4" />
   <link rel="apple-touch-icon" href="favicon.png?v=4" />
@@ -33,6 +33,9 @@
     </nav>
     <div class="top-right">
       <span id="signed-in-user" class="signed-in-user" aria-label="Signed in account"></span>
+      <button id="btn-access" class="btn btn-ghost signout-btn" title="People with access" aria-label="People with access" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/><circle cx="10" cy="7.5" r="3.5"/><path d="M20 19v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.5 4.2a3.5 3.5 0 0 1 0 6.6"/></svg>
+      </button>
       <button id="btn-signout" class="btn btn-ghost signout-btn" title="Sign out" aria-label="Sign out">Sign out</button>
       <span id="db-status" class="db-pill" title="Checking database…">
         <span class="dot"></span><span class="db-pill-text">DB…</span>
@@ -186,6 +189,35 @@
     </div>
   </div>
 
+  <!-- people with access (owner only) -->
+  <div class="modal-backdrop hidden" id="access-modal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3 id="access-title">People with access</h3>
+        <button class="icon-btn btn btn-ghost" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="access-body">
+        <p class="muted small access-note">
+          Everyone listed here can sign in with their Google account. Manage the list here, or directly in the
+          <code>app_users</code> table.
+        </p>
+        <div id="access-list" class="access-list"></div>
+        <form id="access-form" class="access-add" autocomplete="off">
+          <input type="email" name="email" placeholder="name@gmail.com" required />
+          <input type="text" name="name" placeholder="Name (optional)" />
+          <select name="role" aria-label="Role">
+            <option value="member">Member</option>
+            <option value="owner">Owner</option>
+          </select>
+          <button class="btn btn-primary" type="submit">Add</button>
+        </form>
+      </div>
+      <div class="modal-foot"><button class="btn btn-ghost" data-close>Close</button></div>
+    </div>
+  </div>
+
   <!-- detail drawer -->
   <div class="drawer-backdrop hidden" id="drawer-backdrop">
     <aside class="drawer" id="drawer"></aside>
@@ -209,6 +241,6 @@
 
   <div id="toasts" class="toasts"></div>
 
-  <script src="js/app.js?v=5"></script>
+  <script src="js/app.js?v=6"></script>
 </body>
 </html>

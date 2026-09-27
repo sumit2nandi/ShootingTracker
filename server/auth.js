@@ -1,11 +1,8 @@
 'use strict';
 
 const crypto = require('crypto');
+const { isAllowedEmail } = require('./users');
 
-const ALLOWED_EMAILS = new Set([
-  'sumit2nandi@gmail.com',
-  'sushmitaghosh0099@gmail.com'
-]);
 const SESSION_COOKIE = 'shootingtracker_session';
 const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 const GOOGLE_CERTS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
@@ -57,12 +54,12 @@ async function verifyGoogleCredential(credential, clientId) {
     keysExpireAt = 0;
     const refreshed = (await googleKeys()).find((candidate) => candidate.kid === header.kid && candidate.kty === 'RSA');
     if (!refreshed) throw new Error('Google credential signing key not found');
-    return validateClaimsAndSignature(parts, header, claims, refreshed, clientId);
+    return await validateClaimsAndSignature(parts, header, claims, refreshed, clientId);
   }
-  return validateClaimsAndSignature(parts, header, claims, key, clientId);
+  return await validateClaimsAndSignature(parts, header, claims, key, clientId);
 }
 
-function validateClaimsAndSignature(parts, header, claims, key, clientId) {
+async function validateClaimsAndSignature(parts, header, claims, key, clientId) {
   const publicKey = crypto.createPublicKey({ key, format: 'jwk' });
   const verified = crypto.verify(
     'RSA-SHA256',
@@ -82,7 +79,8 @@ function validateClaimsAndSignature(parts, header, claims, key, clientId) {
     throw new Error('Google credential is invalid or expired');
   }
   const email = String(claims.email || '').trim().toLowerCase();
-  if (!ALLOWED_EMAILS.has(email)) throw new Error('This Google account is not allowed to access ShootingTracker');
+  // the allow-list is the `app_users` table, not a list baked into this file
+  if (!(await isAllowedEmail(email))) throw new Error('This Google account is not allowed to access ShootingTracker');
   return { email, name: String(claims.name || email.split('@')[0]).slice(0, 120) };
 }
 
@@ -103,8 +101,11 @@ function readSession(token, secret) {
   const expected = crypto.createHmac('sha256', secret).update(payload).digest('base64url');
   if (!safeEqual(signature, expected)) return null;
   try {
+    // cryptographic check only — whether this account is still allowed to sign
+    // in is decided by the app_users table in currentUser() (server/index.js)
     const session = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-    if (!ALLOWED_EMAILS.has(session.email) || !Number.isFinite(session.exp) || session.exp <= Date.now() / 1000) return null;
+    if (typeof session.email !== 'string' || !session.email
+      || !Number.isFinite(session.exp) || session.exp <= Date.now() / 1000) return null;
     return { email: session.email, name: session.name };
   } catch (_error) {
     return null;
@@ -128,7 +129,6 @@ function getSession(req, secret) {
 }
 
 module.exports = {
-  ALLOWED_EMAILS,
   SESSION_COOKIE,
   SESSION_TTL_SECONDS,
   createSession,

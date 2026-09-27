@@ -214,21 +214,23 @@ tbody tr:hover { background: var(--surface-2); }
 .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .pill.planned { color: #47596e; background: var(--slate-soft); border-color: #d7dfe9; }
 .pill.completed { color: var(--green); background: var(--green-soft); border-color: rgba(21, 128, 61, .3); }
+.pill.owner { color: var(--accent-strong); background: var(--accent-soft); border-color: rgba(37, 99, 235, .3); }
 .pill.paid { color: var(--green); background: var(--green-soft); }
 .pill.partial { color: var(--amber); background: var(--amber-soft); }
 .pill.unpaid { color: var(--muted); background: var(--slate-soft); }
 
 /* ---------- calendar ---------- */
 .cal-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
-.cal-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cal-nav { display: flex; align-items: center; gap: 8px; }
 .cal-select {
   font-size: 14px; font-weight: 650; color: var(--text);
-  padding: 6px 28px 6px 10px; border-radius: 9px; border: 1px solid var(--line-2);
+  padding: 6px 26px 6px 9px; border-radius: 9px; border: 1px solid var(--line-2);
   background-color: var(--surface); font-family: inherit;
-  flex: none;   /* never let the flex row squeeze the month name out of view */
+  flex: none;   /* the toolbar must not squeeze the month name out of view */
 }
-#cal-month { min-width: 134px; }   /* fits "September" plus the caret */
-#cal-year { min-width: 78px; }
+/* just wide enough for the longest month name plus the caret */
+#cal-month { min-width: 108px; }
+#cal-year { min-width: 0; }
 .cal-select:focus { outline: none; border-color: var(--accent); }
 .cal-legend { display: flex; align-items: center; gap: 7px 14px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -301,7 +303,6 @@ tbody tr:hover { background: var(--surface-2); }
 }
 .cl-event:hover { border-color: var(--accent); }
 .cl-title { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cl-coord { flex: none; max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cl-fee { margin-left: auto; flex: none; font-size: 13px; font-weight: 650; }
 /* shoots-tab filter toggle */
 #btn-shoots-filter.active { color: var(--accent-strong); background: var(--accent-soft); border-color: rgba(37, 99, 235, .35); }
@@ -309,7 +310,7 @@ tbody tr:hover { background: var(--surface-2); }
 @media (min-width: 768px) { .cal-mobile-note { display: none; } }
 @media (max-width: 768px) {
   .cal-frame { border-radius: 10px; }
-  #cal-month { min-width: 122px; }
+  #cal-month { min-width: 100px; }
   .cal-grid { grid-auto-rows: clamp(74px, 10.5vh, 100px); }
   .cal-cell { padding: 3px 4px 4px; }
   .cal-dow { padding: 6px 5px; font-size: 10.5px; }
@@ -378,6 +379,8 @@ tbody tr:hover { background: var(--surface-2); }
 .drawer .section { margin-top: 18px; }
 .drawer .section h4 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); font-weight: 650; }
 .kv { display: grid; grid-template-columns: 104px 1fr; gap: 6px 12px; font-size: 13.5px; }
+.kv-lead { padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; }
+.kv-lead .k { font-weight: 600; color: var(--text); }
 .kv .k { color: var(--muted); }
 .drawer-actions { display: flex; gap: 8px; margin-top: 22px; flex-wrap: wrap; }
 .pay-list { display: flex; flex-direction: column; gap: 6px; }
@@ -470,6 +473,34 @@ tbody tr:hover { background: var(--surface-2); }
 .toast.leaving { opacity: 0; transform: translateY(6px); transition: all .25s; }
 
 .empty { text-align: center; color: var(--muted); padding: 32px 10px; font-size: 13.5px; }
+
+/* ---------- people with access ---------- */
+.access-body { padding: 14px 18px 4px; }
+.access-note { margin: 0 0 12px; }
+.access-list { display: flex; flex-direction: column; gap: 8px; }
+.access-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 9px 12px;
+}
+.access-row.off { opacity: .62; }
+.access-who { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.access-who b { font-size: 13.5px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.access-who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.access-actions { display: flex; gap: 6px; flex: none; }
+.access-actions .btn { padding: 5px 10px; font-size: 12px; }
+.access-add {
+  display: grid; grid-template-columns: 1fr 1fr auto; grid-template-areas: "email name role" "add add add";
+  gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line);
+}
+.access-add input[name="email"] { grid-area: email; }
+.access-add input[name="name"] { grid-area: name; }
+.access-add select { grid-area: role; }
+.access-add button { grid-area: add; }
+@media (max-width: 560px) {
+  .access-add { grid-template-columns: 1fr; grid-template-areas: "email" "name" "role" "add"; }
+  .access-row { flex-wrap: wrap; }
+  .access-actions { width: 100%; justify-content: flex-end; }
+}
 
 /* ---------- authenticated account controls ---------- */
 .signed-in-user { color: var(--muted); font-size: 11px; font-weight: 600; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

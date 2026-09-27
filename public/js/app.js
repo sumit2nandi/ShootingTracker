@@ -11,9 +11,11 @@ const state = {
   viewFilters: {}, // per-view filter memory
   meta: { statuses: [], coordinators: [], clients: [], types: [], months: [] },
   cal: { year: new Date().getFullYear(), month: new Date().getMonth() },
+  user: null,          // the signed-in account (role decides who can manage access)
   calView: 'grid',
   calShoots: [],
   shootsFiltersOpen: false, // shoots-tab filter bar starts collapsed
+  shootsExpandAll: false,  // set when the user arrives from a dashboard tile
   dbOk: null
 };
 
@@ -196,6 +198,7 @@ function clearFilters() {
 
 function setView(v) {
   if (state.view !== 'calendar' && v !== state.view) state.viewFilters[state.view] = readFilters();
+  if (v !== 'shoots') state.shootsExpandAll = false;   // the tile-driven expansion is one-shot
   state.view = v;
   $$('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === v));
   for (const el of $$('.view')) el.classList.toggle('hidden', el.id !== `view-${v}`);
@@ -446,7 +449,6 @@ function renderCalendarList() {
         <div class="cl-events">
           ${shoots.map((s) => `<div class="cl-event" data-id="${s.id}">
             <span class="cl-title">${esc(s.title)}</span>
-            ${s.coordinator ? `<span class="muted small cl-coord">${esc(s.coordinator)}</span>` : ''}
             <span class="cl-fee td-mono">${fmtMoney(s.fee)}</span>
             ${statusPill(s.status)}
           </div>`).join('')}
@@ -550,6 +552,8 @@ function renderShoots(rows) {
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const headings = (ym) => ym === 'undated' ? 'Undated' : monthLabel(ym);
+  // arriving from a dashboard tile means "show me everything", so open every group
+  const isOpen = (ym) => state.shootsExpandAll || ym === currentMonth;
   const tableFor = (monthRows) => `
     <table class="shoots-table">
       <thead><tr><th>Date</th><th>Title</th><th>Coordinator</th><th class="num">Fee</th><th class="col-pay">Payment</th><th class="col-status">Status</th></tr></thead>
@@ -576,7 +580,7 @@ function renderShoots(rows) {
     </table>`;
 
   wrap.innerHTML = [...groups.entries()].map(([ym, monthRows]) => `
-    <details class="shoot-month" ${ym === currentMonth ? 'open' : ''}>
+    <details class="shoot-month" ${isOpen(ym) ? 'open' : ''}>
       <summary><span>${esc(headings(ym))}</span><span class="month-count">${monthRows.length} shoot${monthRows.length === 1 ? '' : 's'}</span></summary>
       ${tableFor(monthRows)}
     </details>`).join('');
@@ -640,6 +644,74 @@ $('#btn-save-shoot').addEventListener('click', async () => {
   } catch (e) { toast('Save failed: ' + e.message, 'err'); }
 });
 
+/* ---------- people with access (owner only) ---------- */
+
+let accessCache = null;
+
+async function openAccess() {
+  $('#access-modal').classList.remove('hidden');
+  $('#access-list').innerHTML = '<div class="empty">Loading…</div>';
+  await refreshAccess();
+}
+
+function closeAccess() { $('#access-modal').classList.add('hidden'); }
+
+async function refreshAccess() {
+  let data;
+  try { data = await api('/api/users'); }
+  catch (e) { $('#access-list').innerHTML = `<div class="empty">Could not load the list: ${esc(e.message)}</div>`; return; }
+  accessCache = data.users || [];
+  const me = String(state.user && state.user.email || '').toLowerCase();
+  const owners = accessCache.filter((u) => u.is_active && u.role === 'owner').length;
+  $('#access-list').innerHTML = accessCache.map((u) => {
+    const isMe = String(u.email).toLowerCase() === me;
+    const isLastOwner = u.role === 'owner' && u.is_active && owners <= 1;
+    return `
+      <div class="access-row${u.is_active ? '' : ' off'}">
+        <div class="access-who">
+          <b>${esc(u.name || u.email)}</b>
+          <span class="muted small">${esc(u.email)}${isMe ? ' · you' : ''}</span>
+        </div>
+        <span class="pill ${u.role === 'owner' ? 'owner' : 'unpaid'}">${u.role === 'owner' ? 'Owner' : 'Member'}</span>
+        <div class="access-actions">
+          <button class="btn btn-ghost" data-toggle="${u.id}" data-active="${u.is_active}"
+            ${u.role === 'owner' && u.is_active && owners <= 1 ? 'disabled title="At least one active owner is required"' : ''}>${u.is_active ? 'Deactivate' : 'Activate'}</button>
+          <button class="btn btn-ghost" data-remove="${u.id}" ${isMe ? 'disabled title="You cannot remove your own access"' : ''}>Remove</button>
+        </div>
+      </div>`;
+  }).join('') || '<div class="empty">Nobody yet.</div>';
+  $$('#access-list [data-toggle]').forEach((b) => b.addEventListener('click', async () => {
+    b.disabled = true;
+    try {
+      await api(`/api/users/${b.dataset.toggle}`, { method: 'PATCH', body: { is_active: b.dataset.active !== 'true' } });
+      toast('Access updated');
+      await refreshAccess();
+    } catch (e) { toast(e.message, 'err'); b.disabled = false; }
+  }));
+  $$('#access-list [data-remove]').forEach((b) => b.addEventListener('click', async () => {
+    if (!confirm('Remove this person from the allow-list?')) return;
+    b.disabled = true;
+    try {
+      await api(`/api/users/${b.dataset.remove}`, { method: 'DELETE' });
+      toast('Access removed');
+      await refreshAccess();
+    } catch (e) { toast(e.message, 'err'); b.disabled = false; }
+  }));
+}
+
+$('#access-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const body = { email: f.email.value.trim(), name: f.name.value.trim(), role: f.role.value };
+  if (!body.email) return;
+  try {
+    await api('/api/users', { body });
+    f.reset();
+    toast(`${body.email} can now sign in`);
+    await refreshAccess();
+  } catch (err) { toast(err.message, 'err'); }
+});
+
 /* ---------- detail drawer ---------- */
 
 async function openDrawer(id) {
@@ -654,16 +726,16 @@ async function openDrawer(id) {
       <div class="sub">${fmtDate(s.shoot_date)}${s.end_date && s.end_date !== s.shoot_date ? ` → ${fmtDate(s.end_date)}` : ''}${s.start_time ? ` · ${fmtTime(s.start_time)}` : ''}</div>
       <div>${statusPill(s.status)} <span class="pill ${s.payment_status}">${esc(statusLabel(s.payment_status))}</span></div>
       <div class="section"><h4>Details</h4>
-        <div class="kv">
-          <span class="k">Client</span><span>${esc(s.client_name || '—')}</span>
-          <span class="k">Type</span><span>${esc(s.shoot_type || '—')}</span>
+        <div class="kv kv-lead">
           <span class="k">Coordinator</span><span>${esc(s.coordinator || '—')}</span>
-          <span class="k">Venue</span><span>${esc(s.venue || '—')}</span>
-          <span class="k">Location</span><span>${esc(s.location || '—')}</span>
-          <span class="k">Contact</span><span>${esc(s.contact_name || '—')}${s.contact_phone ? ' · ' + esc(s.contact_phone) : ''}</span>
           <span class="k">Fee</span><span class="td-mono">${fmtMoney(fee)}</span>
           <span class="k">Collected</span><span class="td-mono" style="color:var(--green)">${fmtMoney(paid)}</span>
           <span class="k">Balance</span><span class="td-mono">${fmtMoney(Math.max(0, fee - paid))}</span>
+          <span class="k">Client</span><span>${esc(s.client_name || '—')}</span>
+          <span class="k">Type</span><span>${esc(s.shoot_type || '—')}</span>
+          <span class="k">Venue</span><span>${esc(s.venue || '—')}</span>
+          <span class="k">Location</span><span>${esc(s.location || '—')}</span>
+          <span class="k">Contact</span><span>${esc(s.contact_name || '—')}${s.contact_phone ? ' · ' + esc(s.contact_phone) : ''}</span>
         </div>
         ${s.notes ? `<div class="section"><h4>Notes</h4><div>${esc(s.notes)}</div></div>` : ''}
         ${Object.keys(s.extra || {}).length ? `<div class="section"><h4>Extra fields (from import)</h4><div class="kv">${Object.entries(s.extra).map(([k, v]) => `<span class="k">${esc(k)}</span><span>${esc(v)}</span>`).join('')}</div></div>` : ''}
@@ -807,6 +879,7 @@ $('#kpi-row').addEventListener('click', (e) => {
     month: state.filters.month, coordinator: state.filters.coordinator, status: '', paymentStatus: '', q: '', ...extra
   };
   state.shootsFiltersOpen = true;
+  state.shootsExpandAll = true;   // every month group open, not just this month
   $('#btn-shoots-filter').setAttribute('aria-expanded', 'true');
   $('#btn-shoots-filter').classList.add('active');
   setView('shoots');
@@ -844,10 +917,13 @@ $('#btn-export').addEventListener('click', async () => {
     toast(`Exported ${rows.length} shoots`);
   } catch (e) { toast('Export failed: ' + e.message, 'err'); }
 });
-$$('.modal-backdrop [data-close]').forEach((b) => b.addEventListener('click', closeShootModal));
+$$('#shoot-modal [data-close]').forEach((b) => b.addEventListener('click', closeShootModal));
+$$('#access-modal [data-close]').forEach((b) => b.addEventListener('click', closeAccess));
+$('#access-modal').addEventListener('click', (e) => { if (e.target.id === 'access-modal') closeAccess(); });
+$('#btn-access').addEventListener('click', openAccess);
 $('#shoot-modal').addEventListener('click', (e) => { if (e.target.id === 'shoot-modal') closeShootModal(); });
 $('#drawer-backdrop').addEventListener('click', (e) => { if (e.target.id === 'drawer-backdrop') closeDrawer(); });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeShootModal(); closeDrawer(); } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeShootModal(); closeDrawer(); closeAccess(); } });
 ['f-month', 'f-coordinator', 'f-status', 'f-payment'].forEach((id) => $('#' + id).addEventListener('change', onFilterChange));
 $('#f-q').addEventListener('input', onFilterChange);
 $('#f-clear').addEventListener('click', clearFilters);
@@ -862,7 +938,9 @@ $('#btn-signout').addEventListener('click', async () => {
 (async function boot() {
   try {
     const { user } = await api('/api/auth/me');
+    state.user = user;
     $('#signed-in-user').textContent = user.email;
+    $('#btn-access').hidden = user.role !== 'owner';
   } catch (_error) { return; }
   pollHealth();
   await loadMeta();
