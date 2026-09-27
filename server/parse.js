@@ -37,9 +37,18 @@ function parseHtml(text) {
   return { headers, data };
 }
 
-/* ---------------- CSV ---------------- */
+/* ---------------- CSV / TSV ---------------- */
+
+function detectDelimiter(text) {
+  const firstLine = String(text).split(/\r?\n/, 1)[0] || '';
+  const counts = { ',': (firstLine.match(/,/g) || []).length, '\t': (firstLine.match(/\t/g) || []).length, ';': (firstLine.match(/;/g) || []).length, '|': (firstLine.match(/\|/g) || []).length };
+  let best = ',', n = -1;
+  for (const [d, c] of Object.entries(counts)) if (c > n) { best = d; n = c; }
+  return n > 0 ? best : ',';
+}
 
 function parseCsv(text) {
+  const delim = detectDelimiter(text);
   const rows = [];
   let row = [];
   let cell = '';
@@ -54,7 +63,7 @@ function parseCsv(text) {
       } else cell += ch;
     } else if (ch === '"') {
       inQuotes = true;
-    } else if (ch === ',') {
+    } else if (ch === delim) {
       row.push(cell); cell = '';
     } else if (ch === '\n' || ch === '\r') {
       if (ch === '\r' && src[i + 1] === '\n') i++;
@@ -328,4 +337,4 @@ function parseSheet(text, format) {
   return rowsToShoots(table);
 }
 
-module.exports = { parseSheet, detectFormat, parseHtml, parseCsv, parseJson, parseDate, parseMoney, parsePaid, normalizeStatus, mapHeaders, normalizeHeader };
+module.exports = { parseSheet, detectFormat, detectDelimiter, parseHtml, parseCsv, parseJson, parseDate, parseMoney, parsePaid, normalizeStatus, mapHeaders, normalizeHeader };
