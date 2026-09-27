@@ -88,7 +88,18 @@ npm start                 # → http://localhost:3000
 ```ini
 DATABASE_URL=postgres://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require
 PORT=3000
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+SESSION_SECRET=use-a-long-random-secret
 ```
+
+### Google-only access
+
+The app and every `/api` endpoint require a Google sign-in. The server verifies Google's signed ID token and accepts only `sumit2nandi@gmail.com` and `sushmitaghosh0099@gmail.com`; the allowlist is enforced on the server, not just by the sign-in screen. Signed-in sessions use an HTTP-only, same-site cookie and expire after seven days.
+
+1. In Google Cloud Console, configure the Google Identity Services OAuth consent screen and create an **OAuth client ID** of type **Web application**.
+2. Add each hostname where this app runs to **Authorized JavaScript origins** (for local development, `http://localhost:3000`; add your production HTTPS origin too). No redirect URI is needed.
+3. Set `GOOGLE_CLIENT_ID` to that web client ID and `SESSION_SECRET` to a long random value (`openssl rand -hex 32` is a good way to generate one). Keep both values in the server environment; the client ID is public by design, but the session secret is not.
+4. Restart the app. Without a Google client ID, the sign-in page displays a configuration message and does not grant access. In production, serve over HTTPS so the session cookie is Secure.
 
 > The checked-in `.env` already points at your Aiven `defaultdb` for convenience. It is **git-ignored**;
 > treat it like a secret.

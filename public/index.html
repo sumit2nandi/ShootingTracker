@@ -32,6 +32,8 @@
       </button>
     </nav>
     <div class="top-right">
+      <span id="signed-in-user" class="signed-in-user" aria-label="Signed in account"></span>
+      <button id="btn-signout" class="btn btn-ghost signout-btn" title="Sign out" aria-label="Sign out">Sign out</button>
       <span id="db-status" class="db-pill" title="Checking database…">
         <span class="dot"></span><span class="db-pill-text">DB…</span>
       </span>
@@ -51,6 +53,7 @@
     <div class="filter-group"><label>Coordinator</label><select id="f-coordinator"></select></div>
     <div class="filter-group extra"><label>Client</label><select id="f-client"></select></div>
     <div class="filter-group extra"><label>Status</label><select id="f-status"></select></div>
+    <div class="filter-group extra"><label>Payment</label><select id="f-payment"><option value="">All payments</option><option value="paid">Paid</option><option value="partial">Partially paid</option><option value="unpaid">Unpaid</option><option value="outstanding">Outstanding balance</option></select></div>
     <div class="filter-group extra"><label>Type</label><select id="f-type"></select></div>
     <div class="filter-group grow extra"><label>Search</label><input id="f-q" type="search" placeholder="Search shoots…" /></div>
     <button id="f-clear" class="btn btn-ghost">Clear</button>
@@ -99,11 +102,16 @@
           <button class="btn btn-ghost" id="cal-today">Today</button>
         </div>
         <div class="cal-legend" id="cal-legend"></div>
+        <div class="cal-viewtoggle" role="group" aria-label="Calendar view">
+          <button id="cal-view-grid" class="btn btn-ghost active" aria-pressed="true">Grid</button>
+          <button id="cal-view-list" class="btn btn-ghost" aria-pressed="false">List</button>
+        </div>
       </div>
       <div class="cal-head-row">
         <div class="cal-dow">Sun</div><div class="cal-dow">Mon</div><div class="cal-dow">Tue</div><div class="cal-dow">Wed</div><div class="cal-dow">Thu</div><div class="cal-dow">Fri</div><div class="cal-dow">Sat</div>
       </div>
       <div id="cal-grid" class="cal-grid"></div>
+      <div id="cal-list" class="cal-list hidden"></div>
       <div class="cal-mobile-note muted small">Tap a day to add a shoot · tap a shoot to open it</div>
     </section>
 
@@ -112,6 +120,9 @@
         <div class="card-head">
           <h3>All shoots</h3>
           <span class="muted" id="shoots-count"></span>
+          <button id="btn-shoots-filter" class="btn btn-ghost icon-btn" aria-label="Show filters" aria-expanded="false" title="Show / hide filters">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6.5 8v5.5l-3 2V13L4 5z"/></svg>
+          </button>
         </div>
         <div id="shoots-table" class="table-wrap"></div>
       </div>
@@ -130,7 +141,7 @@
       <form id="shoot-form" class="form-grid">
         <input type="hidden" name="id" />
         <!-- core fields -->
-        <div class="field span-2"><label>Title *</label><input name="title" required placeholder="e.g. Ananya & Vikram — Wedding" /></div>
+        <div class="field span-2"><label>Title *</label><input name="title" required placeholder="Shoot title" /></div>
         <div class="field"><label>Shoot date *</label><input name="shoot_date" type="date" required /></div>
         <div class="field"><label>Fee (₹)</label><input name="fee" type="number" min="0" step="0.01" inputmode="numeric" value="0" /></div>
         <div class="field"><label>Coordinator</label>
