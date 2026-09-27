@@ -35,7 +35,9 @@ CREATE TABLE IF NOT EXISTS shoots (
   coordinator_id INTEGER REFERENCES coordinators(id) ON DELETE SET NULL,
   fee            NUMERIC(14,2) NOT NULL DEFAULT 0,
   status         TEXT NOT NULL DEFAULT 'planned'
-                 CHECK (status IN ('planned','confirmed','completed','postponed','cancelled')),
+                 -- only two states: a shoot is either still to come or closed out.
+                 -- (existing databases keep their wider CHECK; nothing rewrites rows)
+                 CHECK (status IN ('planned','completed')),
   contact_name   TEXT,
   contact_phone  TEXT,
   notes          TEXT,

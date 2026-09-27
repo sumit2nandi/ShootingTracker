@@ -83,7 +83,7 @@ check("paymentStatus=paid", s == 200 and all(r["payment_status"] == "paid" for r
 print("\n-- CRUD --")
 s, created = call("POST", "/api/shoots", {
     "title": "API Test Wedding", "client_name": "Test Client", "shoot_date": "2026-10-01",
-    "fee": 10000, "coordinator": "New Coord", "status": "confirmed", "venue": "Test Hall", "location": "Kolkata"})
+    "fee": 10000, "coordinator": "New Coord", "status": "planned", "venue": "Test Hall", "location": "Kolkata"})
 sid = created.get("id") if created else None
 check("create returns id", s == 201 and sid)
 

@@ -223,14 +223,18 @@ function parseTime(v) {
   return null;
 }
 
+// The app tracks two states only: a shoot either still has to happen (Planned) or
+// it is closed out (Completed). So a sheet that says "booked" / "confirmed" /
+// "postponed" is still to come, while "done" / "delivered" / "cancelled" is over.
 function normalizeStatus(v) {
   const s = String(v || '').toLowerCase();
   if (!s) return null;
-  if (s.includes('cancel') || s.includes('abort') || s.includes('drop')) return 'cancelled';
-  if (s.includes('postpon') || s.includes('reschedul') || s.includes('hold') || s.includes('shift')) return 'postponed';
-  if (s.includes('complet') || s.includes('don') || s.includes('finish') || s.includes('deliver') || s.includes('archive')) return 'completed';
-  if (s.includes('plan')) return 'planned';
-  if (s.includes('confirm') || s.includes('book') || s.includes('lock') || s.includes('schedul') || s.includes('final')) return 'confirmed';
+  if (s.includes('cancel') || s.includes('abort') || s.includes('drop')
+    || s.includes('complet') || s.includes('don') || s.includes('finish')
+    || s.includes('deliver') || s.includes('archive')) return 'completed';
+  if (s.includes('plan') || s.includes('confirm') || s.includes('book') || s.includes('lock')
+    || s.includes('schedul') || s.includes('final') || s.includes('upcoming')
+    || s.includes('postpon') || s.includes('reschedul') || s.includes('hold') || s.includes('shift')) return 'planned';
   return null;
 }
 

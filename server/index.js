@@ -83,7 +83,7 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
   setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache, must-revalidate')
 }));
 
-const STATUSES = ['planned', 'confirmed', 'completed', 'postponed', 'cancelled'];
+const STATUSES = ['planned', 'completed'];
 
 /* ---------------- filters ---------------- */
 
@@ -192,7 +192,7 @@ app.get('/api/dashboard', async (req, res, next) => {
              COALESCE(SUM(paid_amount),0)::numeric AS total_paid,
              COALESCE(SUM(fee - LEAST(paid_amount, fee)),0)::numeric AS outstanding,
              COUNT(*) FILTER (WHERE status = 'completed')::int AS completed,
-             COUNT(*) FILTER (WHERE status IN ('planned','confirmed'))::int AS active,
+             COUNT(*) FILTER (WHERE status = 'planned')::int AS active,
              COUNT(*) FILTER (WHERE payment_status = 'paid')::int AS paidShoots,
              COUNT(*) FILTER (WHERE payment_status = 'unpaid')::int AS unpaidShoots,
              COUNT(*) FILTER (WHERE fee > 0 AND paid_amount < fee)::int AS outstandingShoots
@@ -226,7 +226,9 @@ app.get('/api/dashboard', async (req, res, next) => {
       ${where ? `FROM base b ${where}` : 'FROM base b'}
       GROUP BY 1 ORDER BY n DESC`, params);
 
-    const upcomingExtra = `b.shoot_date >= CURRENT_DATE AND b.status IN ('planned','confirmed')`;
+    // the dashboard only looks one week ahead; 'confirmed' is kept in the
+    // predicate so rows imported before the two-state model still show up
+    const upcomingExtra = `b.shoot_date >= CURRENT_DATE AND b.shoot_date < (CURRENT_DATE + 7) AND b.status IN ('planned','confirmed')`;
     const upcomingWhere = where ? `${where.replace(/^WHERE\s+/, '')} AND ${upcomingExtra}` : upcomingExtra;
     const upcoming = await query(BASE_CTE + `
       SELECT b.id, b.title, b.client_name, b.shoot_date, b.venue, b.location,

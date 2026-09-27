@@ -13,7 +13,7 @@ const CLIENTS = [
 const TYPES = ['wedding', 'pre-wedding', 'fashion', 'commercial', 'maternity', 'newborn', 'product'];
 const VENUES = ['Sambad Pavilion, Kolkata', 'The Grand Ballroom, Howrah', 'Studio 8, Salt Lake', 'Nalhati Resort, Murshidabad', 'Skyline Rooftop, BKC', 'Botanical Garden, Shibpur'];
 const LOCATIONS = ['Kolkata', 'Howrah', 'Kharagpur', 'Darjeeling', 'Murshidabad'];
-const STATUSES = ['planned', 'confirmed', 'completed', 'completed', 'completed', 'postponed', 'cancelled'];
+const STATUSES = ['planned', 'completed', 'completed', 'completed', 'planned'];
 
 const D = (s) => s; // passthrough for clarity
 
@@ -38,12 +38,10 @@ function buildRows() {
       const date = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const fee = [5000, 8000, 12000, 15000, 20000, 25000, 35000, 45000][Math.floor(Math.random() * 8)];
       const isFuture = new Date(date) > now;
-      const status = isFuture
-        ? (Math.random() < 0.7 ? 'confirmed' : 'planned')
-        : STATUSES[Math.floor(Math.random() * STATUSES.length)];
+      const status = isFuture ? 'planned' : STATUSES[Math.floor(Math.random() * STATUSES.length)];
       const title = `[DEMO] ${type.charAt(0).toUpperCase() + type.slice(1)} shoot`;
       const dedupe = crypto.createHash('md5').update(`demo|${title}|${date}|${client}`).digest('hex');
-      const paid = !isFuture && status !== 'cancelled' ? (Math.random() < 0.8 ? fee : fee / 2) : 0;
+      const paid = !isFuture ? (Math.random() < 0.8 ? fee : fee / 2) : 0;
       rows.push({
         title, client_name: client, shoot_type: type, shoot_date: date,
         end_date: null, start_time: '10:00:00', end_time: null,

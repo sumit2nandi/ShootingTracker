@@ -14,13 +14,16 @@ tab bar** on mobile.
 - **Shoot tracking (CRUD)** — a minimal form (title, date, client, coordinator, fee, status) with the rest
   (type, end date/times, venue, location, contacts, notes) tucked under “More details”. Anything that
   doesn't fit a column is preserved in a JSON `extra` field, so you never lose data from a sheet.
+- **Two statuses, everywhere** — a shoot is either **Planned** (still to come) or **Completed** (closed
+  out). Filters, pills, calendar chips, the legend and the donut all speak those two words, and an import
+  that says “booked”, “confirmed”, “postponed” or “cancelled” is folded into the right one.
 - **Earnings** — a per-shoot **payments ledger**. Collected amount, balance and a derived
   `paid / partial / unpaid` status are computed from the ledger, not hand-typed.
-- **Dashboard** — KPI cards (shoots, total fee value, collected, outstanding, active, completed) plus:
-  - monthly **fee vs collected** bar chart,
+- **Dashboard** — KPI cards (shoots, total fee value, outstanding, planned, completed) plus:
+  - monthly earnings bar chart (per-day when a month filter is on),
   - status donut,
-  - per-**coordinator** and per-**type** breakdowns,
-  - upcoming shoots.
+  - **upcoming shoots** for the next 7 days, listed as date + title,
+  - per-**coordinator** and per-**type** breakdowns.
   Every widget respects the shared filter bar: **month, coordinator, client, status, type, fee range,
   text search, payment status**.
 - **Calendar** — Google-style month grid: cells share their edges (no gaps), today is highlighted, days from

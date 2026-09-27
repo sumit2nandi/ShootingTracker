@@ -109,12 +109,14 @@ async function loadMeta() {
   } catch { return; }
   fillSelect('#f-month', state.meta.months, '', true);
   fillSelect('#f-coordinator', state.meta.coordinators.map((c) => c.name));
-  // status filter: Planned / Completed (matching the form)
+  // status filter mirrors whatever the API reports (Planned / Completed)
   {
     const el = $('#f-status');
     const cur = el.value;
-    el.innerHTML = '<option value="">All statuses</option><option value="planned">Planned</option><option value="confirmed">Confirmed</option><option value="completed">Completed</option><option value="postponed">Postponed</option><option value="cancelled">Cancelled</option>';
-    if (['planned', 'confirmed', 'completed', 'postponed', 'cancelled'].includes(cur)) el.value = cur;
+    const list = (state.meta.statuses || []).filter((s) => STATUS_ORDER.includes(s));
+    el.innerHTML = '<option value="">All statuses</option>' +
+      list.map((s) => `<option value="${esc(s)}">${esc(statusLabel(s))}</option>`).join('');
+    if (list.includes(cur)) el.value = cur;
   }
   $('#dl-coordinators').innerHTML = state.meta.coordinators.map((c) => `<option value="${esc(c.name)}">`).join('');
   $('#dl-clients').innerHTML = state.meta.clients.map((c) => `<option value="${esc(c)}">`).join('');
@@ -209,7 +211,7 @@ function restoreViewFilters(v) {
   state.filters = { month: f.month || '', coordinator: f.coordinator || '', status: f.status || '', paymentStatus: f.paymentStatus || '', q: f.q || '' };
   $('#f-month').value = state.filters.month;
   $('#f-coordinator').value = state.filters.coordinator;
-  $('#f-status').value = ['planned', 'confirmed', 'completed', 'postponed', 'cancelled'].includes(state.filters.status) ? state.filters.status : '';
+  $('#f-status').value = (state.meta.statuses || []).includes(state.filters.status) ? state.filters.status : '';
   $('#f-payment').value = ['paid', 'partial', 'unpaid', 'outstanding'].includes(state.filters.paymentStatus) ? state.filters.paymentStatus : '';
   $('#f-q').value = state.filters.q;
 }
@@ -248,7 +250,7 @@ function renderDashboard(d, daily) {
     <div class="kpi accent" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Shoots</div><div class="kpi-value">${k.shoots ?? 0}</div><div class="kpi-sub">${k.completed ?? 0} completed</div></div>
     <div class="kpi violet" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Total fee value</div><div class="kpi-value">${fmtMoney(k.total_fee)}</div><div class="kpi-sub">booked earnings</div></div>
     <div class="kpi amber" data-goto='{"paymentStatus":"outstanding"}' role="button" tabindex="0"><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmtMoney(k.outstanding)}</div><div class="kpi-sub">${k.outstandingshoots ?? 0} shoots with a balance</div></div>
-    <div class="kpi" data-goto='{"status":"planned,confirmed"}' role="button" tabindex="0"><div class="kpi-label">Active (planned/confirmed)</div><div class="kpi-value">${k.active ?? 0}</div><div class="kpi-sub">on the books</div></div>
+    <div class="kpi" data-goto='{"status":"planned"}' role="button" tabindex="0"><div class="kpi-label">Planned</div><div class="kpi-value">${k.active ?? 0}</div><div class="kpi-sub">still to come</div></div>
     <div class="kpi red" data-goto='{"status":"completed"}' role="button" tabindex="0"><div class="kpi-label">Completed</div><div class="kpi-value">${k.completed ?? 0}</div><div class="kpi-sub">of ${k.shoots ?? 0} total</div></div>`;
 
   renderEarnings(d.monthly || [], daily);
@@ -299,17 +301,29 @@ function renderEarnings(monthly, daily) {
   $('#chart-range').textContent = `${label(months[0].ym)} – ${label(months[months.length - 1].ym)}`;
 }
 
-const STATUS_COLORS = { planned: '#7b8ea3', confirmed: '#0e7490', completed: '#15803d', postponed: '#b45309', cancelled: '#dc2626' };
+const STATUS_COLORS = { planned: '#7b8ea3', completed: '#15803d' };
 const STATUS_ORDER = Object.keys(STATUS_COLORS);
 const statusLabel = (s) => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1);
+/* Rows imported before the app settled on two states may still carry
+   "confirmed" / "postponed" / "cancelled"; fold them into Planned or Completed
+   so every screen, filter and legend only ever shows the two real states. */
+const appStatus = (s) => (s === 'completed' || s === 'cancelled' ? 'completed' : 'planned');
+const statusPill = (s) => `<span class="pill ${appStatus(s)}">${statusLabel(appStatus(s))}</span>`;
 
 function renderStatusDonut(byStatus) {
   const wrap = $('#chart-status');
-  const total = byStatus.reduce((a, b) => a + b.n, 0);
+  // fold any legacy status into Planned / Completed before charting
+  const totals = new Map();
+  for (const s of byStatus) {
+    const key = appStatus(s.status);
+    totals.set(key, (totals.get(key) || 0) + s.n);
+  }
+  const rows = STATUS_ORDER.filter((st) => totals.has(st)).map((st) => ({ status: st, n: totals.get(st) }));
+  const total = rows.reduce((a, b) => a + b.n, 0);
   if (!total) { wrap.innerHTML = '<div class="empty">No data for this filter</div>'; return; }
   const R = 56, C = 2 * Math.PI * R;
   let offset = 0;
-  const segs = byStatus.map((s) => {
+  const segs = rows.map((s) => {
     const frac = s.n / total;
     const seg = { color: STATUS_COLORS[s.status] || '#888', dash: `${frac * C} ${C}`, off: -offset * C, status: s.status, n: s.n };
     offset += frac;
@@ -324,7 +338,7 @@ function renderStatusDonut(byStatus) {
       <text x="80" y="97" text-anchor="middle" fill="#8b98ad" font-size="11">shoots</text>
     </svg>
     <div class="donut-legend">
-      ${byStatus.map((s) => `<div class="row"><i style="background:${STATUS_COLORS[s.status] || '#888'}"></i>${esc(s.status.charAt(0).toUpperCase() + s.status.slice(1))}<span class="n">${s.n}</span></div>`).join('')}
+      ${rows.map((s) => `<div class="row"><i style="background:${STATUS_COLORS[s.status] || '#888'}"></i>${esc(statusLabel(s.status))}<span class="n">${s.n}</span></div>`).join('')}
     </div>`;
 }
 
@@ -347,21 +361,15 @@ function renderTypes(list) {
 
 function renderUpcoming(list) {
   const wrap = $('#upcoming-table');
-  if (!list.length) { wrap.innerHTML = '<div class="empty">Nothing upcoming for this filter 🎉</div>'; return; }
+  if (!list.length) { wrap.innerHTML = '<div class="empty">Nothing scheduled in the next 7 days 🎉</div>'; return; }
   wrap.innerHTML = `
     <table class="upcoming-table"><thead><tr>
-      <th>Date</th><th>Title</th><th>Client</th><th class="col-u-venue">Venue / Location</th>
-      <th class="col-u-coord">Coordinator</th><th class="num">Fee</th><th>Status</th>
+      <th>Date</th><th>Title</th>
     </tr></thead>
     <tbody>${list.map((s) => `
       <tr data-id="${s.id}">
-        <td class="td-mono">${fmtDate(s.shoot_date)}</td>
+        <td class="td-mono td-date">${fmtDate(s.shoot_date)}</td>
         <td>${esc(s.title)}</td>
-        <td>${esc(s.client_name || '—')}</td>
-        <td class="col-u-venue">${esc([s.venue, s.location].filter(Boolean).join(', ') || '—')}</td>
-        <td class="col-u-coord">${esc(s.coordinator || '—')}</td>
-        <td class="num td-mono">${fmtMoney(s.fee)}</td>
-        <td><span class="pill ${s.status}">${esc(statusLabel(s.status))}</span></td>
       </tr>`).join('')}</tbody></table>`;
   $$('#upcoming-table tbody tr').forEach((tr) => tr.addEventListener('click', () => openDrawer(+tr.dataset.id)));
 }
@@ -406,8 +414,9 @@ function renderCalLegend() {
   const idsByStatus = new Map();
   for (const s of state.calShoots || []) {
     if (!s) continue;
-    if (!idsByStatus.has(s.status)) idsByStatus.set(s.status, new Set());
-    idsByStatus.get(s.status).add(s.id);
+    const key = appStatus(s.status);
+    if (!idsByStatus.has(key)) idsByStatus.set(key, new Set());
+    idsByStatus.get(key).add(s.id);
   }
   const present = STATUS_ORDER.filter((st) => idsByStatus.has(st));
   const wrap = $('#cal-legend');
@@ -439,7 +448,7 @@ function renderCalendarList() {
             <span class="cl-title">${esc(s.title)}</span>
             ${s.coordinator ? `<span class="muted small cl-coord">${esc(s.coordinator)}</span>` : ''}
             <span class="cl-fee td-mono">${fmtMoney(s.fee)}</span>
-            <span class="pill ${s.status}">${esc(statusLabel(s.status))}</span>
+            ${statusPill(s.status)}
           </div>`).join('')}
         </div>
       </div>`);
@@ -481,7 +490,7 @@ function renderCalendarGrid() {
       <div class="cal-cell ${inMonth ? '' : 'dim'} ${k === todayK ? 'today' : ''}" data-date="${k}">
         <div class="cal-dayno"><span>${d.getDate()}</span></div>
         <div class="cal-chips">
-          ${shown.map((s) => `<div class="cal-chip ${s.status}" data-id="${s.id}" title="${esc(s.title)}${s.venue ? ' — ' + esc(s.venue) : ''}">${esc(s.title)}</div>`).join('')}
+          ${shown.map((s) => `<div class="cal-chip ${appStatus(s.status)}" data-id="${s.id}" title="${esc(s.title)}${s.venue ? ' — ' + esc(s.venue) : ''}">${esc(s.title)}</div>`).join('')}
           ${shoots.length > 3 ? `<div class="cal-more" data-date="${k}">+${shoots.length - 3} more…</div>` : ''}
         </div>
       </div>`);
@@ -501,7 +510,7 @@ function openDayPanel(dateK) {
     <div class="sub">${shoots.length} shoot${shoots.length === 1 ? '' : 's'} on this day</div>
     ${shoots.map((s) => `
       <div class="pay-row" data-id="${s.id}" style="cursor:pointer">
-        <span class="pill ${s.status}">${esc(statusLabel(s.status))}</span>
+        ${statusPill(s.status)}
         <span>${esc(s.title)}</span>
         <span class="amt">${fmtMoney(s.fee)}</span>
       </div>`).join('')}
@@ -561,7 +570,7 @@ function renderShoots(rows) {
               <span class="fee-bubble ${paid ? 'paid' : 'due'}" title="${esc(paymentLabel)}" aria-label="${esc(fmtMoney(s.fee))}, ${esc(paymentLabel)}">${fmtMoney(s.fee)}</span>
             </td>
             <td class="col-pay"><span class="pill ${s.payment_status}">${esc(paymentLabel)}</span></td>
-            <td class="col-status"><span class="pill ${s.status}">${esc(statusLabel(s.status))}</span></td>
+            <td class="col-status">${statusPill(s.status)}</td>
           </tr>`;
       }).join('')}</tbody>
     </table>`;
@@ -596,14 +605,9 @@ function openShootModal(shoot, presetDate) {
     coordNew.value = known ? '' : shoot.coordinator;
   } else { coordSel.value = ''; coordNew.value = ''; }
   coordNew.hidden = coordSel.value !== '__new__';
-  // status: core options are Planned/Completed; keep any other value intact when editing
+  // status: the app only knows Planned and Completed
   const stSel = $('#sel-status');
-  const st = shoot?.status || 'planned';
-  if (st !== 'planned' && st !== 'completed' && ![...stSel.options].some((o) => o.value === st)) {
-    const o = document.createElement('option');
-    o.value = st; o.textContent = st; stSel.appendChild(o);
-  }
-  stSel.value = st;
+  stSel.value = appStatus(shoot?.status);
   $('#shoot-modal').classList.remove('hidden');
   setTimeout(() => f.title.focus(), 50);
 }
@@ -648,7 +652,7 @@ async function openDrawer(id) {
     drawer.innerHTML = `
       <h2>${esc(s.title)}</h2>
       <div class="sub">${fmtDate(s.shoot_date)}${s.end_date && s.end_date !== s.shoot_date ? ` → ${fmtDate(s.end_date)}` : ''}${s.start_time ? ` · ${fmtTime(s.start_time)}` : ''}</div>
-      <div><span class="pill ${s.status}">${esc(statusLabel(s.status))}</span> <span class="pill ${s.payment_status}">${esc(statusLabel(s.payment_status))}</span></div>
+      <div>${statusPill(s.status)} <span class="pill ${s.payment_status}">${esc(statusLabel(s.payment_status))}</span></div>
       <div class="section"><h4>Details</h4>
         <div class="kv">
           <span class="k">Client</span><span>${esc(s.client_name || '—')}</span>
@@ -760,7 +764,7 @@ function buildExportCsv(rows) {
   sorted.forEach((s, i) => {
     const [y, m, d] = String(s.shoot_date).slice(0, 10).split('-').map(Number);
     const date = `${d}-${MONTH_NAMES[m - 1]}-${y}`;
-    const status = s.status === 'completed' ? 'Done' : '';
+    const status = appStatus(s.status) === 'completed' ? 'Done' : '';
     const fee = Math.round((+s.fee || 0) * 100) / 100;
     const mt = monthTotals[i];
     const row = [
