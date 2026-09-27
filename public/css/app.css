@@ -207,12 +207,10 @@ tbody tr:hover { background: var(--surface-2); }
 .td-mono { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 
-/* iOS/Android: 16px controls stop the page zoom when a field is focused.
-   The calendar month/year selects are deliberately excluded — they are pickers,
-   not typing fields, and 16px made the calendar toolbar overflow on phones. */
+/* iOS/Android: 16px controls stop the page zoom when a field is focused */
 @media (max-width: 768px) {
   #shoot-form input, #shoot-form select, #shoot-form textarea,
-  .filter-group select, .filter-group input { font-size: 16px; }
+  .cal-select, .filter-group select, .filter-group input { font-size: 16px; }
 }
 @media (max-width: 700px) {
   .table-wrap { scrollbar-width: thin; }
@@ -230,18 +228,12 @@ tbody tr:hover { background: var(--surface-2); }
 
 /* ---------- calendar ---------- */
 .cal-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
-.cal-nav { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
-.cal-nav .icon-btn { padding: 6px; }
-.cal-nav #cal-today { padding: 6px 10px; font-size: 12.5px; }
+.cal-nav { display: flex; align-items: center; gap: 8px; }
 .cal-select {
-  font-size: 13px; font-weight: 650; color: var(--text);
-  padding: 5px 22px 5px 8px; border-radius: 8px; border: 1px solid var(--line-2);
+  font-size: 14px; font-weight: 650; color: var(--text);
+  padding: 6px 28px 6px 10px; border-radius: 9px; border: 1px solid var(--line-2);
   background-color: var(--surface); font-family: inherit;
-  flex: none;   /* the toolbar must not squeeze the month name out of view */
 }
-/* just wide enough for the longest month name ("September") plus the caret */
-#cal-month { min-width: 92px; }
-#cal-year { min-width: 0; padding-right: 20px; }
 .cal-select:focus { outline: none; border-color: var(--accent); }
 .cal-legend { display: flex; align-items: center; gap: 7px 14px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
@@ -321,7 +313,6 @@ tbody tr:hover { background: var(--surface-2); }
 @media (min-width: 768px) { .cal-mobile-note { display: none; } }
 @media (max-width: 768px) {
   .cal-frame { border-radius: 10px; }
-  #cal-month { min-width: 88px; }
   .cal-grid { grid-auto-rows: clamp(74px, 10.5vh, 100px); }
   .cal-cell { padding: 3px 4px 4px; }
   .cal-dow { padding: 6px 5px; font-size: 10.5px; }
