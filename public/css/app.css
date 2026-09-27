@@ -27,6 +27,8 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+/* stop mobile browsers from inflating (i.e. visually zooming) the text on rotate */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   background: var(--bg);
   color: var(--text);
@@ -207,10 +209,15 @@ tbody tr:hover { background: var(--surface-2); }
 .td-mono { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 
-/* iOS/Android: 16px controls stop the page zoom when a field is focused */
+/* iOS/Android: anything under 16px makes the browser zoom the whole page on
+   focus, so every text field / picker is bumped to 16px on small screens */
 @media (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select, textarea,
   #shoot-form input, #shoot-form select, #shoot-form textarea,
-  .cal-select, .filter-group select, .filter-group input { font-size: 16px; }
+  .cal-select, .filter-group select, .filter-group input,
+  .access-add input, .access-add select,
+  .drawer input, .drawer select, .drawer textarea { font-size: 16px; }
 }
 @media (max-width: 700px) {
   .table-wrap { scrollbar-width: thin; }
@@ -384,8 +391,19 @@ tbody tr:hover { background: var(--surface-2); }
   .drawer-backdrop { align-items: flex-end; }
   .drawer { width: 100%; height: 94%; border-left: 0; border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; animation: sheetup .22s cubic-bezier(.2, .8, .3, 1); }
 }
+/* the head is pinned to the top of the drawer, so the ✕ is never scrolled away */
+.drawer-head {
+  position: sticky; top: 0; z-index: 3;
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+  margin: -20px -20px 14px; padding: 15px 20px 12px;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+  box-shadow: 0 6px 16px rgba(23, 35, 58, .05);
+}
+.drawer-head-txt { min-width: 0; }
+.drawer-head .icon-btn { flex: none; margin-top: -2px; }
 .drawer h2 { font-size: 18px; margin-bottom: 4px; letter-spacing: -.2px; }
 .drawer .sub { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+.drawer-head .sub { margin-bottom: 0; }
 .drawer .section { margin-top: 18px; }
 .drawer .section h4 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); font-weight: 650; }
 .kv { display: grid; grid-template-columns: 104px 1fr; gap: 6px 12px; font-size: 13.5px; }
@@ -397,10 +415,22 @@ tbody tr:hover { background: var(--surface-2); }
 .pay-row { display: flex; align-items: center; gap: 10px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; padding: 8px 11px; font-size: 13px; }
 .pay-row .amt { font-weight: 700; color: var(--green); margin-left: auto; white-space: nowrap; }
 .pay-row button { background: none; border: 0; color: var(--red); cursor: pointer; font-size: 13px; }
-.pay-form { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 8px; margin-top: 8px; }
-.pay-form input { padding: 8px 9px; font-size: 13px; }
-@media (max-width: 480px) { .pay-form { grid-template-columns: 1fr 1fr; } }
-.pay-total { font-size: 13px; margin-top: 8px; }
+.pay-total { font-size: 13px; margin-top: 10px; }
+.pay-collect {
+  display: flex; align-items: center; gap: 10px; margin-top: 10px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px;
+}
+.pay-check { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: pointer; font-size: 13.5px; }
+.pay-check input[type="checkbox"] {
+  appearance: auto; -webkit-appearance: checkbox; appearance: checkbox;
+  width: 20px; height: 20px; min-width: 20px; margin: 0; padding: 0; flex: none;
+  background: none; border: 0; border-radius: 5px; accent-color: var(--green); cursor: pointer;
+}
+.pay-check input[type="checkbox"]:disabled { cursor: default; }
+.pay-check b { font-variant-numeric: tabular-nums; }
+.pay-collect .btn { flex: none; }
+.pay-collect .btn:disabled { opacity: .45; cursor: default; }
+.pay-hint { margin-top: 6px; }
 .extra-keys { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; }
 .extra-keys span { color: var(--muted); }
 

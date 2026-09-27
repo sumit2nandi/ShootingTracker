@@ -18,7 +18,9 @@ tab bar** on mobile.
   out). Filters, pills, calendar chips, the legend and the donut all speak those two words, and an import
   that says “booked”, “confirmed”, “postponed” or “cancelled” is folded into the right one.
 - **Earnings** — a per-shoot **payments ledger**. Collected amount, balance and a derived
-  `paid / partial / unpaid` status are computed from the ledger, not hand-typed.
+  `paid / partial / unpaid` status are computed from the ledger, not hand-typed. In the shoot
+  drawer the ledger is topped by a single **Collected** checkbox pre-filled with whatever is still
+  due on the fee — tick it, press **Save**, and the balance is booked in one step.
 - **Dashboard** — KPI cards (shoots, total fee value, outstanding, planned, completed) plus:
   - monthly earnings bar chart (per-day when a month filter is on),
   - status donut,

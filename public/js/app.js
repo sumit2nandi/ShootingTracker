@@ -375,10 +375,7 @@ function renderUpcoming(list) {
   const wrap = $('#upcoming-table');
   if (!list.length) { wrap.innerHTML = '<div class="empty">Nothing scheduled in the next 7 days 🎉</div>'; return; }
   wrap.innerHTML = `
-    <table class="upcoming-table"><thead><tr>
-      <th>Date</th><th>Title</th>
-    </tr></thead>
-    <tbody>${list.map((s) => `
+    <table class="upcoming-table"><tbody>${list.map((s) => `
       <tr data-id="${s.id}">
         <td class="td-mono td-date">${fmtDate(s.shoot_date)}</td>
         <td>${esc(s.title)}</td>
@@ -758,9 +755,18 @@ async function openDrawer(id) {
   try {
     const s = await api(`/api/shoots/${id}`);
     const paid = +s.paid_amount, fee = +s.fee;
+    const balance = Math.max(0, Math.round((fee - paid) * 100) / 100);
+    const canCollect = balance > 0;
     drawer.innerHTML = `
-      <h2>${esc(s.title)}</h2>
-      <div class="sub">${fmtDate(s.shoot_date)}${s.end_date && s.end_date !== s.shoot_date ? ` → ${fmtDate(s.end_date)}` : ''}${s.start_time ? ` · ${fmtTime(s.start_time)}` : ''}</div>
+      <div class="drawer-head">
+        <div class="drawer-head-txt">
+          <h2>${esc(s.title)}</h2>
+          <div class="sub">${fmtDate(s.shoot_date)}${s.end_date && s.end_date !== s.shoot_date ? ` → ${fmtDate(s.end_date)}` : ''}${s.start_time ? ` · ${fmtTime(s.start_time)}` : ''}</div>
+        </div>
+        <button class="icon-btn btn btn-ghost" data-close aria-label="Close" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
       <div>${statusPill(s.status)} <span class="pill ${s.payment_status}">${esc(statusLabel(s.payment_status))}</span></div>
       <div class="section"><h4>Details</h4>
         <div class="kv kv-lead">
@@ -777,37 +783,25 @@ async function openDrawer(id) {
         ${s.notes ? `<div class="section"><h4>Notes</h4><div>${esc(s.notes)}</div></div>` : ''}
         ${Object.keys(s.extra || {}).length ? `<div class="section"><h4>Extra fields (from import)</h4><div class="kv">${Object.entries(s.extra).map(([k, v]) => `<span class="k">${esc(k)}</span><span>${esc(v)}</span>`).join('')}</div></div>` : ''}
       </div>
-      <div class="section"><h4>Payments</h4>
+      <div class="section"><h4>Payment</h4>
         <div class="pay-list">
           ${(s.payments || []).map((p) => `
             <div class="pay-row">
               <span class="muted small">${fmtDate(p.paid_on)}</span>
-              <span>${esc(p.method || '')}${p.note ? ` <span class="muted small">· ${esc(p.note)}</span>` : ''}</span>
+              <span>${[p.method, p.note].filter(Boolean).map(esc).join(' <span class="muted small">· </span>')}</span>
               <span class="amt">${fmtMoney(p.amount)}</span>
               <button data-pay-id="${p.id}" title="Delete payment">✕</button>
-            </div>`).join('') || '<div class="muted small">No payments recorded.</div>'}
-        </div>
-        <div class="pay-form">
-          <input type="number" id="pay-amount" min="0" step="0.01" placeholder="Amount ₹" />
-          <input type="date" id="pay-date" value="${dayKey(new Date())}" />
-          <input type="text" id="pay-method" placeholder="method (cash/UPI…)" />
-          <button class="btn btn-primary" id="pay-add">Add</button>
+            </div>`).join('') || `<div class="muted small">${fee ? 'Nothing collected yet.' : 'Set a fee to start collecting.'}</div>`}
         </div>
         <div class="pay-total">Collected <b style="color:var(--green)">${fmtMoney(paid)}</b> of ${fmtMoney(fee)} (${fee ? Math.round((paid / fee) * 100) : 0}%)</div>
-      </div>
-      <div class="section"><h4>Media / deliverables</h4>
-        <div class="pay-list">
-          ${(s.media || []).map((mm) => `
-            <div class="pay-row">
-              <a href="${esc(mm.file_url)}" target="_blank" rel="noopener" class="btn-link" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(mm.caption || mm.file_url)}</a>
-              <button data-media-id="${mm.id}" title="Remove">✕</button>
-            </div>`).join('') || '<div class="muted small">No links yet.</div>'}
+        <div class="pay-collect">
+          <label class="pay-check">
+            <input type="checkbox" id="pay-collected" ${canCollect ? '' : 'checked disabled'} />
+            <span>${canCollect ? `Collected <b>${fmtMoney(balance)}</b>` : fee ? 'Fee fully collected' : 'Nothing to collect'}</span>
+          </label>
+          <button class="btn btn-primary" id="pay-save" disabled>Save</button>
         </div>
-        <div class="pay-form" style="grid-template-columns:2fr 1fr auto">
-          <input type="text" id="media-url" placeholder="https://… (photo / album / drive link)" />
-          <input type="text" id="media-caption" placeholder="caption" />
-          <button class="btn btn-primary" id="media-add">Add</button>
-        </div>
+        <div class="muted small pay-hint">${!fee ? 'Add a fee to this shoot, then tick the box to collect it.' : canCollect ? 'The amount is pre-filled from the fee — tick the box and save.' : 'Tick nothing: this shoot is already paid in full.'}</div>
       </div>
       <div class="drawer-actions">
         <button class="btn" id="dr-edit">✏️ Edit</button>
@@ -817,36 +811,26 @@ async function openDrawer(id) {
     $$('#drawer [data-close]').forEach((b) => b.addEventListener('click', closeDrawer));
     $('#dr-edit').addEventListener('click', () => { closeDrawer(); openShootModal(s); });
     $('#dr-delete').addEventListener('click', async () => {
-      if (!confirm(`Delete "${s.title}"? Payments and media will be removed too.`)) return;
+      if (!confirm(`Delete "${s.title}"? Its payments will be removed too.`)) return;
       try { await api(`/api/shoots/${id}`, { method: 'DELETE' }); toast('Shoot deleted'); closeDrawer(); loadMeta(); refreshCurrent(); }
       catch (e) { toast('Delete failed: ' + e.message, 'err'); }
     });
-    $('#pay-add').addEventListener('click', async () => {
-      const amount = $('#pay-amount').value;
-      if (!amount || +amount <= 0) { toast('Enter a payment amount', 'err'); return; }
+    const payBox = $('#pay-collected');
+    const paySave = $('#pay-save');
+    payBox.addEventListener('change', () => { paySave.disabled = !payBox.checked; });
+    paySave.addEventListener('click', async () => {
+      if (!payBox.checked) return;
+      paySave.disabled = true;
       try {
-        await api(`/api/shoots/${id}/payments`, { body: { amount: +amount, paid_on: $('#pay-date').value || null, method: $('#pay-method').value.trim() || null } });
-        toast('Payment recorded');
+        await api(`/api/shoots/${id}/payments`, { body: { amount: balance, paid_on: dayKey(new Date()), note: 'Collected' } });
+        toast(`Marked ${fmtMoney(balance)} as collected`);
         openDrawer(id);
         refreshCurrent();
-      } catch (e) { toast('Payment failed: ' + e.message, 'err'); }
+      } catch (e) { paySave.disabled = false; toast('Could not save: ' + e.message, 'err'); }
     });
     $$('#drawer [data-pay-id]').forEach((b) => b.addEventListener('click', async () => {
       if (!confirm('Remove this payment?')) return;
       try { await api(`/api/payments/${b.dataset.payId}`, { method: 'DELETE' }); toast('Payment removed'); openDrawer(id); refreshCurrent(); }
-      catch (e) { toast('Failed: ' + e.message, 'err'); }
-    }));
-    $('#media-add').addEventListener('click', async () => {
-      const url = $('#media-url').value.trim();
-      if (!url) { toast('Enter a media URL', 'err'); return; }
-      try {
-        await api(`/api/shoots/${id}/media`, { body: { file_url: url, caption: $('#media-caption').value.trim() || null } });
-        toast('Link added');
-        openDrawer(id);
-      } catch (e) { toast('Failed: ' + e.message, 'err'); }
-    });
-    $$('#drawer [data-media-id]').forEach((b) => b.addEventListener('click', async () => {
-      try { await api(`/api/media/${b.dataset.mediaId}`, { method: 'DELETE' }); toast('Link removed'); openDrawer(id); }
       catch (e) { toast('Failed: ' + e.message, 'err'); }
     }));
   } catch (e) {
