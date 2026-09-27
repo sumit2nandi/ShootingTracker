@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """End-to-end API smoke test. Usage: python3 scripts/api-test.py [base_url]"""
-import json, sys, urllib.request, urllib.error
+import json, sys, urllib.request, urllib.error, urllib.parse
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:3000"
 passed, failed = [], []
@@ -53,15 +53,20 @@ s, r4 = call("GET", "/api/shoots?month=2026-04")
 check(f"month=2026-04 filter ({len(r4)} rows)", s == 200 and len(r4) >= 1)
 check("month filter all April", all(r["shoot_date"].startswith("2026-04") for r in r4))
 
-s, rc = call("GET", "/api/shoots?coordinator=Riya%20Saha")
+s, meta = call("GET", "/api/meta")
+coord_names = [c["name"] for c in meta.get("coordinators", [])]
+rc_name = coord_names[0] if coord_names else "Riya Saha"
+s, rc = call("GET", "/api/shoots?coordinator=" + urllib.parse.quote(rc_name))
 check("coordinator filter works", s == 200 and len(rc) >= 1)
-check("coordinator filter correct", all((r.get("coordinator") or "") == "Riya Saha" for r in rc))
+check("coordinator filter correct", all((r.get("coordinator") or "") == rc_name for r in rc))
 
 s, rs = call("GET", "/api/shoots?status=completed")
 check("status filter works", s == 200 and all(r["status"] == "completed" for r in rs))
 
-s, rq = call("GET", "/api/shoots?q=Ananya")
-check("search q=Ananya works", s == 200 and len(rq) >= 1)
+s, allrows = call("GET", "/api/shoots")
+probe = (allrows[0]["title"].split() or ["shoot"])[0]
+s, rq = call("GET", "/api/shoots?q=" + urllib.parse.quote(probe))
+check(f"search q={probe} works", s == 200 and len(rq) >= 1)
 
 s, d4 = call("GET", "/api/dashboard?month=2026-04")
 check("dashboard month filter", s == 200 and d4["kpi"]["shoots"] >= 1)
