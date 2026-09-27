@@ -256,13 +256,16 @@ async function loadDashboard() {
 
 function renderDashboard(d, daily) {
   const k = d.kpi || {};
-  // tiles are clickable → open the Shoots tab with the matching filter
+  // six tiles, in count/amount pairs: total → completed → planned.
+  // tiles are clickable → open the Shoots tab with the matching filter.
+  // (note: unquoted SQL aliases come back lowercased, hence k.paidshoots)
   $('#kpi-row').innerHTML = `
-    <div class="kpi accent" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Shoots</div><div class="kpi-value">${k.shoots ?? 0}</div><div class="kpi-sub">${k.completed ?? 0} completed</div></div>
-    <div class="kpi violet" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Total fee value</div><div class="kpi-value">${fmtMoney(k.total_fee)}</div><div class="kpi-sub">booked earnings</div></div>
-    <div class="kpi amber" data-goto='{"paymentStatus":"outstanding"}' role="button" tabindex="0"><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmtMoney(k.outstanding)}</div><div class="kpi-sub">${k.outstandingshoots ?? 0} shoots with a balance</div></div>
+    <div class="kpi accent" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Total shoots</div><div class="kpi-value">${k.shoots ?? 0}</div><div class="kpi-sub">${k.active ?? 0} planned · ${k.completed ?? 0} completed</div></div>
+    <div class="kpi violet" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Total fee</div><div class="kpi-value">${fmtMoney(k.total_fee)}</div><div class="kpi-sub">booked earnings</div></div>
+    <div class="kpi red" data-goto='{"status":"completed"}' role="button" tabindex="0"><div class="kpi-label">Completed</div><div class="kpi-value">${k.completed ?? 0}</div><div class="kpi-sub">of ${k.shoots ?? 0} total</div></div>
+    <div class="kpi green" data-goto='{"paymentStatus":"paid"}' role="button" tabindex="0"><div class="kpi-label">Total received</div><div class="kpi-value">${fmtMoney(k.total_paid)}</div><div class="kpi-sub">${k.paidshoots ?? 0} shoots fully paid</div></div>
     <div class="kpi" data-goto='{"status":"planned"}' role="button" tabindex="0"><div class="kpi-label">Planned</div><div class="kpi-value">${k.active ?? 0}</div><div class="kpi-sub">still to come</div></div>
-    <div class="kpi red" data-goto='{"status":"completed"}' role="button" tabindex="0"><div class="kpi-label">Completed</div><div class="kpi-value">${k.completed ?? 0}</div><div class="kpi-sub">of ${k.shoots ?? 0} total</div></div>`;
+    <div class="kpi amber" data-goto='{"paymentStatus":"outstanding"}' role="button" tabindex="0"><div class="kpi-label">Outstanding</div><div class="kpi-value">${fmtMoney(k.outstanding)}</div><div class="kpi-sub">${k.outstandingshoots ?? 0} shoots with a balance</div></div>`;
 
   renderEarnings(d.monthly || [], daily);
   renderStatusDonut(d.byStatus || []);

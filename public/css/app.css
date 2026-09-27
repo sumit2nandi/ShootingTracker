@@ -138,7 +138,7 @@ main { padding: 16px 16px calc(110px + env(safe-area-inset-bottom)); max-width: 
 .kpi[data-goto]:hover, .kpi[data-goto]:focus-visible { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-md); outline: none; }
 .kpi[data-goto]:active { transform: translateY(0); }
 @media (min-width: 640px) { .kpi-row { grid-template-columns: repeat(3, 1fr); } }
-@media (min-width: 1100px) { .kpi-row { grid-template-columns: repeat(5, 1fr); } }
+@media (min-width: 1200px) { .kpi-row { grid-template-columns: repeat(6, 1fr); } }
 .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 13px 15px; box-shadow: var(--shadow-sm); }
 .kpi .kpi-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); font-weight: 600; }
 .kpi .kpi-value { font-size: 22px; font-weight: 750; margin-top: 5px; letter-spacing: -.3px; font-variant-numeric: tabular-nums; }

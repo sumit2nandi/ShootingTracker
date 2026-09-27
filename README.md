@@ -21,7 +21,7 @@ tab bar** on mobile.
   `paid / partial / unpaid` status are computed from the ledger, not hand-typed. In the shoot
   drawer the ledger is topped by a single **Collected** checkbox pre-filled with whatever is still
   due on the fee — tick it, press **Save**, and the balance is booked in one step.
-- **Dashboard** — KPI cards (shoots, total fee value, outstanding, planned, completed) plus:
+- **Dashboard** — six KPI cards in count/amount pairs (total shoots, total fee · completed, total received · planned, outstanding) plus:
   - monthly earnings bar chart (per-day when a month filter is on),
   - status donut,
   - **upcoming shoots** for the next 7 days, listed as date + title,
