@@ -6,7 +6,7 @@ const cheerio = require('cheerio');
 /* ---------------- format detection ---------------- */
 
 function detectFormat(text) {
-  const t = String(text).trim();
+  const t = String(text).replace(/^\uFEFF/, '').trim();
   if (!t) return 'csv';
   if (t.startsWith('[') || t.startsWith('{')) return 'json';
   if (/<table[\s>]/i.test(t) || /<html/i.test(t)) return 'html';
@@ -74,7 +74,9 @@ function parseCsv(text) {
     }
   }
   if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
-  const clean = rows.map((r) => r.map((c) => String(c).trim())).filter((r) => r.some((c) => c !== ''));
+  const clean = rows
+    .map((r) => r.map((c) => decodeEntities(String(c).trim())))
+    .filter((r) => r.some((c) => c !== ''));
   if (!clean.length) return { headers: [], data: [] };
   const headers = clean[0].map(normalizeHeader);
   return { headers, data: clean.slice(1) };
@@ -99,6 +101,13 @@ function parseJson(text) {
   return { headers, data };
 }
 
+/* ---------------- HTML entities ---------------- */
+
+const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '—', ndash: '–' };
+function decodeEntities(s) {
+  return s.replace(/&(\w+);/g, (m, k) => (ENTITIES[k.toLowerCase()] !== undefined ? ENTITIES[k.toLowerCase()] : m));
+}
+
 /* ---------------- header → field mapping ---------------- */
 
 function normalizeHeader(h) {
@@ -112,13 +121,13 @@ function normalizeHeader(h) {
 
 const FIELD_RULES = [
   // [field, predicate(normalizedHeader)]
-  ['fee', (h) => ['fee', 'amount', 'price', 'earnings', 'earning', 'rate', 'charge', 'cost', 'total', 'payment amount', 'amount paid', 'paid amount', 'budget', 'shoot fee', 'value', 'amount rs', 'rs'].includes(h)],
+  ['fee', (h) => ['fee', 'amount', 'price', 'earnings', 'earning', 'rate', 'charge', 'cost', 'total', 'payment amount', 'amount paid', 'paid amount', 'budget', 'shoot fee', 'value', 'amount rs', 'rs', 'remuneration', 'remuneration amount', 'pay', 'payment amount rs'].includes(h)],
   ['paid', (h) => ['paid', 'payment', 'payment status', 'paid status', 'advance', 'advance status', 'payment received'].includes(h)],
   ['shoot_date', (h) => ['date', 'shoot date', 'day', 'scheduled date', 'booking date', 'event date', 'shoot day', 'date of shoot', 'shoot day date', 'dob'].includes(h)],
   ['end_date', (h) => ['end date', 'to date', 'till date', 'last date', 'until date'].includes(h)],
   ['start_time', (h) => ['start time', 'time', 'report time', 'start', 'call time'].includes(h)],
   ['end_time', (h) => ['end time', 'completion time', 'finish time'].includes(h)],
-  ['title', (h) => ['title', 'project', 'shoot title', 'shoot name', 'project name', 'job', 'campaign', 'event', 'work', 'booking', 'order title'].includes(h)],
+  ['title', (h) => ['title', 'project', 'shoot title', 'shoot name', 'project name', 'job', 'campaign', 'event', 'work', 'booking', 'order title', 'description', 'shoot description', 'details'].includes(h)],
   ['client_name', (h) => ['client', 'client name', 'customer', 'brand', 'client / name', 'party', 'client name city', 'groom bride', 'couple'].includes(h)],
   ['shoot_type', (h) => ['type', 'category', 'kind', 'occasion', 'shoot type', 'event type', 'work type'].includes(h)],
   ['venue', (h) => ['venue', 'venue name', 'hall', 'hall name', 'studio', 'venue place'].includes(h)],
@@ -127,7 +136,7 @@ const FIELD_RULES = [
   ['contact_name', (h) => ['contact', 'contact name', 'client contact', 'contact person', 'client contact name'].includes(h)],
   ['contact_phone', (h) => ['phone', 'mobile', 'contact number', 'number', 'whatsapp', 'phone number', 'mobile number', 'contact mobile', 'client number', 'phone no'].includes(h)],
   ['status', (h) => ['status', 'state', 'progress', 'shoot status'].includes(h)],
-  ['notes', (h) => ['notes', 'remark', 'remarks', 'note', 'details', 'info', 'description', 'desc', 'comments'].includes(h)]
+  ['notes', (h) => ['notes', 'remark', 'remarks', 'note', 'info', 'comments'].includes(h)]
 ];
 
 function mapHeaders(headers) {
@@ -328,6 +337,7 @@ function rowsToShoots(table) {
 }
 
 function parseSheet(text, format) {
+  text = String(text).replace(/^\uFEFF/, ''); // strip UTF-8 BOM (Google Sheets exports)
   format = format || detectFormat(text);
   let table;
   if (format === 'html') table = parseHtml(text);

@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
-# Waits for /home/user/uploads/April.html and copies it into the repo.
-for i in $(seq 1 240); do
-  if [ -f /home/user/uploads/April.html ]; then
-    cp /home/user/uploads/April.html /home/user/ShootingTracker/data/April.html
-    echo "CAPTURED April.html at iteration $i"
-    exit 0
+# Waits for the user's data file in /home/user/uploads and copies it into the repo.
+for i in $(seq 1 300); do
+  if [ -d /home/user/uploads ]; then
+    for f in /home/user/uploads/*; do
+      [ -f "$f" ] || continue
+      base="$(basename "$f")"
+      # normalize spaces in the stored name
+      out="/home/user/ShootingTracker/data/upload-$(echo "$base" | tr ' ' '_')"
+      if [ ! -f "$out" ]; then
+        cp "$f" "$out"
+        echo "CAPTURED: $base -> $out (iteration $i)"
+      fi
+    done
+    # stop once any data file is captured
+    ls /home/user/ShootingTracker/data/upload-* >/dev/null 2>&1 && exit 0
   fi
   sleep 5
 done
-echo "TIMEOUT: April.html never appeared"
+echo "TIMEOUT: no upload captured"
 exit 1
