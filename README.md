@@ -4,8 +4,9 @@ A self-hosted, **mobile-first** tool to **track every shoot**, with a **filterab
 and a **calendar linked to each shoot** — all backed by **PostgreSQL** (your Aiven `defaultdb`).
 
 Built with a small **Node.js + Express + `pg`** API and a dependency-free frontend (vanilla JS, no build
-step), so it runs anywhere Node runs. Professional **light theme**, with a floating **liquid-glass bottom
-tab bar** on mobile.
+step), so it runs anywhere Node runs. Professional **light and dark themes** (one tap in the top-right
+corner, remembered per browser), with a floating **liquid-glass bottom tab bar** that carries the views
+and the profile.
 
 ---
 
@@ -33,10 +34,17 @@ tab bar** on mobile.
   range) as a status-coloured chip. The legend mirrors those chips and counts the statuses in the month on
   screen. Tap a shoot → detail drawer; tap a day → add a shoot on that date. A list view is one tap away.
 - **Mobile-first UI** — responsive layout, bottom-sheet forms/drawers, safe-area insets, and a floating glass
-  tab bar (Dashboard / Calendar / Shoots). The **All shoots** table goes edge-to-edge on phones and drops its
+  tab bar (Dashboard / Calendar / Shoots / Profile). The **All shoots** table goes edge-to-edge on phones and drops its
   **Status** and **Payment** columns; the fee itself turns into a **green bubble when paid** and a **red
   bubble when a balance is due**. A **Show all** button appears whenever a filter is applied, and **Export
   (CSV)** lives next to the filter icon in the same header.
+- **Light / dark theme** — the toggle sits in the **top-right corner** (moon ⇄ sun). The choice is stored in
+  the browser, follows the operating system until you pick a side, and is applied before the first paint, so
+  there is no white flash on load. Every surface — cards, tables, calendar, drawer, pills and the glass tab
+  bar — is themed from one set of CSS custom properties.
+- **Profile in the bottom tab bar** — the signed-in account and **Sign out** live behind the **Profile** entry
+  of the bottom tab bar (a profile logo with the account's initial), not in the top bar. The sheet shows the
+  name, email and role, and owners also reach **People with access** from it.
 - **Import (server-side)** — an **HTML spreadsheet export / CSV / JSON** sheet can be loaded via the REST
   API (`POST /api/import`) or the CLI (`npm run import`). Columns like `date`, `client`, `coordinator`,
   `fee`, `venue`, `status`, `payment` are auto-mapped (many date formats, `Paid`/`50%`/amounts for
@@ -111,8 +119,8 @@ the sign-in screen. Signed-in sessions use an HTTP-only, same-site cookie and ex
 
 Managing who can sign in — **no code changes and no restart needed**:
 
-- From the app: an owner sees the people icon in the top bar → *People with access* (add, activate/deactivate,
-  promote, remove).
+- From the app: an owner opens **Profile** in the bottom tab bar → *People with access* (add,
+  activate/deactivate, promote, remove).
 - From the database: `INSERT INTO app_users (email, name, role) VALUES ('new@example.com', 'New', 'member');`
   or `UPDATE app_users SET is_active = false WHERE lower(email) = '…';`
 
@@ -224,7 +232,7 @@ server/
   seed-demo.js    # demo data
 public/
   index.html      # SPA shell
-  css/app.css     # dark studio theme
+  css/app.css     # light + dark theme
   js/app.js       # dashboard, calendar, CRUD, import UI
 scripts/
   dev-postgres.js # embedded local Postgres for dev
