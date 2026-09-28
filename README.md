@@ -127,6 +127,11 @@ Tables created:
 > ```
 >
 > It is idempotent — running it twice is a no-op.
+>
+> **No Node on the server?** [`scripts/assign-existing-data-to-sushmita.sql`](scripts/assign-existing-data-to-sushmita.sql)
+> is the exact same migration as one paste-able SQL file — the complete idempotent schema (which also
+> converges the older database) followed by the reassignment and a check query. Paste it into the Aiven
+> web console and run it; the result set at the end shows the totals.
 
 > **Aiven note:** Aiven blocks connections from cloud/datacenter IP ranges by default. If you see
 > “DB unreachable”, add your egress IP (or `0.0.0.0/0` for a quick test) to the service **IP allowlist** in
