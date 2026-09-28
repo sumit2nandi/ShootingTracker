@@ -307,6 +307,43 @@ test('only owners may reach the access endpoints', async () => {
   });
 });
 
+test('an owner cannot change roles through the API, in either direction', async () => {
+  const { AccessService } = require('../../server/services/access-service');
+  const { UserDirectory } = require('../../server/services/user-directory');
+  const { FakeUserRepository, noopSchemaInitializer } = require('../helpers/fakes');
+
+  const userRepository = new FakeUserRepository([
+    { id: 1, email: 'owner@example.com', role: 'owner' },
+    { id: 2, email: 'second@example.com', role: 'owner' },
+    { id: 3, email: 'member@example.com', role: 'member' }
+  ]);
+  const userDirectory = new UserDirectory({ userRepository, schemaInitializer: noopSchemaInitializer });
+  const services = {
+    accessService: new AccessService({
+      userRepository,
+      userDirectory,
+      schemaInitializer: noopSchemaInitializer
+    })
+  };
+
+  await withApp({ services }, async (server) => {
+    const demote = await server.request('/api/users/2', { method: 'PATCH', body: { role: 'member' } });
+    assert.equal(demote.status, 403);
+    assert.match(demote.body.error, /not changed from the app/);
+
+    const promote = await server.request('/api/users/3', { method: 'PATCH', body: { role: 'owner' } });
+    assert.equal(promote.status, 403);
+
+    const added = await server.request('/api/users', { method: 'POST', body: { email: 'fresh@example.com', role: 'owner' } });
+    assert.equal(added.status, 201);
+    assert.equal(added.body.user.role, 'member', 'a sent role is ignored — people join as members');
+
+    const rows = await userRepository.list();
+    assert.equal(rows.find((row) => row.id === 2).role, 'owner', 'the demotion never reached the row');
+    assert.equal(rows.find((row) => row.id === 3).role, 'member', 'the promotion never reached the row');
+  });
+});
+
 test('import accepts JSON envelopes and raw text bodies', async () => {
   const seen = [];
   const services = {

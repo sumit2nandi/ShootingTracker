@@ -43,7 +43,11 @@
       const result = await post('/api/auth/google', { credential: response.credential });
       if (result.needsConsent) {
         showConsent(result.user, response.credential);
-        return; // busy stays on until consent is answered
+        // The consent form is now on screen and must be interactive — release
+        // the busy flag (the Google button itself is hidden with the sign-in
+        // block, so it cannot be re-clicked while the form is open).
+        setBusy(false);
+        return;
       }
       setMessage(`Signed in as ${result.user.email}`, 'success');
       window.location.replace('/');

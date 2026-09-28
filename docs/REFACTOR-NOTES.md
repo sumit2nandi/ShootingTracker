@@ -54,12 +54,42 @@ without it they stay unowned and a warning is printed).
 account (default `sushmitaghosh0099@gmail.com`), creates it if missing, marks
 tours done, and is idempotent.
 
-**Tests.** `npm test` now covers 153 cases, including the data-scope rules,
+**Tests.** `npm test` now covers 155 cases, including the data-scope rules,
 the consent flow and the `viewingAs` passthrough. `scripts/api-test.py` passes
 unmodified (47 checks; its one “test coordinators removed” quirk when running
 against a `seed:demo` database predates this change — the demo and the suite
 use the same coordinator names, and the delete is correctly refused while demo
 shoots still reference them).
+
+## 2026-09 · Roles are database-only; viewing-mode bug fixes
+
+- **Roles cannot be changed from the app.** `AccessPolicy.assertCanUpdate`
+  now refuses any patch that carries `role` (owner→member *and*
+  member→owner, and even an owner→owner rewrite) with `403 Roles are not
+  changed from the app…`; `UserRepository.update` no longer accepts the
+  column at all, and `upsert` reactivates/renames an existing account but
+  never re-roles it, so `POST /api/users` always creates a **member** even
+  when the body sends a role. The add form's role selector is gone. Changing
+  a role is a deliberate database job:
+  `UPDATE app_users SET role = 'owner' WHERE lower(email) = '…';`
+- **Shoot detail followed the viewing choice.** `getShoot` was the one read
+  that did not send `viewingAs`, so an owner opening a viewed account's shoot
+  got `404`. The detail read now carries the choice like every other read
+  (writes still never do).
+- **Consent form was stuck disabled.** The sign-in `busy` flag was left on
+  while the consent screen was on screen, so “Create my profile” never
+  enabled. It is released when the form appears (the Google button is hidden
+  underneath, so it cannot be re-clicked); Cancel is never locked.
+- **“Back to my data” is gone from one's own data.** Choosing one's own
+  account in the viewing switch (or restoring such a choice from storage)
+  now normalizes to *no choice*; the redundant “(you)” row left the
+  dropdown, so own data has exactly one representation and the banner can
+  never appear for it.
+- **No create/edit entry point while viewing.** The `newShoot`/`editShoot`
+  actions are guarded by a single read-only check with an explanatory
+  toast, so the calendar day, list rows, FAB and top-bar button all refuse
+  the same way (the server already refused the writes with `404`).
+- The consent page drops the “Owners can view, never edit” term.
 
 ## Contract: unchanged (superseded where the 2026-09 section says otherwise)
 

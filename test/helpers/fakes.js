@@ -192,13 +192,15 @@ class FakeUserRepository {
     return this.rows.map((row) => ({ ...row }));
   }
 
-  async upsert({ email, name, role }) {
+  async upsert({ email, name }) {
     const existing = await this.findByEmail(email);
     if (existing) {
-      Object.assign(existing, { name: name || existing.name, role: role || existing.role, is_active: true });
+      // mirrors the real repository: re-adding reactivates and renames, but
+      // never touches the role (database-level only)
+      Object.assign(existing, { name: name || existing.name, is_active: true });
       return { ...existing };
     }
-    const row = { id: this.nextId++, email, name: name || null, role: role || 'member', is_active: true };
+    const row = { id: this.nextId++, email, name: name || null, role: 'member', is_active: true };
     this.rows.push(row);
     return { ...row };
   }
@@ -206,7 +208,9 @@ class FakeUserRepository {
   async update(id, patch) {
     const row = this.rows.find((candidate) => String(candidate.id) === String(id));
     if (!row) return null;
-    Object.assign(row, patch);
+    // the repository applies only what it can write: no role here either
+    const { role, ...writable } = patch;
+    Object.assign(row, writable);
     return { ...row };
   }
 

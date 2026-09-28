@@ -171,6 +171,7 @@ test('the owner’s viewing choice rides along on reads, never on writes', async
   await api.dashboard('');
   await api.listShootsBetween('2026-04-01', '2026-04-30');
   await api.meta();
+  await api.getShoot(9);
   await api.createShoot({ title: 'X' });
   await api.updateShoot(7, { fee: 1 });
 
@@ -178,8 +179,9 @@ test('the owner’s viewing choice rides along on reads, never on writes', async
   assert.deepEqual(calls[1], ['GET', '/api/dashboard', `viewingAs=${viewingAs}`]);
   assert.deepEqual(calls[2], ['GET', '/api/shoots', `from=2026-04-01&to=2026-04-30&viewingAs=${viewingAs}`]);
   assert.deepEqual(calls[3], ['GET', '/api/meta', `viewingAs=${viewingAs}`]);
-  assert.deepEqual(calls[4], ['POST', '/api/shoots', { title: 'X' }], 'writes never carry the choice');
-  assert.deepEqual(calls[5], ['PUT', '/api/shoots/7', { fee: 1 }]);
+  assert.deepEqual(calls[4], ['GET', '/api/shoots/9', `viewingAs=${viewingAs}`], 'the detail read follows the choice');
+  assert.deepEqual(calls[5], ['POST', '/api/shoots', { title: 'X' }], 'writes never carry the choice');
+  assert.deepEqual(calls[6], ['PUT', '/api/shoots/7', { fee: 1 }]);
 
   api.setViewingAs(null);
   assert.equal(api.withViewing(''), '', 'and it can be switched back off');

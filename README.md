@@ -198,14 +198,18 @@ consent are both refused with a clear message — a deactivated account can only
 
 Managing who can sign in — **no code changes and no restart needed**:
 
-- From the app: an owner opens the **Profile** tab → *People with Access* (add,
-  activate/deactivate, promote, remove).
-- From the database: `INSERT INTO app_users (email, name, role) VALUES ('new@example.com', 'New', 'member');`
-  or `UPDATE app_users SET is_active = false WHERE lower(email) = '…';`
+- From the app: an owner opens the **Profile** tab → *People with Access* (add as
+  member, activate/deactivate, remove). **Roles cannot be changed from the app** —
+  the UI no longer offers a role, and the API refuses any role in the body
+  (`403 … not changed from the app`), so an owner can neither demote another
+  owner nor promote a member.
+- From the database: `INSERT INTO app_users (email, name, role) VALUES ('new@example.com', 'New', 'member');`,
+  `UPDATE app_users SET is_active = false WHERE lower(email) = '…';`, and the only
+  way to change a role: `UPDATE app_users SET role = 'owner' WHERE lower(email) = '…';`
 
 The two original logins are seeded by the first `npm run migrate` (existing databases pick them up on the next
-migration run). Owners can never demote, deactivate or remove the last active owner, and nobody can remove
-their own access. The allow-list is cached for 20 s, so a change takes effect within half a minute.
+migration run). Owners can never deactivate or remove the last active owner, and nobody can remove their own
+access. The allow-list is cached for 20 s, so a change takes effect within half a minute.
 
 1. In Google Cloud Console, configure the Google Identity Services OAuth consent screen and create an **OAuth client ID** of type **Web application**.
 2. Add each hostname where this app runs to **Authorized JavaScript origins** (for local development, `http://localhost:3000`; add your production HTTPS origin too). No redirect URI is needed.

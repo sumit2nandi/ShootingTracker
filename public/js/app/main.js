@@ -55,8 +55,15 @@ class Application {
     const actions = {
       openShoot: (id) => this.drawer.showShoot(id),
       openDay: (dateKey, shoots) => this.drawer.showDay(dateKey, shoots),
-      newShoot: (dateKey) => this.shootForm.open(null, dateKey),
-      editShoot: (shoot) => this.shootForm.open(shoot),
+      // guarded: while an owner views another account's data the whole app is
+      // read-only — no entry point (calendar day, list row, FAB, drawer) may
+      // open a shoot form
+      newShoot: (dateKey) => {
+        if (this.#assertCanWrite()) this.shootForm.open(null, dateKey);
+      },
+      editShoot: (shoot) => {
+        if (this.#assertCanWrite()) this.shootForm.open(shoot);
+      },
       openAccess: () => this.access.open(),
       setViewingAs: (email) => this.#applyViewing(email),
       /** True while an owner looks at someone else's data — read-only mode. */
@@ -187,7 +194,10 @@ class Application {
   async #applyViewing(email) {
     const { user, users } = this.store.get();
     const match = email && users.find((entry) => entry.email.toLowerCase() === String(email).toLowerCase());
-    const viewingAs = match ? match.email : null;
+    // Choosing one's own account is the same as choosing nobody: own data is
+    // the default, and the "Back to my data" banner never belongs to it.
+    const isSelf = match && String(match.email).toLowerCase() === String((user && user.email) || '').toLowerCase();
+    const viewingAs = match && !isSelf ? match.email : null;
 
     this.store.update({ viewingAs });
     this.api.setViewingAs(viewingAs);
@@ -201,6 +211,20 @@ class Application {
     this.profile.render(user, users, viewingAs);
     await this.loadMeta();
     await this.refresh(false);
+  }
+
+  /**
+   * The write gate behind every "new shoot" / "edit shoot" entry point.
+   *
+   * @returns {boolean} true when the shoot form may open
+   */
+  #assertCanWrite() {
+    if (!this.actions.isReadOnly()) return true;
+    const { viewingAs, users } = this.store.get();
+    const target = (users || []).find((entry) => entry.email.toLowerCase() === String(viewingAs).toLowerCase());
+    const name = (target && (target.name || target.email)) || viewingAs;
+    this.toaster.info(`Read-only — you are viewing ${name}'s data. Switch back to your own data to add or edit shoots.`);
+    return false;
   }
 
   /** Banner + the read-only chrome (the new-shoot buttons disappear). */

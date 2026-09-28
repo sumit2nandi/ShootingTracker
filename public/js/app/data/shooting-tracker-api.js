@@ -71,7 +71,9 @@ export class ShootingTrackerApi {
   }
 
   getShoot(id) {
-    return this.client.get(`/api/shoots/${id}`);
+    // A read like the rest — so an owner viewing another account can open
+    // their shoots' details (and the server keeps it to read-only data).
+    return this.client.get(`/api/shoots/${id}`, this.withViewing(''));
   }
 
   createShoot(shoot) {

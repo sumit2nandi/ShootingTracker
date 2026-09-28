@@ -264,25 +264,45 @@ function accessServiceWith(rows) {
   return { service, userRepository, userDirectory };
 }
 
-test('the last owner is protected without writing first', async () => {
+test('a role change is refused without writing first', async () => {
   const { service, userRepository } = accessServiceWith([
     { id: 1, email: 'owner@example.com', role: 'owner' },
     { id: 2, email: 'member@example.com', role: 'member' }
   ]);
 
-  await assert.rejects(service.update(1, { role: 'member' }, { actor: { email: 'owner@example.com' } }), ConflictError);
-  const [owner] = await userRepository.list();
-  assert.equal(owner.role, 'owner', 'the row was never touched, so no undo was needed');
+  await assert.rejects(
+    service.update(1, { role: 'member' }, { actor: { email: 'owner@example.com' } }),
+    /not changed from the app/
+  );
+  await assert.rejects(
+    service.update(2, { role: 'owner' }, { actor: { email: 'owner@example.com' } }),
+    /not changed from the app/
+  );
+  const [owner, member] = await userRepository.list();
+  assert.equal(owner.role, 'owner', 'the rows were never touched, so no undo was needed');
+  assert.equal(member.role, 'member');
 });
 
-test('adding a user normalizes the address and clears the lookup cache', async () => {
+test('deactivating the last owner is refused without writing first', async () => {
+  const { service } = accessServiceWith([
+    { id: 1, email: 'owner@example.com', role: 'owner' },
+    { id: 2, email: 'member@example.com', role: 'member' }
+  ]);
+
+  await assert.rejects(
+    service.update(1, { is_active: false }, { actor: { email: 'owner@example.com' } }),
+    /At least one active owner is required/
+  );
+});
+
+test('adding a user normalizes the address, arrives as member and clears the lookup cache', async () => {
   const { service, userDirectory } = accessServiceWith([{ id: 1, email: 'owner@example.com', role: 'owner' }]);
 
   assert.equal(await userDirectory.lookup('new@example.com'), null); // caches the miss
   const created = await service.add({ email: '  New@Example.com ', name: ' New ', role: 'owner' });
 
   assert.equal(created.email, 'new@example.com');
-  assert.equal(created.role, 'owner');
+  assert.equal(created.role, 'member', 'a sent role is ignored — people join as members');
   const fresh = await userDirectory.lookup('new@example.com');
   assert.ok(fresh, 'the cached miss was invalidated by the write');
 });

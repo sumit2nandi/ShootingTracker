@@ -51,10 +51,12 @@ export class ProfileView {
 
     const select = $('#viewing-select');
     const me = String((user && user.email) || '').toLowerCase();
+    // The first option *is* the owner's own data — their account is not
+    // offered as a second "(you)" row, so there is one way to say "mine".
     const options = [`<option value="">My own data (${escapeHtml((user && (user.name || user.email)) || 'me')})</option>`];
     for (const entry of users) {
-      const self = String(entry.email).toLowerCase() === me;
-      const label = `${entry.name || entry.email}${self ? ' (you)' : ''}${entry.is_active ? '' : ' (inactive)'}`;
+      if (String(entry.email).toLowerCase() === me) continue;
+      const label = `${entry.name || entry.email}${entry.is_active ? '' : ' (inactive)'}`;
       options.push(`<option value="${escapeHtml(entry.email)}">${escapeHtml(label)}</option>`);
     }
     select.innerHTML = options.join('');

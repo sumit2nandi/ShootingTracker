@@ -68,12 +68,28 @@ class AccessPolicy {
     return !next.some(isActiveOwner);
   }
 
-  /** @throws {ConflictError} when the change would lock everybody out. */
+  /**
+   * Validate a PATCH to the allow-list.
+   *
+   * Roles are deliberately **not** changeable from the app: demoting an owner
+   * or promoting a member is a deliberate database-level decision
+   * (`UPDATE app_users SET role = …`), not a tap in a list. Everything else
+   * (name, active flag) stays owner-manageable, with the last-owner rule still
+   * guarding against locking everyone out.
+   *
+   * @throws {ForbiddenError} when the patch touches the role
+   * @throws {ConflictError}  when the change would leave the app without an owner
+   */
   static assertCanUpdate({ users, target, patch }) {
-    const touchesOwnership = patch.is_active === false || patch.role === MEMBER;
-    if (!touchesOwnership || target.role !== OWNER) return;
-    if (AccessPolicy.wouldRemoveLastOwner({ users, target, patch })) {
-      throw new ConflictError('At least one active owner is required');
+    if (patch.role !== undefined) {
+      throw new ForbiddenError(
+        'Roles are not changed from the app — update the role in the database (app_users)'
+      );
+    }
+    if (patch.is_active === false && target.role === OWNER) {
+      if (AccessPolicy.wouldRemoveLastOwner({ users, target, patch })) {
+        throw new ConflictError('At least one active owner is required');
+      }
     }
   }
 

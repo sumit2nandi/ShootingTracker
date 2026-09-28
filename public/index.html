@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ShootingTracker</title>
-  <link rel="stylesheet" href="css/app.css?v=30" />
+  <link rel="stylesheet" href="css/app.css?v=31" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=5" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=5" />
   <link rel="apple-touch-icon" href="favicon.png?v=5" />
@@ -290,11 +290,8 @@
         <form id="access-form" class="access-add" autocomplete="off">
           <input type="email" name="email" placeholder="name@gmail.com" required />
           <input type="text" name="name" placeholder="Name (optional)" />
-          <select name="role" aria-label="Role">
-            <option value="member">Member</option>
-            <option value="owner">Owner</option>
-          </select>
           <button class="btn btn-primary" type="submit">Add</button>
+          <p class="muted small access-add-hint">New people join as members. Roles are set in the database (<code>app_users</code>), not here.</p>
         </form>
       </div>
       <div class="modal-foot"><button class="btn btn-ghost" data-close>Close</button></div>
@@ -336,6 +333,6 @@
 
   <div id="toasts" class="toasts"></div>
 
-  <script type="module" src="js/app/main.js?v=27"></script>
+  <script type="module" src="js/app/main.js?v=28"></script>
 </body>
 </html>

@@ -59,24 +59,25 @@ class UserRepository {
   /**
    * Add an account, or reactivate one that already exists.
    *
-   * @param {{ email: string, name?: string|null, role?: string }} user
+   * New accounts always arrive as members. Re-adding an existing account
+   * updates the name and reactivates the row — it never touches the role,
+   * which can only be changed in the database (see AccessPolicy).
+   *
+   * @param {{ email: string, name?: string|null, role?: string }} user the
+   *        `role` is ignored on purpose (see above); kept in the signature so
+   *        callers cannot smuggle one in.
    */
-  async upsert({ email, name, role }) {
+  async upsert({ email, name }) {
     const result = await withTranslatedErrors(
       () =>
         this.database.query(
           `INSERT INTO app_users (email, name, role)
-           VALUES ($1, $2, COALESCE($3, 'member'))
+           VALUES ($1, $2, 'member')
            ON CONFLICT (lower(email)) DO UPDATE
              SET name = COALESCE(EXCLUDED.name, app_users.name),
-                 role = COALESCE($3, app_users.role),
                  is_active = TRUE
            RETURNING ${USER_COLUMNS}`,
-          [
-            AccessPolicy.normalizeEmail(email),
-            (name && String(name).trim()) || null,
-            AccessPolicy.coerceRole(role)
-          ]
+          [AccessPolicy.normalizeEmail(email), (name && String(name).trim()) || null]
         ),
       { conflictMessage: 'That email is already in the list' }
     );
@@ -85,7 +86,8 @@ class UserRepository {
 
   /**
    * @param {number|string} id
-   * @param {{ name?: string|null, role?: string, is_active?: boolean }} patch
+   * @param {{ name?: string|null, is_active?: boolean }} patch — the role is
+   *        deliberately not updatable here (database-level only)
    * @returns {Promise<object|null>} the updated row, or null when nothing matched
    */
   async update(id, patch = {}) {
@@ -96,7 +98,6 @@ class UserRepository {
       assignments.push(`${column} = $${params.length}`);
     };
     if (patch.name !== undefined) set('name', (patch.name && String(patch.name).trim()) || null);
-    if (patch.role !== undefined) set('role', AccessPolicy.coerceRole(patch.role));
     if (patch.is_active !== undefined) set('is_active', Boolean(patch.is_active));
     if (!assignments.length) return null;
 

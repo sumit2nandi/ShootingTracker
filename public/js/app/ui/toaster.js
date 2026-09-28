@@ -23,6 +23,11 @@ export class Toaster {
     this.show(message, 'ok');
   }
 
+  /** Neutral notice (read-only mode, hints) — no good-news, bad-news tint. */
+  info(message) {
+    this.show(message, 'info');
+  }
+
   error(message) {
     this.show(message, 'err');
   }

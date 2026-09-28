@@ -26,24 +26,34 @@ test('roles outside the vocabulary fall back to member', () => {
   assert.equal(AccessPolicy.coerceRole('superuser'), 'member');
 });
 
-test('the last active owner cannot be demoted or deactivated', () => {
+test('roles are never changed from the app — in either direction', () => {
+  const users = [owner, secondOwner, member];
+  // owner → member, with another active owner still around…
+  assert.throws(
+    () => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'member' } }),
+    /not changed from the app/
+  );
+  // …and member → owner is refused just the same
+  assert.throws(
+    () => AccessPolicy.assertCanUpdate({ users, target: member, patch: { role: 'owner' } }),
+    ForbiddenError
+  );
+  // even an "owner → owner" write is rejected, so the patch cannot smuggle one in
+  assert.throws(() => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'owner' } }), ForbiddenError);
+});
+
+test('the last active owner cannot be deactivated', () => {
   const users = [owner, member, inactiveOwner];
-  assert.throws(() => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'member' } }), ConflictError);
   assert.throws(
     () => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { is_active: false } }),
     /At least one active owner is required/
   );
 });
 
-test('an owner may be demoted while another active owner remains', () => {
-  const users = [owner, secondOwner];
-  assert.doesNotThrow(() => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'member' } }));
-});
-
-test('harmless updates are never blocked', () => {
-  const users = [owner];
+test('deactivating a non-last owner and harmless updates are allowed', () => {
+  const users = [owner, secondOwner, member];
+  assert.doesNotThrow(() => AccessPolicy.assertCanUpdate({ users, target: secondOwner, patch: { is_active: false } }));
   assert.doesNotThrow(() => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { name: 'New Name' } }));
-  assert.doesNotThrow(() => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'owner' } }));
 });
 
 test('nobody can remove their own access', () => {

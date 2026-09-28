@@ -29,13 +29,18 @@ class AccessService {
   }
 
   /**
-   * @param {{ email: string, name?: string, role?: string }} input
+   * Add an account (or reactivate an existing one).
+   *
+   * New accounts always arrive as **members**; the `role` a caller might send
+   * is ignored — ownership is a database-level decision, not an app action.
+   *
+   * @param {{ email: string, name?: string }} input
    * @returns {Promise<object>} the created (or reactivated) account
    */
   async add(input = {}) {
     const email = AccessPolicy.assertValidEmail(input.email);
     await this.schemaInitializer.ensureApplied();
-    const user = await this.userRepository.upsert({ email, name: input.name, role: input.role });
+    const user = await this.userRepository.upsert({ email, name: input.name });
     this.userDirectory.invalidate();
     return user;
   }

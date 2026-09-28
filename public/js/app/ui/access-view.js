@@ -106,12 +106,13 @@ export class AccessView {
   async #add(event) {
     event.preventDefault();
     const form = event.target;
-    const body = { email: form.email.value.trim(), name: form.name.value.trim(), role: form.role.value };
+    // no role on purpose: people join as members; ownership is a database job
+    const body = { email: form.email.value.trim(), name: form.name.value.trim() };
     if (!body.email) return;
     try {
       await this.api.addUser(body);
       form.reset();
-      this.actions.notify(`${body.email} can now sign in`);
+      this.actions.notify(`${body.email} can now sign in as a member`);
       await this.refresh();
     } catch (error) {
       this.actions.notifyError(error.message);
