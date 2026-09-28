@@ -1,7 +1,7 @@
 import { $, $$, escapeHtml } from '../core/dom.js';
 import { dayKey, formatDate, formatMoney, formatMoneyShort, MONTH_SHORT } from '../core/format.js';
 import { STATUS_COLORS, STATUS_ORDER, appStatus, statusLabel } from '../domain/shoot-status.js';
-import { isWrapUpTime, outstandingAmount } from '../domain/wrap-up.js';
+import { isWrapUpTime, outstandingAmount, zonedNow } from '../domain/wrap-up.js';
 
 /** KPI tiles, charts and breakdowns. Reads data, writes HTML, emits actions. */
 export class DashboardView {
@@ -61,7 +61,8 @@ export class DashboardView {
     this.#renderShootList($('#upcoming-table'), summary.upcoming || []);
     this.#renderShootList($('#attention-table'), summary.attention || [], {
       alwaysActions: true,   // these have already slipped; no need to wait for the evening
-      reason: true
+      reason: true,
+      tone: 'attention'
     });
   }
 
@@ -206,9 +207,9 @@ export class DashboardView {
    *
    * @param {Element} wrap
    * @param {object[]} list
-   * @param {{ alwaysActions?: boolean, reason?: boolean }} [options]
+   * @param {{ alwaysActions?: boolean, reason?: boolean, tone?: string }} [options]
    */
-  #renderShootList(wrap, list, { alwaysActions = false, reason = false } = {}) {
+  #renderShootList(wrap, list, { alwaysActions = false, reason = false, tone = '' } = {}) {
     if (!wrap) return;
     const card = wrap.closest('.card');
     if (card) card.classList.toggle('hidden', list.length === 0);
@@ -216,11 +217,12 @@ export class DashboardView {
       wrap.innerHTML = '';
       return;
     }
+    const today = zonedNow(this.now()).date;
     wrap.innerHTML = `
-    <table class="upcoming-table"><tbody>${list
+    <table class="upcoming-table${tone ? ` tone-${tone}` : ''}"><tbody>${list
       .map(
         (shoot) => `
-      <tr data-id="${shoot.id}">
+      <tr data-id="${shoot.id}"${String(shoot.shoot_date).slice(0, 10) === today ? ' class="is-today"' : ''}>
         <td class="td-mono td-date">${formatDate(shoot.shoot_date)}</td>
         <td>${escapeHtml(shoot.title)}${reason ? `<span class="row-reason">${this.#reasonFor(shoot)}</span>` : ''}</td>
         <td class="td-actions">${this.#rowActions(shoot, alwaysActions)}</td>

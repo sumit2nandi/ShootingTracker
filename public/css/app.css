@@ -26,6 +26,11 @@
   --green-line: rgba(21, 128, 61, .3);
   --red-line: rgba(220, 38, 38, .32);
   --accent-line: rgba(124, 58, 237, .3);
+  /* dashboard rows that want to be noticed: today, and anything overdue */
+  --row-today: rgba(124, 58, 237, .07);
+  --row-today-hover: rgba(124, 58, 237, .13);
+  --row-alert: rgba(225, 29, 72, .06);
+  --row-alert-hover: rgba(225, 29, 72, .12);
   --text-dim: #a9a7b8;                     /* days from a neighbouring month */
 
   /* ---- shape: material radii, from chips to sheets ---- */
@@ -101,6 +106,10 @@
   --green-line: rgba(0, 208, 156, .34);
   --red-line: rgba(235, 91, 60, .38);
   --accent-line: rgba(167, 139, 250, .34);
+  --row-today: rgba(167, 139, 250, .13);
+  --row-today-hover: rgba(167, 139, 250, .2);
+  --row-alert: rgba(235, 91, 60, .11);
+  --row-alert-hover: rgba(235, 91, 60, .18);
   --text-dim: #4e4e57;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, .6);
   --shadow-md: 0 6px 18px rgba(0, 0, 0, .65);
@@ -315,6 +324,15 @@ main { padding: 16px 16px calc(110px + env(safe-area-inset-bottom)); max-width: 
    paid. Empty outlines while the work is open, filled once it is done — icons
    only, so they never crowd the title. */
 .upcoming-table .td-actions { width: 1%; white-space: nowrap; text-align: right; padding-left: 0; }
+/* the last row closes the card, so it needs no rule under it */
+.upcoming-table tbody tr:last-child td { border-bottom: 0; }
+/* today is worth spotting at a glance; the whole attention list wears a warning tint */
+.upcoming-table tbody tr.is-today { background: var(--row-today); }
+.upcoming-table tbody tr.is-today:hover { background: var(--row-today-hover); }
+.upcoming-table tbody tr.is-today td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.upcoming-table.tone-attention tbody tr { background: var(--row-alert); }
+.upcoming-table.tone-attention tbody tr:hover { background: var(--row-alert-hover); }
+.upcoming-table.tone-attention .row-reason { color: var(--red); }
 .upcoming-table .row-reason { display: block; font-size: 10.5px; color: var(--muted); margin-top: 1px; }
 .row-btn {
   display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0;
