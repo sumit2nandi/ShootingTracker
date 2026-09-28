@@ -26,11 +26,30 @@ object, so nothing else moved).
 
 **Frontend.** The coordinator `<select>`, the coordinator datalist and the
 filter-bar options all consume `meta.coordinators`, so they are per-account
-with no further change. The title input (`name="title"`, no id — the form
-reaches it via `form.elements.namedItem`) now carries `list="dl-titles"` and
-`autocomplete="off"`, backed by a new `<datalist id="dl-titles">` next to the
-other `dl-*`s; the filter bar's `populate()` fills it from `meta.titles`.
-Native datalist — no new dependency.
+with no further change. Two refinements followed the first pass:
+
+- **Title suggestions are a hand-rolled typeahead, not a `<datalist>`.** The
+  shoot modal spends most of its life `display: none` (the `.hidden` class),
+  and browsers suppress datalist suggestions for inputs inside a hidden
+  container — the account's past titles never surfaced. `ShootForm` now
+  builds a small `.field-suggest` list under the title input: it filters
+  `meta.titles` on every keystroke (titles starting with the typed text
+  first, then the rest, cap 8), supports ↑/↓ + Enter (Enter accepts the
+  highlighted title and is `preventDefault`-ed so it cannot trigger the
+  form's implicit submit) and Esc (which closes the list, not the modal).
+  The datalist and its `list=` attribute are gone.
+- **Coordinator field adapts to the account.** An account with **no** past
+  coordinators gets the existing text input (`#coord-new-input`) shown
+  directly instead of the `<select>` — a dropdown that could only say
+  “none” or “new” forced a detour before a first coordinator could be named.
+  `coordinatorValue()` reads the box straight through when the select is
+  hidden; an account *with* past coordinators keeps the dropdown (known name
+  selects it, a new name goes through “➕ New Coordinator…”). The two modes
+  flip automatically when an owner switches the viewed account, since both
+  are driven by `populate(meta)`.
+
+`scripts/shoot-form-check.mjs` drives the real `ShootForm` through both
+coordinator modes and the full suggestion keyboard flow.
 
 **The tour is mobile-browser friendly.** `public/js/app/ui/tour.js` was laid
 out against the *layout* viewport (`window.innerWidth/innerHeight` + a one-shot

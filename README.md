@@ -35,8 +35,10 @@ that adds a shoot from anywhere.
   (type, end date/times, venue, location, contacts, notes) tucked under “More details”. Anything that
   doesn't fit a column is preserved in a JSON `extra` field, so you never lose data from a sheet.
 - **Your own reference data** — the coordinator dropdown offers the coordinators *this account* has used
-  in its own past shoots (not everyone's), and typing a shoot title auto-suggests that account's past
-  titles, most recent first. When an owner views a member's data, both lists follow the account on screen.
+  in its own past shoots (not everyone's); an account with **no** past coordinators gets a plain text box
+  instead, so a first shoot can name its coordinator without a dropdown in the way. Typing a shoot title
+  suggests that account's past titles as you type — titles starting with the text first, then the rest,
+  ranked by most recently used. When an owner views a member's data, both follow the account on screen.
 - **Two statuses, everywhere** — a shoot is either **Planned** (still to come) or **Completed** (closed
   out). Filters, pills, calendar chips, the legend and the donut all speak those two words, and an import
   that says “booked”, “confirmed”, “postponed” or “cancelled” is folded into the right one.

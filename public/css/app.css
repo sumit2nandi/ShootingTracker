@@ -534,9 +534,27 @@ tbody tr:hover { background: var(--surface-2); }
 .modal-head { border-bottom: 1px solid var(--line); }
 #shoot-form { padding: 14px 18px 8px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
-.field { display: flex; flex-direction: column; gap: 5px; }
+.field { display: flex; flex-direction: column; gap: 5px; position: relative; }
 .field.span-2 { grid-column: span 2; }
 .field label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 650; }
+/* the title field's past-title suggestions (a hand-rolled list — datalists
+   do not fire for inputs inside this modal's display:none life) */
+.field-suggest {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 40;
+  margin-top: 3px; padding: 4px;
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: 10px;
+  box-shadow: var(--shadow-md);
+  max-height: 200px; overflow-y: auto;
+}
+.field-suggest[hidden] { display: none; }
+.field-suggest-item {
+  display: block; width: 100%; padding: 9px 10px;
+  font-size: 13.5px; font-family: inherit; text-align: left;
+  color: var(--text); background: none; border: 0; border-radius: 7px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.field-suggest-item:hover { background: var(--slate-soft); }
+.field-suggest-item.active { background: var(--accent-soft); color: var(--accent-strong); }
 @media (max-width: 560px) {
   .form-grid { grid-template-columns: 1fr; }
   .field.span-2 { grid-column: span 1; }

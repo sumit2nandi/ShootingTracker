@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ShootingTracker</title>
-  <link rel="stylesheet" href="css/app.css?v=34" />
+  <link rel="stylesheet" href="css/app.css?v=35" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=5" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=5" />
   <link rel="apple-touch-icon" href="favicon.png?v=5" />
@@ -229,7 +229,7 @@
       <form id="shoot-form" class="form-grid">
         <input type="hidden" name="id" />
         <!-- core fields -->
-        <div class="field span-2"><label>Title *</label><input name="title" required list="dl-titles" placeholder="Shoot title" autocomplete="off" /></div>
+        <div class="field span-2"><label>Title *</label><input name="title" required placeholder="Shoot title" autocomplete="off" /></div>
         <div class="field"><label>Shoot Date *</label><input name="shoot_date" type="date" required /></div>
         <div class="field"><label>Fee (₹)</label><input name="fee" type="number" min="0" step="0.01" inputmode="numeric" value="0" /></div>
         <div class="field"><label>Coordinator</label>
@@ -237,7 +237,7 @@
             <option value="">— none —</option>
             <option value="__new__">➕ New Coordinator…</option>
           </select>
-          <input name="coordinator_new" id="coord-new-input" placeholder="Type new coordinator name" hidden />
+          <input name="coordinator_new" id="coord-new-input" placeholder="Coordinator name (optional)" hidden />
         </div>
         <div class="field"><label>Status</label>
           <select name="status" id="sel-status">
@@ -265,7 +265,6 @@
       <datalist id="dl-coordinators"></datalist>
       <datalist id="dl-clients"></datalist>
       <datalist id="dl-types"></datalist>
-      <datalist id="dl-titles"></datalist>
       <div class="modal-foot">
         <button class="btn btn-ghost" data-close>Cancel</button>
         <button class="btn btn-primary" id="btn-save-shoot">Save Shoot</button>
@@ -334,6 +333,6 @@
 
   <div id="toasts" class="toasts"></div>
 
-  <script type="module" src="js/app/main.js?v=31"></script>
+  <script type="module" src="js/app/main.js?v=32"></script>
 </body>
 </html>
