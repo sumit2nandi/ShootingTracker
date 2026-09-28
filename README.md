@@ -45,9 +45,9 @@ that adds a shoot from anywhere.
   there is no white flash on load. Every surface — cards, tables, calendar, drawer, pills, the navigation
   pill and the action button — is themed from one set of CSS custom properties in `public/css/app.css`
   (palette, radii, elevation and the navigation metrics), so a re-skin is a token edit, not a hunt.
-- **Profile in the bottom tab bar** — the signed-in account and **Sign out** live behind the **Profile** entry
-  of the bottom tab bar (a profile logo with the account's initial), not in the top bar. The sheet shows the
-  name, email and role, and owners also reach **People with access** from it.
+- **Profile view** — the fourth destination in the bottom bar, opening as a full view like the others
+  (no popup): the signed-in account with its avatar, email and role, plus **Sign out** and, for owners,
+  **People with access**.
 - **Import (server-side)** — an **HTML spreadsheet export / CSV / JSON** sheet can be loaded via the REST
   API (`POST /api/import`) or the CLI (`npm run import`). Columns like `date`, `client`, `coordinator`,
   `fee`, `venue`, `status`, `payment` are auto-mapped (many date formats, `Paid`/`50%`/amounts for
@@ -136,7 +136,7 @@ the sign-in screen. Signed-in sessions use an HTTP-only, same-site cookie and ex
 
 Managing who can sign in — **no code changes and no restart needed**:
 
-- From the app: an owner opens **Profile** in the bottom tab bar → *People with access* (add,
+- From the app: an owner opens the **Profile** tab → *People with access* (add,
   activate/deactivate, promote, remove).
 - From the database: `INSERT INTO app_users (email, name, role) VALUES ('new@example.com', 'New', 'member');`
   or `UPDATE app_users SET is_active = false WHERE lower(email) = '…';`

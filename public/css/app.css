@@ -600,9 +600,9 @@ tbody tr:hover { background: var(--surface-2); }
   opacity: 0; transform: scale(.55);
   transition: opacity .18s ease, transform .26s cubic-bezier(.2, .8, .2, 1);
 }
-.tabbar .tab.active, .tabbar .tab.is-open { color: var(--accent); }
-.tabbar .tab.active::before, .tabbar .tab.is-open::before { opacity: 1; transform: none; }
-.tabbar .tab:not(.active):not(.is-open):hover { color: var(--text); }
+.tabbar .tab.active { color: var(--accent); }
+.tabbar .tab.active::before { opacity: 1; transform: none; }
+.tabbar .tab:not(.active):hover { color: var(--text); }
 .tabbar .tab:active { transform: scale(.96); }
 .tabbar .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* a destination can flag itself: <button class="tab" data-badge="NEW"> */
@@ -612,6 +612,7 @@ tbody tr:hover { background: var(--surface-2); }
   line-height: 1; padding: 3px 5px; border-radius: 6px; box-shadow: 0 2px 6px rgba(225, 29, 72, .35);
 }
 /* the profile entry carries an avatar instead of an icon */
+.tabbar .tab:not(.active) .profile-logo { filter: grayscale(.55); opacity: .75; }
 .tabbar .tab-profile .profile-logo {
   width: 23px; height: 23px; border-radius: 50%;
   display: grid; place-items: center;
@@ -698,15 +699,8 @@ tbody tr:hover { background: var(--surface-2); }
 :root[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
 :root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 
-/* ---------- profile menu ---------- */
-.profile-modal { max-width: 380px; }
-.profile-body { padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 14px; }
-/* On phones the sheet is a bottom sheet, so its buttons are lifted clear of the
-   floating tab bar — nothing tappable ever hides underneath it. */
-@media (max-width: 767px) { .profile-body { padding-bottom: calc(18px + 70px); } }
-/* While the profile sheet is open the tab bar stays live (and above the scrim),
-   so tapping the profile tab again — or any other tab — dismisses the sheet. */
-body.profile-open .tabbar { z-index: 70; }
+/* ---------- profile view ---------- */
+#view-profile { max-width: 560px; }
 .profile-identity { display: flex; align-items: center; gap: 12px; }
 .profile-avatar {
   width: 44px; height: 44px; border-radius: 50%; flex: none;
@@ -718,7 +712,7 @@ body.profile-open .tabbar { z-index: 70; }
 .profile-who b { font-size: 14.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-actions { display: flex; flex-direction: column; gap: 8px; }
-.profile-action { justify-content: flex-start; width: 100%; padding: 10px 12px; font-size: 13.5px; }
+.profile-action { justify-content: flex-start; width: 100%; padding: 11px 14px; font-size: 13.5px; }
 .profile-action svg { width: 17px; height: 17px; flex: none; }
 
 

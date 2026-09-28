@@ -282,6 +282,7 @@ test('the app shell is served to members and the login page to visitors', async 
     assert.equal(page.status, 200);
     assert.match(page.body, /id="view-dashboard"/);
     assert.match(page.body, /class="tabbar"/, 'the floating navigation is part of the shell');
+    assert.match(page.body, /id="view-profile"/, 'profile is a view, not a popup');
     assert.match(page.body, /id="btn-new-shoot-fab"/, 'so is the floating action button');
     assert.equal(page.headers.get('cache-control'), 'no-store');
   });

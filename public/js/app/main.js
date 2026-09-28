@@ -25,6 +25,9 @@ import { ShootForm } from './ui/shoot-form.js';
 import { AccessView } from './ui/access-view.js';
 import { ProfileView } from './ui/profile-view.js';
 
+/** The destinations the filter bar applies to; the others hide it. */
+const FILTERED_VIEWS = new Set(['dashboard', 'shoots']);
+
 class Application {
   constructor() {
     this.store = new Store({
@@ -74,7 +77,8 @@ class Application {
     this.loaders = {
       dashboard: () => this.dashboard.load(this.store.get().filters),
       shoots: () => this.shoots.load(this.store.get().filters),
-      calendar: () => this.calendar.load()
+      calendar: () => this.calendar.load(),
+      profile: async () => this.profile.render(this.store.get().user)
     };
   }
 
@@ -97,7 +101,6 @@ class Application {
       this.shootForm.close();
       this.drawer.close();
       this.access.close();
-      this.profile.close();
     });
   }
 
@@ -142,19 +145,19 @@ class Application {
 
   setView(view) {
     const state = this.store.get();
-    this.profile.close(); // leaving for another tab closes the profile sheet
 
-    // remember the filters of the tab we are leaving (the calendar has none)
+    // remember the filters of the tab we are leaving (only two tabs have any)
     const viewFilters = { ...state.viewFilters };
-    if (state.view !== 'calendar' && view !== state.view) viewFilters[state.view] = this.filterBar.read();
+    if (FILTERED_VIEWS.has(state.view) && view !== state.view) viewFilters[state.view] = this.filterBar.read();
     if (view !== 'shoots') this.shoots.setExpandAll(false); // the tile-driven expansion is one-shot
 
     this.store.update({ view, viewFilters });
     $$('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.view === view));
     $$('.view').forEach((section) => section.classList.toggle('hidden', section.id !== `view-${view}`));
 
-    const showFilters = view === 'dashboard' || (view === 'shoots' && this.store.get().shootsFiltersOpen);
-    this.filterBar.setVisible(view !== 'calendar' && showFilters);
+    const showFilters =
+      view === 'dashboard' || (view === 'shoots' && this.store.get().shootsFiltersOpen);
+    this.filterBar.setVisible(FILTERED_VIEWS.has(view) && showFilters);
     this.filterBar.setContext(view);
 
     this.#restoreFilters(view);

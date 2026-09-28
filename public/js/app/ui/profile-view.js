@@ -1,43 +1,20 @@
-import { $, $$ } from '../core/dom.js';
+import { $ } from '../core/dom.js';
 
-/** The bottom-bar profile sheet: identity, access shortcut, sign out. */
+/**
+ * The Profile destination: who is signed in, and what they can do about it.
+ *
+ * It is a view like Dashboard, Calendar and Shoots — the router shows and
+ * hides it — so this class only renders the account and wires its two actions.
+ */
 export class ProfileView {
   constructor({ api, actions }) {
     this.api = api;
     this.actions = actions;
-    this.modal = $('#profile-modal');
-    this.tab = $('#tab-profile');
   }
 
   mount() {
-    this.tab.addEventListener('click', () => (this.isOpen ? this.close() : this.open()));
-    this.modal.addEventListener('click', (event) => {
-      if (event.target.id === 'profile-modal') this.close();
-    });
-    $$('#profile-modal [data-close]').forEach((button) => button.addEventListener('click', () => this.close()));
-    $('#btn-access').addEventListener('click', () => {
-      this.close();
-      this.actions.openAccess();
-    });
+    $('#btn-access').addEventListener('click', () => this.actions.openAccess());
     $('#btn-signout').addEventListener('click', () => this.signOut());
-  }
-
-  get isOpen() {
-    return !this.modal.classList.contains('hidden');
-  }
-
-  open() {
-    this.modal.classList.remove('hidden');
-    this.tab.classList.add('is-open');
-    this.tab.setAttribute('aria-expanded', 'true');
-    document.body.classList.add('profile-open');
-  }
-
-  close() {
-    this.modal.classList.add('hidden');
-    this.tab.classList.remove('is-open');
-    this.tab.setAttribute('aria-expanded', 'false');
-    document.body.classList.remove('profile-open');
   }
 
   /** The avatar carries the first letter of the account name (or its email). */
@@ -45,6 +22,7 @@ export class ProfileView {
     return String((user && (user.name || user.email)) || '?').trim().charAt(0).toUpperCase() || '?';
   }
 
+  /** Paint the account into both the tab avatar and the profile view. */
   render(user) {
     const initial = ProfileView.initial(user);
     $('#profile-logo').textContent = initial;
@@ -54,11 +32,10 @@ export class ProfileView {
     const isOwner = user && user.role === 'owner';
     $('#profile-role').textContent = isOwner ? 'Owner' : 'Member';
     $('#profile-role').classList.toggle('owner', Boolean(isOwner));
-    $('#btn-access').hidden = !isOwner;
+    $('#btn-access').hidden = !isOwner; // managing access is an owner's job
   }
 
   async signOut() {
-    document.body.classList.remove('profile-open');
     try {
       await this.api.signOut();
     } finally {

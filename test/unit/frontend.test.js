@@ -198,6 +198,14 @@ test('the store notifies subscribers on every update', async () => {
   assert.deepEqual(store.get().user, { email: 'a@example.com' });
 });
 
+test('the profile avatar falls back through name, email and a placeholder', async () => {
+  const { ProfileView } = await load('ui/profile-view.js');
+  assert.equal(ProfileView.initial({ name: 'Sumit Nandi', email: 'a@b.c' }), 'S');
+  assert.equal(ProfileView.initial({ email: 'zoe@example.com' }), 'Z');
+  assert.equal(ProfileView.initial({ name: '  ' }), '?');
+  assert.equal(ProfileView.initial(null), '?');
+});
+
 test('the event bus supports unsubscription', async () => {
   const { EventBus } = await load('core/events.js');
   const bus = new EventBus();
