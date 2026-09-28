@@ -18,15 +18,16 @@ class DashboardService {
   /** @param {Record<string, string>} query */
   async summarize(query) {
     const filter = ShootFilter.fromQuery(query);
-    const [kpi, monthly, byCoordinator, byType, byStatus, upcoming] = await Promise.all([
+    const [kpi, monthly, byCoordinator, byType, byStatus, upcoming, attention] = await Promise.all([
       this.analyticsRepository.kpis(filter),
       this.analyticsRepository.monthlyTotals(filter),
       this.analyticsRepository.totalsByCoordinator(filter),
       this.analyticsRepository.totalsByType(filter),
       this.analyticsRepository.countsByStatus(filter),
-      this.analyticsRepository.upcoming(filter)
+      this.analyticsRepository.upcoming(filter),
+      this.analyticsRepository.needsAttention(filter)
     ]);
-    return { kpi, monthly, byCoordinator, byType, byStatus, upcoming };
+    return { kpi, monthly, byCoordinator, byType, byStatus, upcoming, attention };
   }
 }
 

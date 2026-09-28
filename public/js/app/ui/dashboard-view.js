@@ -57,7 +57,14 @@ export class DashboardView {
     this.#renderStatusDonut(summary.byStatus || []);
     this.#renderCoordinators(summary.byCoordinator || []);
     this.#renderTypes(summary.byType || []);
-    this.#renderUpcoming(summary.upcoming || []);
+    this.#renderShootList($('#upcoming-table'), summary.upcoming || [], {
+      empty: 'Nothing scheduled in the next 7 days 🎉'
+    });
+    this.#renderShootList($('#attention-table'), summary.attention || [], {
+      empty: 'Nothing needs your attention 🎉',
+      alwaysActions: true,   // these have already slipped; no need to wait for the evening
+      reason: true
+    });
   }
 
   #onTileActivated(event) {
@@ -193,10 +200,18 @@ export class DashboardView {
       .join('');
   }
 
-  #renderUpcoming(list) {
-    const wrap = $('#upcoming-table');
+  /**
+   * The two "what now?" lists — Upcoming Shoots and Needs Attention — are the
+   * same table: date, title and the two closing actions.
+   *
+   * @param {Element} wrap
+   * @param {object[]} list
+   * @param {{ empty: string, alwaysActions?: boolean, reason?: boolean }} options
+   */
+  #renderShootList(wrap, list, { empty, alwaysActions = false, reason = false }) {
+    if (!wrap) return;
     if (!list.length) {
-      wrap.innerHTML = '<div class="empty">Nothing scheduled in the next 7 days 🎉</div>';
+      wrap.innerHTML = `<div class="empty">${empty}</div>`;
       return;
     }
     wrap.innerHTML = `
@@ -205,16 +220,16 @@ export class DashboardView {
         (shoot) => `
       <tr data-id="${shoot.id}">
         <td class="td-mono td-date">${formatDate(shoot.shoot_date)}</td>
-        <td>${escapeHtml(shoot.title)}</td>
-        <td class="td-actions">${this.#wrapUpButtons(shoot)}</td>
+        <td>${escapeHtml(shoot.title)}${reason ? `<span class="row-reason">${this.#reasonFor(shoot)}</span>` : ''}</td>
+        <td class="td-actions">${this.#rowActions(shoot, alwaysActions)}</td>
       </tr>`
       )
       .join('')}</tbody></table>`;
 
-    $$('#upcoming-table tbody tr').forEach((row) =>
+    $$('tbody tr', wrap).forEach((row) =>
       row.addEventListener('click', () => this.actions.openShoot(+row.dataset.id))
     );
-    $$('#upcoming-table .row-btn').forEach((button) =>
+    $$('.row-btn', wrap).forEach((button) =>
       button.addEventListener('click', (event) => {
         event.stopPropagation(); // the row itself opens the shoot
         this.#runWrapUp(button);
@@ -222,26 +237,35 @@ export class DashboardView {
     );
   }
 
+  /** Why a shoot ended up on the attention list. */
+  #reasonFor(shoot) {
+    if (appStatus(shoot.status) !== 'completed') return 'Not marked complete';
+    return `${formatMoney(outstandingAmount(shoot))} still to collect`;
+  }
+
   /**
-   * A shoot booked for today, after 7 pm IST, can be closed out from here:
-   * two icon buttons, no text — the row is already narrow.
+   * Two toggles per row: completed, and paid. Both are always drawn — an empty
+   * outline while the job is open, filled once it is done — so a row never
+   * loses a control just because half of it is finished.
    */
-  #wrapUpButtons(shoot) {
-    if (!isWrapUpTime(shoot.shoot_date, this.now())) return '';
+  #rowActions(shoot, always) {
+    if (!always && !isWrapUpTime(shoot.shoot_date, this.now())) return '';
+    const completed = appStatus(shoot.status) === 'completed';
+    const fee = Number(shoot.fee) || 0;
     const balance = outstandingAmount(shoot);
-    const complete = appStatus(shoot.status) === 'completed'
-      ? ''
-      : `<button type="button" class="row-btn complete" data-act="complete" data-id="${shoot.id}"
-           title="Mark Complete" aria-label="Mark Complete">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.4"/></svg>
-        </button>`;
-    const paid = balance <= 0
-      ? ''
-      : `<button type="button" class="row-btn paid" data-act="paid" data-id="${shoot.id}" data-amount="${balance}"
-           title="Mark Paid — ${formatMoney(balance)}" aria-label="Mark Paid">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.2" y="6.4" width="19.6" height="11.2" rx="2.4"/><circle cx="12" cy="12" r="2.5"/><path d="M5.8 9.8v4.4M18.2 9.8v4.4"/></svg>
-        </button>`;
-    return complete + paid;
+    const settled = fee > 0 && balance <= 0;
+
+    return `
+      <button type="button" class="row-btn check${completed ? ' is-on' : ''}" data-act="complete" data-id="${shoot.id}"
+              aria-pressed="${completed}" ${completed ? 'disabled' : ''}
+              title="${completed ? 'Already completed' : 'Mark Complete'}" aria-label="Mark Complete">
+        ${completed ? CHECK_FILLED : CHECK_EMPTY}
+      </button>
+      <button type="button" class="row-btn note${settled ? ' is-on' : ''}" data-act="paid" data-id="${shoot.id}"
+              data-amount="${balance}" aria-pressed="${settled}" ${settled || !fee ? 'disabled' : ''}
+              title="${settled ? 'Paid in full' : fee ? `Mark Paid — ${formatMoney(balance)}` : 'Set a fee first'}" aria-label="Mark Paid">
+        ${settled ? NOTE_FILLED : NOTE_EMPTY}
+      </button>`;
   }
 
   async #runWrapUp(button) {
@@ -267,6 +291,12 @@ export class DashboardView {
     }
   }
 }
+
+/* Row toggles: an empty outline, and the same glyph filled once it is done. */
+const CHECK_EMPTY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.6"/></svg>`;
+const CHECK_FILLED = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.6" fill="currentColor" stroke="none"/><path d="M8.3 12.2l2.6 2.6 5-5.5" stroke="var(--surface)" stroke-width="2.1" stroke-linecap="round"/></svg>`;
+const NOTE_EMPTY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.3" y="6.3" width="19.4" height="11.4" rx="2.6"/><path d="M9.9 9.9h4.2M9.9 12.1h4.2M12.6 9.9c1.3 0 2 .8 2 1.7 0 1.1-.9 1.8-2.4 1.8h-2.3l3.6 3.3" stroke-width="1.5"/></svg>`;
+const NOTE_FILLED = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.3" y="6.3" width="19.4" height="11.4" rx="2.6" fill="currentColor" stroke="none"/><path d="M9.9 9.9h4.2M9.9 12.1h4.2M12.6 9.9c1.3 0 2 .8 2 1.7 0 1.1-.9 1.8-2.4 1.8h-2.3l3.6 3.3" stroke="var(--surface)" stroke-width="1.5"/></svg>`;
 
 function barChart(bars) {
   return `<div class="bars">${bars

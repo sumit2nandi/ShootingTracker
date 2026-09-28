@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ShootingTracker</title>
-  <link rel="stylesheet" href="css/app.css?v=25" />
+  <link rel="stylesheet" href="css/app.css?v=26" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=4" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=4" />
   <link rel="apple-touch-icon" href="favicon.png?v=4" />
@@ -92,6 +92,11 @@
       <div class="card">
         <div class="card-head"><h3>Upcoming Shoots</h3><span class="muted small">Next 7 Days</span></div>
         <div id="upcoming-table" class="table-wrap"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Needs Attention</h3><span class="muted small">Overdue &amp; Unpaid</span></div>
+        <div id="attention-table" class="table-wrap"></div>
       </div>
       <div id="kpi-row" class="kpi-row"></div>
       <div class="grid-2">
@@ -319,6 +324,6 @@
 
   <div id="toasts" class="toasts"></div>
 
-  <script type="module" src="js/app/main.js?v=23"></script>
+  <script type="module" src="js/app/main.js?v=24"></script>
 </body>
 </html>

@@ -311,22 +311,25 @@ main { padding: 16px 16px calc(110px + env(safe-area-inset-bottom)); max-width: 
 /* ---------- tables ---------- */
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .upcoming-table td:first-child, .upcoming-table th:first-child { width: 34%; }
-/* a shoot booked for today, after 7 pm IST, can be closed out from its row —
-   icons only, so the two buttons never crowd the title */
+/* Rows in Upcoming Shoots / Needs Attention carry two toggles: completed and
+   paid. Empty outlines while the work is open, filled once it is done — icons
+   only, so they never crowd the title. */
 .upcoming-table .td-actions { width: 1%; white-space: nowrap; text-align: right; padding-left: 0; }
+.upcoming-table .row-reason { display: block; font-size: 10.5px; color: var(--muted); margin-top: 1px; }
 .row-btn {
   display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0;
-  border-radius: 50%; border: 1px solid transparent; cursor: pointer;
-  transition: transform .12s ease, background .15s ease, color .15s ease, border-color .15s ease;
+  border-radius: 50%; cursor: pointer;
+  color: var(--muted); background: var(--surface-2); border: 1px solid var(--line-2);
+  transition: transform .12s ease, background .16s ease, color .16s ease, border-color .16s ease;
 }
 .row-btn + .row-btn { margin-left: 6px; }
-.row-btn svg { width: 16px; height: 16px; }
-.row-btn.complete { color: var(--green); background: var(--green-soft); border-color: var(--green-line); }
-.row-btn.complete:hover:not(:disabled) { background: var(--green); border-color: var(--green); color: #fff; }
-.row-btn.paid { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-line); }
-.row-btn.paid:hover:not(:disabled) { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
-.row-btn:active { transform: scale(.9); }
-.row-btn:disabled { opacity: .5; cursor: default; }
+.row-btn svg { width: 17px; height: 17px; }
+.row-btn:hover:not(:disabled) { color: var(--green); border-color: var(--green-line); background: var(--green-soft); }
+.row-btn:active:not(:disabled) { transform: scale(.9); }
+/* ticked: the glyph fills with the settled colour and the control stops asking */
+.row-btn.is-on { color: var(--green); background: var(--green-soft); border-color: var(--green-line); }
+.row-btn:disabled { cursor: default; }
+.row-btn:disabled:not(.is-on) { opacity: .45; }
 table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 th {
   text-align: left; color: var(--muted); font-size: 12px; letter-spacing: .1px; font-weight: 650;

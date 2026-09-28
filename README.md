@@ -26,9 +26,12 @@ that adds a shoot from anywhere.
 - **Dashboard** — six KPI cards in count/amount pairs (total shoots, total fee · completed, total received · planned, outstanding) plus:
   - monthly earnings bar chart (per-day when a month filter is on),
   - status donut,
-  - **Upcoming Shoots** for the next 7 days, listed as date + title — and once it is past **7 pm IST on the
-    day of a shoot**, that row grows two icon buttons to close it out on the spot: mark it complete, and
-    collect the balance,
+  - **Upcoming Shoots** — the next 7 days, plus everything booked for today whatever state it is in. Once
+    it is past **7 pm IST on the day of a shoot**, the row carries two icon toggles: a checkbox for
+    *completed* and a banknote for *paid*. They stay put once ticked — empty outline while the job is
+    open, filled green when it is done,
+  - **Needs Attention** — the same list for work that has slipped: past shoots nobody marked complete, and
+    finished shoots whose fee is still outstanding (with what is left to collect spelled out),
   - per-**coordinator** and per-**type** breakdowns.
   Every widget respects the shared filter bar: **month, coordinator, client, status, type, fee range,
   text search, payment status**.

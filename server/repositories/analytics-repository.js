@@ -3,7 +3,25 @@
 const { BASE_CTE } = require('./shoot-queries');
 
 /** Rows imported before the two-state model may still say 'confirmed'. */
-const UPCOMING_WINDOW = `b.shoot_date >= CURRENT_DATE AND b.shoot_date < (CURRENT_DATE + 7) AND b.status IN ('planned','confirmed')`;
+const STILL_OPEN = `b.status IN ('planned','confirmed')`;
+const OWES_MONEY = `b.fee > 0 AND b.paid_amount < b.fee`;
+
+/**
+ * The next seven days: everything still to happen, plus *everything* booked for
+ * today whatever state it is in — today's schedule stays on screen all day, so
+ * a shoot ticked off in the evening does not vanish mid-tap.
+ */
+const UPCOMING_WINDOW =
+  `b.shoot_date >= CURRENT_DATE AND b.shoot_date < (CURRENT_DATE + 7)
+   AND (${STILL_OPEN} OR b.shoot_date = CURRENT_DATE)`;
+
+/**
+ * Work that has slipped: a past shoot nobody closed, or a finished shoot whose
+ * fee is still outstanding.
+ */
+const ATTENTION_WINDOW =
+  `(b.shoot_date < CURRENT_DATE AND ${STILL_OPEN})
+   OR (b.status = 'completed' AND ${OWES_MONEY} AND b.shoot_date <> CURRENT_DATE)`;
 
 /**
  * Read-only aggregate queries behind the dashboard.
@@ -106,6 +124,20 @@ class AnalyticsRepository {
     );
     return result.rows;
   }
+
+  /** Shoots that have slipped: overdue, or finished but unpaid. */
+  async needsAttention(filter, limit = 8) {
+    const { where, params } = filter.toSql({ extraConditions: [`(${ATTENTION_WINDOW})`] });
+    const result = await this.database.query(
+      `${BASE_CTE}
+      SELECT b.id, b.title, b.client_name, b.shoot_date, b.venue, b.location,
+             b.coordinator, b.fee, b.paid_amount, b.status, b.payment_status
+      FROM base b ${where}
+      ORDER BY b.shoot_date DESC LIMIT ${Number(limit) || 8}`,
+      params
+    );
+    return result.rows;
+  }
 }
 
-module.exports = { AnalyticsRepository, UPCOMING_WINDOW };
+module.exports = { AnalyticsRepository, UPCOMING_WINDOW, ATTENTION_WINDOW };

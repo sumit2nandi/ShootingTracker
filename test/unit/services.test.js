@@ -131,13 +131,14 @@ test('the dashboard passes one identical filter to every aggregate', async () =>
       totalsByCoordinator: stub([]),
       totalsByType: stub([]),
       countsByStatus: stub([]),
-      upcoming: stub([])
+      upcoming: stub([]),
+      needsAttention: stub([])
     }
   });
 
   const result = await service.summarize({ month: '2026-04', bogus: 'ignored' });
-  assert.deepEqual(Object.keys(result), ['kpi', 'monthly', 'byCoordinator', 'byType', 'byStatus', 'upcoming']);
-  assert.equal(seen.length, 6);
+  assert.deepEqual(Object.keys(result), ['kpi', 'monthly', 'byCoordinator', 'byType', 'byStatus', 'upcoming', 'attention']);
+  assert.equal(seen.length, 7);
   assert.ok(seen.every((filter) => filter === seen[0]), 'the same filter instance is reused');
   assert.deepEqual(seen[0].criteria, { month: '2026-04' });
 });
