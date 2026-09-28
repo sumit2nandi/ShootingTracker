@@ -240,7 +240,7 @@ class Application {
   #applyThemeChrome(theme) {
     const dark = theme === 'dark';
     const meta = $('#meta-theme-color');
-    if (meta) meta.setAttribute('content', dark ? '#0d0b14' : '#f4f3f9');
+    if (meta) meta.setAttribute('content', dark ? '#000000' : '#f4f3f9');
     const button = $('#btn-theme');
     if (button) {
       const label = dark ? 'Switch to light mode' : 'Switch to dark mode';

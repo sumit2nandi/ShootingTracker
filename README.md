@@ -42,7 +42,9 @@ that adds a shoot from anywhere.
   (CSV)** lives next to the filter icon in the same header.
 - **Light / dark theme** — the toggle sits in the **top-right corner** (moon ⇄ sun). The choice is stored in
   the browser, follows the operating system until you pick a side, and is applied before the first paint, so
-  there is no white flash on load. Every surface — cards, tables, calendar, drawer, pills, the navigation
+  there is no white flash on load. Dark mode is a **true-black canvas** with near-black cards separated by
+  hairlines (shadows are invisible on black), white copy, cool-grey secondary text and mint/amber/red for
+  money states. Every surface — cards, tables, calendar, drawer, pills, the navigation
   pill and the action button — is themed from one set of CSS custom properties in `public/css/app.css`
   (palette, radii, elevation and the navigation metrics), so a re-skin is a token edit, not a hunt.
 - **Profile view** — the fourth destination in the bottom bar, opening as a full view like the others
