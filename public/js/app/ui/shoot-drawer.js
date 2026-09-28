@@ -1,6 +1,6 @@
 import { $, $$, escapeHtml, text } from '../core/dom.js';
 import { dayKey, formatDate, formatMoney, formatTime } from '../core/format.js';
-import { paymentLabel, statusPill } from '../domain/shoot-status.js';
+import { appStatus, paymentLabel, statusPill } from '../domain/shoot-status.js';
 import { closeOverlay, openOverlay } from '../core/motion.js';
 
 /** One key/value row; rows without a value are dropped by the caller. */
@@ -55,8 +55,9 @@ export class ShootDrawer {
     const balance = Math.max(0, Math.round((fee - paid) * 100) / 100);
     const canCollect = balance > 0;
 
-    this.element.innerHTML = this.#shootHtml(shoot, { paid, fee, balance, canCollect });
-    this.#bindShoot(shoot, { balance, canCollect });
+    const completed = appStatus(shoot.status) === 'completed';
+    this.element.innerHTML = this.#shootHtml(shoot, { paid, fee, balance, canCollect, completed });
+    this.#bindShoot(shoot, { balance, canCollect, completed });
   }
 
   /** The "+N more" panel for a calendar day. */
@@ -89,7 +90,7 @@ export class ShootDrawer {
     });
   }
 
-  #shootHtml(shoot, { paid, fee, balance, canCollect }) {
+  #shootHtml(shoot, { paid, fee, balance, canCollect, completed }) {
     const contact = [text(shoot.contact_name), text(shoot.contact_phone)].filter(Boolean).join(' · ');
     const hasMoney = fee > 0 || paid > 0; // nothing booked → leave the money rows out
     const detailRows = [
@@ -133,7 +134,14 @@ export class ShootDrawer {
             .join('') || `<div class="muted small">${fee ? 'Nothing collected yet.' : 'Set a fee to start collecting.'}</div>`}
         </div>
         <div class="pay-total">Collected <b style="color:var(--green)">${formatMoney(paid)}</b> of ${formatMoney(fee)} (${fee ? Math.round((paid / fee) * 100) : 0}%)</div>
-        <button class="btn btn-primary pay-mark" id="pay-mark" ${canCollect ? '' : 'disabled'}>Mark Paid</button>
+        <div class="quick-actions">
+          <button class="btn btn-complete" id="mark-complete" ${completed ? 'disabled' : ''}
+                  title="${completed ? 'This shoot is already completed' : 'Mark this shoot completed'}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.4"/></svg>
+            Mark Complete
+          </button>
+          <button class="btn btn-primary pay-mark" id="pay-mark" ${canCollect ? '' : 'disabled'}>Mark Paid</button>
+        </div>
         <div class="muted small pay-hint">${!fee ? 'Set a fee on this shoot first — then it can be marked paid.' : canCollect ? `Books the remaining ${formatMoney(balance)} as collected today.` : 'Nothing to collect — this shoot is already paid in full.'}</div>
       </div>
       <div class="drawer-actions">
@@ -143,8 +151,23 @@ export class ShootDrawer {
       </div>`;
   }
 
-  #bindShoot(shoot, { balance, canCollect }) {
+  #bindShoot(shoot, { balance, canCollect, completed }) {
     this.#bindClose();
+
+    const markComplete = $('#mark-complete');
+    markComplete.addEventListener('click', async () => {
+      if (completed) return;
+      markComplete.disabled = true;
+      try {
+        await this.api.updateShoot(shoot.id, { status: 'completed' });
+        this.actions.notify('Shoot marked complete');
+        this.showShoot(shoot.id);
+        this.actions.dataChanged({ reloadMeta: false });
+      } catch (error) {
+        markComplete.disabled = false;
+        this.actions.notifyError('Could not update: ' + error.message);
+      }
+    });
 
     $('#dr-edit').addEventListener('click', () => {
       this.close();

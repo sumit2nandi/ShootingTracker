@@ -99,7 +99,7 @@ class AnalyticsRepository {
     const result = await this.database.query(
       `${BASE_CTE}
       SELECT b.id, b.title, b.client_name, b.shoot_date, b.venue, b.location,
-             b.coordinator, b.fee, b.status, b.payment_status
+             b.coordinator, b.fee, b.paid_amount, b.status, b.payment_status
       FROM base b ${where}
       ORDER BY b.shoot_date ASC LIMIT ${Number(limit) || 8}`,
       params

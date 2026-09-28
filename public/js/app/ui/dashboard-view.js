@@ -1,12 +1,14 @@
 import { $, $$, escapeHtml } from '../core/dom.js';
-import { formatDate, formatMoney, formatMoneyShort, MONTH_SHORT } from '../core/format.js';
+import { dayKey, formatDate, formatMoney, formatMoneyShort, MONTH_SHORT } from '../core/format.js';
 import { STATUS_COLORS, STATUS_ORDER, appStatus, statusLabel } from '../domain/shoot-status.js';
+import { isWrapUpTime, outstandingAmount } from '../domain/wrap-up.js';
 
 /** KPI tiles, charts and breakdowns. Reads data, writes HTML, emits actions. */
 export class DashboardView {
-  constructor({ api, actions }) {
+  constructor({ api, actions, now = () => new Date() }) {
     this.api = api;
     this.actions = actions;
+    this.now = now;
   }
 
   mount() {
@@ -204,12 +206,65 @@ export class DashboardView {
       <tr data-id="${shoot.id}">
         <td class="td-mono td-date">${formatDate(shoot.shoot_date)}</td>
         <td>${escapeHtml(shoot.title)}</td>
+        <td class="td-actions">${this.#wrapUpButtons(shoot)}</td>
       </tr>`
       )
       .join('')}</tbody></table>`;
+
     $$('#upcoming-table tbody tr').forEach((row) =>
       row.addEventListener('click', () => this.actions.openShoot(+row.dataset.id))
     );
+    $$('#upcoming-table .row-btn').forEach((button) =>
+      button.addEventListener('click', (event) => {
+        event.stopPropagation(); // the row itself opens the shoot
+        this.#runWrapUp(button);
+      })
+    );
+  }
+
+  /**
+   * A shoot booked for today, after 7 pm IST, can be closed out from here:
+   * two icon buttons, no text — the row is already narrow.
+   */
+  #wrapUpButtons(shoot) {
+    if (!isWrapUpTime(shoot.shoot_date, this.now())) return '';
+    const balance = outstandingAmount(shoot);
+    const complete = appStatus(shoot.status) === 'completed'
+      ? ''
+      : `<button type="button" class="row-btn complete" data-act="complete" data-id="${shoot.id}"
+           title="Mark Complete" aria-label="Mark Complete">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.4"/></svg>
+        </button>`;
+    const paid = balance <= 0
+      ? ''
+      : `<button type="button" class="row-btn paid" data-act="paid" data-id="${shoot.id}" data-amount="${balance}"
+           title="Mark Paid — ${formatMoney(balance)}" aria-label="Mark Paid">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.2" y="6.4" width="19.6" height="11.2" rx="2.4"/><circle cx="12" cy="12" r="2.5"/><path d="M5.8 9.8v4.4M18.2 9.8v4.4"/></svg>
+        </button>`;
+    return complete + paid;
+  }
+
+  async #runWrapUp(button) {
+    const id = Number(button.dataset.id);
+    const isPayment = button.dataset.act === 'paid';
+    button.disabled = true;
+    try {
+      if (isPayment) {
+        await this.api.addPayment(id, {
+          amount: Number(button.dataset.amount),
+          paid_on: dayKey(this.now()),
+          note: 'Collected'
+        });
+        this.actions.notify(`Marked ${formatMoney(button.dataset.amount)} as paid`);
+      } else {
+        await this.api.updateShoot(id, { status: 'completed' });
+        this.actions.notify('Shoot marked complete');
+      }
+      this.actions.dataChanged({ reloadMeta: false });
+    } catch (error) {
+      button.disabled = false;
+      this.actions.notifyError(`Could not update: ${error.message}`);
+    }
   }
 }
 

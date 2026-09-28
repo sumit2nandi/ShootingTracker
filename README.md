@@ -21,12 +21,14 @@ that adds a shoot from anywhere.
   that says “booked”, “confirmed”, “postponed” or “cancelled” is folded into the right one.
 - **Earnings** — a per-shoot **payments ledger**. Collected amount, balance and a derived
   `paid / partial / unpaid` status are computed from the ledger, not hand-typed. In the shoot
-  drawer the ledger is topped by a single **Collected** checkbox pre-filled with whatever is still
-  due on the fee — tick it, press **Save**, and the balance is booked in one step.
+  drawer, **Mark Complete** and **Mark Paid** sit side by side under the ledger: one closes the shoot,
+  the other books whatever is still due on the fee in a single tap.
 - **Dashboard** — six KPI cards in count/amount pairs (total shoots, total fee · completed, total received · planned, outstanding) plus:
   - monthly earnings bar chart (per-day when a month filter is on),
   - status donut,
-  - **Upcoming Shoots** for the next 7 days, listed as date + title,
+  - **Upcoming Shoots** for the next 7 days, listed as date + title — and once it is past **7 pm IST on the
+    day of a shoot**, that row grows two icon buttons to close it out on the spot: mark it complete, and
+    collect the balance,
   - per-**coordinator** and per-**type** breakdowns.
   Every widget respects the shared filter bar: **month, coordinator, client, status, type, fee range,
   text search, payment status**.
