@@ -80,8 +80,8 @@ test('missing shoots are reported as not found, not as an empty success', async 
   await assert.rejects(service.remove(404, DataScope.forSelf(1)), NotFoundError);
 });
 
-test('an owner viewing another account reads that account’s data', async () => {
-  const { service } = shootServiceWith([
+test('an owner viewing another account reads and edits that account’s data', async () => {
+  const { service, shootRepository } = shootServiceWith([
     { id: 1, title: 'Mine', owner_id: 1 },
     { id: 2, title: 'Theirs', owner_id: 2 }
   ]);
@@ -91,9 +91,25 @@ test('an owner viewing another account reads that account’s data', async () =>
   assert.equal(detail.title, 'Theirs', 'the viewed account’s record is visible');
   await assert.rejects(service.getDetail(1, viewing), NotFoundError, '…but not their own');
 
-  await assert.rejects(service.update(2, { title: 'no' }, viewing), NotFoundError, 'reads never become writes');
-  await assert.rejects(service.remove(2, viewing), NotFoundError);
-  await assert.doesNotReject(service.update(1, { title: 'ok' }, viewing), 'own data stays editable while viewing');
+  // while viewing, the owner works on the viewed account's records
+  await assert.doesNotReject(service.update(2, { title: 'Theirs, edited' }, viewing), 'the viewed shoot is editable');
+  await assert.doesNotReject(service.create({ title: 'New for them', shoot_date: '2026-05-01' }, viewing));
+  assert.equal(shootRepository.inserted[0].owner_id, 2, 'a new shoot filed under the viewed account');
+  await assert.rejects(service.update(1, { title: 'ok' }, viewing), NotFoundError, '…own data is out of the write scope');
+  await assert.rejects(service.remove(1, viewing), NotFoundError);
+  await assert.doesNotReject(service.remove(2, viewing), 'the viewed shoot is deletable');
+});
+
+test('an owner not viewing edits only their own data', async () => {
+  const { service } = shootServiceWith([
+    { id: 1, title: 'Mine', owner_id: 1 },
+    { id: 2, title: 'Theirs', owner_id: 2 }
+  ]);
+  const self = DataScope.forSelf(1);
+
+  await assert.doesNotReject(service.update(1, { title: 'Mine, edited' }, self));
+  await assert.rejects(service.update(2, { title: 'no' }, self), NotFoundError, 'another account is out of reach');
+  await assert.rejects(service.remove(2, self), NotFoundError);
 });
 
 test('a member’s data is invisible to every other account, owner included', async () => {
@@ -123,12 +139,16 @@ test('payments validate the amount and the parent shoot', async () => {
   assert.ok(id);
 });
 
-test('a payment cannot be booked on another account’s shoot', async () => {
+test('a payment cannot be booked on another account’s shoot — except by an owner viewing it', async () => {
   const service = new PaymentService({
     shootRepository: new FakeShootRepository([{ id: 1, owner_id: 2 }]),
     paymentRepository: new FakePaymentRepository()
   });
-  await assert.rejects(service.record(1, { amount: 10 }, DataScope.forSelf(1)), NotFoundError);
+  await assert.rejects(service.record(1, { amount: 10 }, DataScope.forSelf(1)), NotFoundError, 'own scope cannot touch it');
+  await assert.doesNotReject(
+    service.record(1, { amount: 10 }, new DataScope({ selfId: 1, targetId: 2 })),
+    '…an owner looking at that account can settle its ledger'
+  );
 });
 
 test('zero is a valid payment amount', async () => {
@@ -150,12 +170,16 @@ test('media requires a URL and an existing shoot', async () => {
   assert.ok((await service.attach(1, { file_url: ' https://x ' }, scope)).id);
 });
 
-test('a media link cannot attach to another account’s shoot', async () => {
+test('a media link cannot attach to another account’s shoot — except by an owner viewing it', async () => {
   const service = new MediaService({
     shootRepository: new FakeShootRepository([{ id: 1, owner_id: 2 }]),
     mediaRepository: new FakeMediaRepository()
   });
-  await assert.rejects(service.attach(1, { file_url: 'https://x' }, DataScope.forSelf(1)), NotFoundError);
+  await assert.rejects(service.attach(1, { file_url: 'https://x' }, DataScope.forSelf(1)), NotFoundError, 'own scope cannot touch it');
+  await assert.doesNotReject(
+    service.attach(1, { file_url: 'https://x' }, new DataScope({ selfId: 1, targetId: 2 })),
+    '…an owner looking at that account can add its media'
+  );
 });
 
 test('a coordinator with shoots cannot be deleted', async () => {
@@ -240,9 +264,17 @@ test('an owner without a choice scopes to themselves', async () => {
 test('an owner can scope to another account — deactivated ones included', async () => {
   const service = scopeServiceWith([OWNER, OTHER]);
   const scope = await service.resolve(OWNER, 'OTHER@example.com');
-  assert.equal(scope.selfId, 1, 'writes still go to the owner');
+  assert.equal(scope.selfId, 1);
   assert.equal(scope.targetId, 3, 'reads follow the choice, case-insensitively');
   assert.equal(scope.isViewingOther, true);
+  assert.equal(scope.writeId, 3, '…and so do writes: the owner edits the data they are looking at');
+});
+
+test('writes stay on the signed-in account unless an owner is viewing', async () => {
+  assert.equal(DataScope.forSelf(7).writeId, 7);
+  assert.equal(new DataScope({ selfId: 1, targetId: 2 }).writeId, 2, 'viewing → writes follow the target');
+  const scope = new DataScope({ selfId: 2, targetId: 2 });
+  assert.equal(scope.writeId, 2, 'a member is always self/self');
 });
 
 test('an owner cannot scope to an account that is not in the app', async () => {

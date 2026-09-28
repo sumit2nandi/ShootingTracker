@@ -152,11 +152,11 @@ test('the API facade maps use cases onto endpoints', async () => {
   assert.deepEqual(calls[4], ['GET', '/api/auth/me', undefined]);
 });
 
-test('the owner’s viewing choice rides along on reads, never on writes', async () => {
+test('the owner’s viewing choice rides along on reads and on writes', async () => {
   const { ShootingTrackerApi } = await load('data/shooting-tracker-api.js');
   const calls = [];
-  const record = (method) => (path, arg) => {
-    calls.push([method, path, arg]);
+  const record = (method) => (path, body, query) => {
+    calls.push([method, path, body, query]);
     return Promise.resolve({ user: { email: 'a@example.com' }, users: [] });
   };
   const api = new ShootingTrackerApi({
@@ -175,16 +175,18 @@ test('the owner’s viewing choice rides along on reads, never on writes', async
   await api.createShoot({ title: 'X' });
   await api.updateShoot(7, { fee: 1 });
 
-  assert.deepEqual(calls[0], ['GET', '/api/shoots', `month=2026-04&viewingAs=${viewingAs}`]);
-  assert.deepEqual(calls[1], ['GET', '/api/dashboard', `viewingAs=${viewingAs}`]);
-  assert.deepEqual(calls[2], ['GET', '/api/shoots', `from=2026-04-01&to=2026-04-30&viewingAs=${viewingAs}`]);
-  assert.deepEqual(calls[3], ['GET', '/api/meta', `viewingAs=${viewingAs}`]);
-  assert.deepEqual(calls[4], ['GET', '/api/shoots/9', `viewingAs=${viewingAs}`], 'the detail read follows the choice');
-  assert.deepEqual(calls[5], ['POST', '/api/shoots', { title: 'X' }], 'writes never carry the choice');
-  assert.deepEqual(calls[6], ['PUT', '/api/shoots/7', { fee: 1 }]);
+  assert.deepEqual(calls[0], ['GET', '/api/shoots', `month=2026-04&viewingAs=${viewingAs}`, undefined]);
+  assert.deepEqual(calls[1], ['GET', '/api/dashboard', `viewingAs=${viewingAs}`, undefined]);
+  assert.deepEqual(calls[2], ['GET', '/api/shoots', `from=2026-04-01&to=2026-04-30&viewingAs=${viewingAs}`, undefined]);
+  assert.deepEqual(calls[3], ['GET', '/api/meta', `viewingAs=${viewingAs}`, undefined]);
+  assert.deepEqual(calls[4], ['GET', '/api/shoots/9', `viewingAs=${viewingAs}`, undefined], 'the detail read follows the choice');
+  assert.deepEqual(calls[5], ['POST', '/api/shoots', { title: 'X' }, `viewingAs=${viewingAs}`], 'a create follows the choice too');
+  assert.deepEqual(calls[6], ['PUT', '/api/shoots/7', { fee: 1 }, `viewingAs=${viewingAs}`], '…and so does an update');
 
   api.setViewingAs(null);
-  assert.equal(api.withViewing(''), '', 'and it can be switched back off');
+  assert.equal(api.withViewing(''), undefined, 'and it can be switched back off');
+  await api.createShoot({ title: 'Y' });
+  assert.deepEqual(calls[7], ['POST', '/api/shoots', { title: 'Y' }, undefined], 'back on own data → plain write');
 });
 
 test('the tour-completion call hits the auth endpoint', async () => {

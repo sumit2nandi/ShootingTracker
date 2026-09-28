@@ -48,19 +48,19 @@ export class ApiClient {
     return this.request(path, { query });
   }
 
-  post(path, body) {
-    return this.request(path, { method: 'POST', body });
+  post(path, body, query) {
+    return this.request(path, { method: 'POST', body, query });
   }
 
-  put(path, body) {
-    return this.request(path, { method: 'PUT', body });
+  put(path, body, query) {
+    return this.request(path, { method: 'PUT', body, query });
   }
 
-  patch(path, body) {
-    return this.request(path, { method: 'PATCH', body });
+  patch(path, body, query) {
+    return this.request(path, { method: 'PATCH', body, query });
   }
 
-  delete(path) {
-    return this.request(path, { method: 'DELETE' });
+  delete(path, query) {
+    return this.request(path, { method: 'DELETE', query });
   }
 }

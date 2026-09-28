@@ -5,8 +5,9 @@ const { NotFoundError, ValidationError } = require('../core/errors');
 /**
  * Use cases for photo / album / drive links attached to a shoot.
  *
- * Like the ledger, links are scoped through their shoot: only the owner of a
- * shoot can attach to it or remove its links.
+ * Like the ledger, links are scoped through their shoot: only the account in
+ * the caller's write scope (their own, or the one an owner is viewing) can
+ * attach to a shoot or remove its links.
  */
 class MediaService {
   /**
@@ -28,7 +29,7 @@ class MediaService {
     const fileUrl = typeof body.file_url === 'string' ? body.file_url.trim() : '';
     if (!fileUrl) throw new ValidationError('file_url required');
     const shoot = await this.shootRepository.findById(shootId);
-    if (!shoot || shoot.owner_id !== scope.selfId) throw new NotFoundError();
+    if (!shoot || shoot.owner_id !== scope.writeId) throw new NotFoundError();
 
     const id = await this.mediaRepository.insert({
       shoot_id: shootId,
@@ -41,7 +42,7 @@ class MediaService {
   /** @throws {NotFoundError} when the media link does not exist or is not the caller's */
   async remove(mediaId, scope) {
     const owner = await this.mediaRepository.ownerOfMedia(mediaId);
-    if (owner !== scope.selfId) throw new NotFoundError();
+    if (owner !== scope.writeId) throw new NotFoundError();
     const deleted = await this.mediaRepository.deleteById(mediaId);
     if (!deleted) throw new NotFoundError();
   }

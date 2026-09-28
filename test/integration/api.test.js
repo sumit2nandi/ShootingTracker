@@ -154,8 +154,10 @@ test('the owner’s viewingAs choice becomes the request’s data scope', async 
     await server.request('/api/shoots?viewingAs=other@example.com');
     await server.request('/api/shoots');
     assert.equal(calls[0].targetId, 2, 'the chosen account is the read target');
-    assert.equal(calls[0].selfId, 1, '…while writes would still go to the owner');
+    assert.equal(calls[0].writeId, 2, '…and the write target, while an owner is viewing');
+    assert.equal(calls[0].selfId, 1, 'the signed-in owner is still who they are');
     assert.equal(calls[1].targetId, 1, 'no choice → own data');
+    assert.equal(calls[1].writeId, 1, '…and writes stay on the owner’s own data');
   });
 
   await withApp({ user: { id: 2, email: 'member@example.com', name: 'M', role: 'member' }, services }, async (server) => {

@@ -9,8 +9,9 @@ const { ShootInput } = require('../domain/shoot-input');
  *
  * Reads are scoped to `scope.targetId`: a member sees their own data, an owner
  * sees their own or, when they chose to view another account, that account's.
- * Writes always belong to `scope.selfId` — nobody can create, edit or delete
- * a shoot through another account's data, even an owner while viewing it.
+ * Writes belong to `scope.writeId` — the viewed account while an owner is
+ * looking at it (so an owner can add to and edit a member's shoots), and the
+ * signed-in account otherwise. A member can never write to anyone else's data.
  *
  * A shoot outside the scope is indistinguishable from a missing one (404), so
  * an id can never be used to probe another account's records.
@@ -59,7 +60,9 @@ class ShootService {
     const input = ShootInput.forCreate(body);
     const id = await this.database.withTransaction(async (executor) => {
       const values = await this.#withResolvedCoordinator(input, executor);
-      values.owner_id = scope.selfId; // a new shoot always belongs to the person who made it
+      // an owner adding a shoot while viewing a member files it under that
+      // member, so it shows up in the data they are looking at
+      values.owner_id = scope.writeId;
       return this.shootRepository.insert(values, executor);
     });
     return { id };
@@ -85,11 +88,12 @@ class ShootService {
 
   /**
    * The write-side gate: fetches the shoot and refuses anything that is not
-   * the caller's own, answering 404 either way.
+   * in the scope the caller is writing through (their own data, or the data
+   * an owner is viewing), answering 404 either way.
    */
   async #assertOwnsShoot(id, scope) {
     const shoot = await this.shootRepository.findById(id);
-    if (!shoot || shoot.owner_id !== scope.selfId) throw new NotFoundError();
+    if (!shoot || shoot.owner_id !== scope.writeId) throw new NotFoundError();
   }
 
   /**

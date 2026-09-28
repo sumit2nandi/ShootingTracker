@@ -6,8 +6,9 @@ const { NotFoundError, ValidationError } = require('../core/errors');
  * Use cases for the earnings ledger.
  *
  * The ledger is scoped through its shoots: a payment can only be booked on —
- * or removed from — a shoot the caller owns. Other accounts' ledgers are
- * invisible (404), including to an owner viewing them.
+ * or removed from — a shoot in the caller's write scope. That is the caller's
+ * own data, or the data an owner is viewing (so an owner can settle a member's
+ * ledger while looking at it). Everything else is invisible (404).
  */
 class PaymentService {
   /**
@@ -35,7 +36,7 @@ class PaymentService {
       throw new ValidationError('amount must be a number of 0 or more');
     }
     const shoot = await this.shootRepository.findById(shootId);
-    if (!shoot || shoot.owner_id !== scope.selfId) throw new NotFoundError();
+    if (!shoot || shoot.owner_id !== scope.writeId) throw new NotFoundError();
 
     const id = await this.paymentRepository.insert({
       shoot_id: shootId,
@@ -50,7 +51,7 @@ class PaymentService {
   /** @throws {NotFoundError} when the payment does not exist or is not the caller's */
   async remove(paymentId, scope) {
     const owner = await this.paymentRepository.ownerOfPayment(paymentId);
-    if (owner !== scope.selfId) throw new NotFoundError();
+    if (owner !== scope.writeId) throw new NotFoundError();
     const deleted = await this.paymentRepository.deleteById(paymentId);
     if (!deleted) throw new NotFoundError();
   }

@@ -22,12 +22,15 @@ the FK is attached in a `DO` block that checks `pg_constraint` (Postgres has no
 `http/middleware/data-scope.js`):
 
 - reads filter by `targetId` — the signed-in account by default;
-- writes always belong to `selfId`;
-- `?viewingAs=account@x.com` on read endpoints switches an **owner**'s reads
+- writes belong to `writeId` — the signed-in account, **or the account an
+  owner is viewing** (`DataScope.writeId` = `isViewingOther ? targetId :
+  selfId`), so an owner adding/editing while looking at a member files and
+  edits that member's records;
+- `?viewingAs=account@x.com` on any endpoint switches an **owner**'s scope
   to another account (case-insensitive; deactivated accounts are viewable);
   members' `viewingAs` is ignored, an unknown email is a `400`;
-- a record that isn't yours (or that isn't the owner's viewing target) is a
-  `404` — update, delete, payments and media all enforce this.
+- a record outside the resolved scope is a `404` — update, delete, payments
+  and media all enforce this.
 
 **Sign-in contract.** `POST /api/auth/google` for an account **not in
 `app_users`** now answers `200 { user, needsConsent: true }` with **no**
@@ -43,10 +46,12 @@ spotlight tour (`public/js/app/ui/tour.js`) runs once, for new accounts.
 
 **Frontend.** The Profile tab gains a *Viewing* switch for owners (persisted
 in `localStorage: shootingtracker-viewing-as`, validated against the user list
-at boot); while viewing another account an amber banner is shown, the
-`body.viewing-other` class hides the “new shoot” buttons and the drawer and
-dashboard row actions go read-only. Members see their own profile only, as
-before.
+at boot); while viewing another account an amber banner names whose data is on
+screen, and every add/edit/delete (drawer, day panel, dashboard rows, FAB)
+works on that account's data — the API facade rides `viewingAs` on writes as
+well as reads. Members see their own profile only, as before, and the banner
+never renders for them (the `hidden` attribute is kept above the banner's
+`display:flex`).
 
 **CLI.** `npm run import` accepts `--owner email` (rows belong to that account;
 without it they stay unowned and a warning is printed).
@@ -54,7 +59,7 @@ without it they stay unowned and a warning is printed).
 account (default `sushmitaghosh0099@gmail.com`), creates it if missing, marks
 tours done, and is idempotent.
 
-**Tests.** `npm test` now covers 155 cases, including the data-scope rules,
+**Tests.** `npm test` now covers 157 cases, including the data-scope rules,
 the consent flow and the `viewingAs` passthrough. `scripts/api-test.py` passes
 unmodified (47 checks; its one “test coordinators removed” quirk when running
 against a `seed:demo` database predates this change — the demo and the suite
@@ -74,8 +79,9 @@ shoots still reference them).
   `UPDATE app_users SET role = 'owner' WHERE lower(email) = '…';`
 - **Shoot detail followed the viewing choice.** `getShoot` was the one read
   that did not send `viewingAs`, so an owner opening a viewed account's shoot
-  got `404`. The detail read now carries the choice like every other read
-  (writes still never do).
+  got `404`. The detail read now carries the choice like every other call —
+  and so do the writes, which is what lets an owner edit the shoot they are
+  looking at.
 - **Consent form was stuck disabled.** The sign-in `busy` flag was left on
   while the consent screen was on screen, so “Create my profile” never
   enabled. It is released when the form appears (the Google button is hidden
@@ -85,10 +91,13 @@ shoots still reference them).
   now normalizes to *no choice*; the redundant “(you)” row left the
   dropdown, so own data has exactly one representation and the banner can
   never appear for it.
-- **No create/edit entry point while viewing.** The `newShoot`/`editShoot`
-  actions are guarded by a single read-only check with an explanatory
-  toast, so the calendar day, list rows, FAB and top-bar button all refuse
-  the same way (the server already refused the writes with `404`).
+- **The owner can add to and edit the data they are viewing.** An earlier
+  pass made viewing read-only; the requirement flipped, so the read-only
+  guards (the `isReadOnly` action, the `newShoot`/`editShoot` gate, the
+  `body.viewing-other` button-hiding CSS) are gone. The facade now rides
+  `viewingAs` on creates/updates/deletes/payments, and the server resolves
+  those writes against `scope.writeId`, so an owner's edits while looking at
+  a member land on that member's account. The banner now says so.
 - The consent page drops the “Owners can view, never edit” term.
 
 ## Contract: unchanged (superseded where the 2026-09 section says otherwise)

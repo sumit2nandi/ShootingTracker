@@ -18,9 +18,10 @@ that adds a shoot from anywhere.
   server enforces this on every read and write — a record that isn't yours is simply *not found*.
 - **Owner view mode** — an **owner** can look at any other account's data from the **Profile** tab: pick a
   name in *Viewing* and the dashboard, calendar, shoots, drawer and insights all switch to that person's
-  records (a banner says whose data is on screen and one tap goes back). While viewing, the app is
-  **read-only** — the “new shoot” buttons disappear, and any write still targets the owner's own account,
-  because the server only ever *reads* through the choice, never writes. Members never see the switch.
+  records (a banner says whose data is on screen and one tap goes back). While viewing, the owner can
+  **add to and edit that account's data** — new shoots, edits, deletions, payments, media and imports are
+  all filed under the account being viewed, so the owner can manage a member's book directly. Members
+  never see the switch, and their writes always stay on their own data.
 - **Google sign-in for anyone** — any Google account may sign in. If the account isn't in `app_users` yet,
   it is not refused: after verifying the token the app asks for a one-time **consent** (three short terms),
   and confirming it creates the account as a **member** and starts the session. Deactivated accounts are
@@ -304,11 +305,11 @@ Every `/api` route except `/api/auth/config`, `/api/auth/google` and
 | `DELETE /api/coordinators/:id`             | Delete one (409 while shoots still reference it)   |
 | `GET/POST /api/users`, `PATCH/DELETE /api/users/:id` | Manage the allow-list (owners only)      |
 
-**Owner view mode.** Any read endpoint above also accepts `?viewingAs=account@x.com`. When an **owner**
-passes it, that account's records are returned instead of their own (deactivated accounts included — the
-owner may look at anyone's data). For **members** the parameter is ignored and their own data is returned.
-Writes are never redirected by it: a create/import always belongs to the signed-in account, and a
-`PUT`/`DELETE`/payment on another account's record is a `404`.
+**Owner view mode.** Every endpoint above accepts `?viewingAs=account@x.com`. When an **owner** passes it,
+that account's records are used instead of their own (deactivated accounts included — the owner may look
+at anyone's data), and **writes follow the choice**: creates, imports, `PUT`s, `DELETE`s, payments and
+media all land on the account being viewed. For **members** the parameter is ignored — they always read
+and write their own data. Either way, a record outside the resolved scope is a `404`.
 
 **Error shape.** Every failure is `{ "error": "…" }` with a meaningful status:
 `400` validation, `401` no session, `403` not an owner, `404` unknown id, `409`

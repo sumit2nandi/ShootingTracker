@@ -918,8 +918,9 @@ body.app-ready .app-loader { opacity: 0; visibility: hidden; pointer-events: non
 }
 
 /* ============ owner "viewing" mode ============
-   A thin banner under the filter bar says whose data is on screen, and the
-   read-only chrome (new-shoot buttons) disappears while it is up. */
+   A thin banner under the filter bar says whose data is on screen while an
+   owner looks at another account. The `hidden` attribute is the source of
+   truth for visibility — the [hidden] rule below keeps it above display:flex. */
 .viewing-banner {
   display: flex;
   align-items: center;
@@ -928,6 +929,7 @@ body.app-ready .app-loader { opacity: 0; visibility: hidden; pointer-events: non
   background: var(--amber-soft);
   border-bottom: 1px solid rgba(180, 83, 9, .18);
 }
+.viewing-banner[hidden] { display: none; }
 .viewing-banner-text {
   flex: 1;
   font-size: 12px;
@@ -968,10 +970,6 @@ body.app-ready .app-loader { opacity: 0; visibility: hidden; pointer-events: non
 }
 .viewing-select:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
 .viewing-hint { margin: 10px 0 0; font-size: 12px; line-height: 1.5; }
-
-/* read-only chrome: nobody adds shoots while looking at someone else's data */
-body.viewing-other .fab,
-body.viewing-other #btn-new-shoot { display: none; }
 
 /* ============ first-login tour ============
    A dark scrim with a cut-out spotlight over the described element and a card

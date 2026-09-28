@@ -55,22 +55,13 @@ class Application {
     const actions = {
       openShoot: (id) => this.drawer.showShoot(id),
       openDay: (dateKey, shoots) => this.drawer.showDay(dateKey, shoots),
-      // guarded: while an owner views another account's data the whole app is
-      // read-only — no entry point (calendar day, list row, FAB, drawer) may
-      // open a shoot form
-      newShoot: (dateKey) => {
-        if (this.#assertCanWrite()) this.shootForm.open(null, dateKey);
-      },
-      editShoot: (shoot) => {
-        if (this.#assertCanWrite()) this.shootForm.open(shoot);
-      },
+      // while an owner views a member's data these writes are filed under
+      // that member's account (the server resolves it); for everyone else
+      // they land on their own data as always
+      newShoot: (dateKey) => this.shootForm.open(null, dateKey),
+      editShoot: (shoot) => this.shootForm.open(shoot),
       openAccess: () => this.access.open(),
       setViewingAs: (email) => this.#applyViewing(email),
-      /** True while an owner looks at someone else's data — read-only mode. */
-      isReadOnly: () => {
-        const { user, viewingAs } = this.store.get();
-        return Boolean(viewingAs && user && viewingAs.toLowerCase() !== String(user.email).toLowerCase());
-      },
       dataChanged: (options) => this.dataChanged(options),
       showShootsFiltered: (extra) => this.showShootsFiltered(extra),
       resetFilters: () => this.resetShootsFilters(),
@@ -214,24 +205,15 @@ class Application {
   }
 
   /**
-   * The write gate behind every "new shoot" / "edit shoot" entry point.
-   *
-   * @returns {boolean} true when the shoot form may open
+   * The "whose data is on screen" banner. It is visible exactly while an
+   * owner looks at another account — never for members, never for one's own
+   * data — and it always names the account currently on screen.
    */
-  #assertCanWrite() {
-    if (!this.actions.isReadOnly()) return true;
-    const { viewingAs, users } = this.store.get();
-    const target = (users || []).find((entry) => entry.email.toLowerCase() === String(viewingAs).toLowerCase());
-    const name = (target && (target.name || target.email)) || viewingAs;
-    this.toaster.info(`Read-only — you are viewing ${name}'s data. Switch back to your own data to add or edit shoots.`);
-    return false;
-  }
-
-  /** Banner + the read-only chrome (the new-shoot buttons disappear). */
   #syncViewingChrome() {
     const { user, users, viewingAs } = this.store.get();
-    const other = Boolean(viewingAs && user && viewingAs.toLowerCase() !== String(user.email).toLowerCase());
-    document.body.classList.toggle('viewing-other', other);
+    const other = Boolean(
+      user && user.role === 'owner' && viewingAs && viewingAs.toLowerCase() !== String(user.email).toLowerCase()
+    );
 
     const banner = $('#viewing-banner');
     if (!banner) return;
@@ -241,7 +223,7 @@ class Application {
     }
     const target = (users || []).find((entry) => entry.email.toLowerCase() === String(viewingAs).toLowerCase());
     const name = (target && (target.name || target.email)) || viewingAs;
-    $('#viewing-banner-text').textContent = `Viewing ${name}'s data — read-only. Edits always go to your own data.`;
+    $('#viewing-banner-text').textContent = `Viewing ${name}'s data — new shoots and edits are saved to ${name}'s account.`;
     banner.hidden = false;
   }
 

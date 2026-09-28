@@ -6,9 +6,11 @@
  * against a two-line stub.
  *
  * Data scoping rides here too: `setViewingAs()` tells the facade whose data
- * the owner is currently looking at, and every *read* of business data (shoots,
- * dashboard, calendar, meta) carries it. Writes never carry it — the server
- * always attributes them to the signed-in account.
+ * the owner is currently looking at, and every call that touches business data
+ * — reads *and* writes (shoots, dashboard, calendar, meta, payments) — carries
+ * it. The server attributes a write to the resolved scope, so an owner's edits
+ * while viewing a member land on that member's account; for everyone else the
+ * choice is empty and writes stay on their own data.
  */
 export class ShootingTrackerApi {
   /** @param {{ client: import('./api-client.js').ApiClient }} deps */
@@ -27,9 +29,13 @@ export class ShootingTrackerApi {
     this.viewingAs = email ? String(email).trim().toLowerCase() : null;
   }
 
-  /** Append the `viewingAs` parameter to a query string, when set. */
+  /**
+   * Append the `viewingAs` parameter to a query string, when a choice is set.
+   * Returns `undefined` (not an empty string) when nothing is added, so callers
+   * can hand the result straight to the client as its `query` argument.
+   */
   withViewing(query) {
-    if (!this.viewingAs) return query;
+    if (!this.viewingAs) return query || undefined;
     const suffix = `viewingAs=${encodeURIComponent(this.viewingAs)}`;
     return query ? `${query}&${suffix}` : suffix;
   }
@@ -72,29 +78,31 @@ export class ShootingTrackerApi {
 
   getShoot(id) {
     // A read like the rest — so an owner viewing another account can open
-    // their shoots' details (and the server keeps it to read-only data).
+    // their shoots' details (and, with the write calls below, edit them).
     return this.client.get(`/api/shoots/${id}`, this.withViewing(''));
   }
 
   createShoot(shoot) {
-    return this.client.post('/api/shoots', shoot);
+    // the query (not the body) carries the scope, so an owner adding a shoot
+    // while viewing a member files it under that member's account
+    return this.client.post('/api/shoots', shoot, this.withViewing(''));
   }
 
   updateShoot(id, patch) {
-    return this.client.put(`/api/shoots/${id}`, patch);
+    return this.client.put(`/api/shoots/${id}`, patch, this.withViewing(''));
   }
 
   deleteShoot(id) {
-    return this.client.delete(`/api/shoots/${id}`);
+    return this.client.delete(`/api/shoots/${id}`, this.withViewing(''));
   }
 
   /* ---- ledger ---- */
   addPayment(shootId, payment) {
-    return this.client.post(`/api/shoots/${shootId}/payments`, payment);
+    return this.client.post(`/api/shoots/${shootId}/payments`, payment, this.withViewing(''));
   }
 
   deletePayment(paymentId) {
-    return this.client.delete(`/api/payments/${paymentId}`);
+    return this.client.delete(`/api/payments/${paymentId}`, this.withViewing(''));
   }
 
   /**
