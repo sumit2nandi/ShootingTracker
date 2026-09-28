@@ -1,7 +1,7 @@
 import { $, $$, escapeHtml } from '../core/dom.js';
 
 /**
- * "People with access" (owners only).
+ * "People with Access" (owners only).
  *
  * The server is the authority on these rules; the view mirrors them by
  * disabling the buttons that would fail, and still surfaces the server's answer

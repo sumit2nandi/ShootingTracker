@@ -18,7 +18,7 @@ export class DatabaseStatus {
       else this.#hideBanner();
     } catch {
       this.store.update({ dbOk: false });
-      this.#renderPill(false, 'offline', 'offline');
+      this.#renderPill(false, 'offline', 'Offline');
     }
   }
 
@@ -32,7 +32,7 @@ export class DatabaseStatus {
     this.pill.className = `db-pill ${ok ? 'ok' : 'bad'}`;
     this.pill.title = title;
     const text = this.pill.querySelector('.db-pill-text');
-    if (text) text.textContent = label || (ok ? 'DB connected' : 'DB unreachable');
+    if (text) text.textContent = label || (ok ? 'DB Connected' : 'DB Unreachable');
   }
 
   #showBanner(detail) {

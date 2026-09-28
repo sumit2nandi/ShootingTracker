@@ -43,7 +43,7 @@ export class ShootForm {
     select.innerHTML =
       '<option value="">— none —</option>' +
       this.coordinators.map((coordinator) => `<option value="${escapeHtml(coordinator.name)}">${escapeHtml(coordinator.name)}</option>`).join('') +
-      `<option value="${NEW_COORDINATOR}">➕ New coordinator…</option>`;
+      `<option value="${NEW_COORDINATOR}">➕ New Coordinator…</option>`;
     if (current && [...select.options].some((option) => option.value === current)) select.value = current;
   }
 
@@ -66,7 +66,7 @@ export class ShootForm {
   open(shoot, presetDate) {
     const form = this.form;
     form.reset();
-    $('#shoot-modal-title').textContent = shoot ? 'Edit shoot' : 'New shoot';
+    $('#shoot-modal-title').textContent = shoot ? 'Edit Shoot' : 'New Shoot';
 
     const set = (name, value) => {
       this.field(name).value = value ?? '';

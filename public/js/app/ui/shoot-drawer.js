@@ -1,6 +1,6 @@
 import { $, $$, escapeHtml, text } from '../core/dom.js';
 import { dayKey, formatDate, formatMoney, formatTime } from '../core/format.js';
-import { statusLabel, statusPill } from '../domain/shoot-status.js';
+import { paymentLabel, statusPill } from '../domain/shoot-status.js';
 
 /** One key/value row; rows without a value are dropped by the caller. */
 const kvRow = (label, value, attrs = '') =>
@@ -72,7 +72,7 @@ export class ShootDrawer {
       )
       .join('')}
     <div class="drawer-actions">
-      <button class="btn btn-primary" id="dp-add">+ Add shoot on ${formatDate(dateKey)}</button>
+      <button class="btn btn-primary" id="dp-add">+ Add Shoot on ${formatDate(dateKey)}</button>
       <button class="btn btn-ghost" data-close>Close</button>
     </div>`;
     this.open();
@@ -112,10 +112,10 @@ export class ShootDrawer {
       (shoot.start_time ? ` · ${formatTime(shoot.start_time)}` : '');
 
     return `
-      ${drawerHead(escapeHtml(shoot.title), subtitle, `${statusPill(shoot.status)}<span class="pill ${shoot.payment_status}">${escapeHtml(statusLabel(shoot.payment_status))}</span>`)}
+      ${drawerHead(escapeHtml(shoot.title), subtitle, `${statusPill(shoot.status)}<span class="pill ${shoot.payment_status}">${escapeHtml(paymentLabel(shoot.payment_status))}</span>`)}
       ${detailRows ? `<div class="section"><h4>Details</h4><div class="kv kv-lead">${detailRows}</div></div>` : ''}
       ${shoot.notes ? `<div class="section"><h4>Notes</h4><div>${escapeHtml(shoot.notes)}</div></div>` : ''}
-      ${extraRows ? `<div class="section"><h4>Extra fields (from import)</h4><div class="kv">${extraRows}</div></div>` : ''}
+      ${extraRows ? `<div class="section"><h4>Extra Fields (From Import)</h4><div class="kv">${extraRows}</div></div>` : ''}
       <div class="section"><h4>Payment</h4>
         <div class="pay-list">
           ${(shoot.payments || [])

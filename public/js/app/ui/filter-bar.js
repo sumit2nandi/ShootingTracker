@@ -6,9 +6,9 @@ import { STATUS_ORDER, statusLabel } from '../domain/shoot-status.js';
 const ALL_LABELS = {
   month: 'All',
   coordinator: 'All',
-  client: 'All clients',
-  status: 'All statuses',
-  type: 'All types'
+  client: 'All Clients',
+  status: 'All Statuses',
+  type: 'All Types'
 };
 
 /**

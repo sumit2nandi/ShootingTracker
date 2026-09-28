@@ -47,8 +47,8 @@ export class ShootsView {
     if (!this.rows.length) {
       wrap.innerHTML =
         this.filters && this.filters.isActive
-          ? '<div class="empty">No shoots match this filter — tap “Show all” to clear it.</div>'
-          : '<div class="empty">No shoots yet — add one with “+ New shoot”.</div>';
+          ? '<div class="empty">No shoots match this filter — tap “Show All” to clear it.</div>'
+          : '<div class="empty">No shoots yet — add one with “+ New Shoot”.</div>';
       return;
     }
 

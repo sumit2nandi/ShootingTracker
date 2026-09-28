@@ -22,4 +22,4 @@ export const statusPill = (status) =>
   `<span class="pill ${appStatus(status)}">${escapeHtml(statusLabel(appStatus(status)))}</span>`;
 
 export const paymentLabel = (paymentStatus) =>
-  paymentStatus === 'partial' ? 'Partially paid' : statusLabel(paymentStatus);
+  paymentStatus === 'partial' ? 'Partially Paid' : statusLabel(paymentStatus);

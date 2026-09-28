@@ -26,7 +26,7 @@ that adds a shoot from anywhere.
 - **Dashboard** — six KPI cards in count/amount pairs (total shoots, total fee · completed, total received · planned, outstanding) plus:
   - monthly earnings bar chart (per-day when a month filter is on),
   - status donut,
-  - **upcoming shoots** for the next 7 days, listed as date + title,
+  - **Upcoming Shoots** for the next 7 days, listed as date + title,
   - per-**coordinator** and per-**type** breakdowns.
   Every widget respects the shared filter bar: **month, coordinator, client, status, type, fee range,
   text search, payment status**.
@@ -38,8 +38,11 @@ that adds a shoot from anywhere.
   navigation pill (Dashboard / Calendar / Shoots / Profile) with a violet **floating action button** beside
   it for “new shoot”. The **All shoots** table goes edge-to-edge on phones and drops its
   **Status** and **Payment** columns; the fee itself turns into a **green bubble when paid** and a **red
-  bubble when a balance is due**. A **Show all** button appears whenever a filter is applied, and **Export
+  bubble when a balance is due**. A **Show All** button appears whenever a filter is applied, and **Export
   (CSV)** lives next to the filter icon in the same header.
+- **Wording** — everything the UI labels (tabs, headings, table columns, form fields, buttons, status
+  chips) is **Title Case**; anything that reads as a sentence (empty states, hints, toasts, tooltips) stays
+  sentence case.
 - **Light / dark theme** — the toggle sits in the **top-right corner** (moon ⇄ sun). The choice is stored in
   the browser, follows the operating system until you pick a side, and is applied before the first paint, so
   there is no white flash on load. Dark mode is a **true-black canvas** with near-black cards separated by
@@ -48,8 +51,8 @@ that adds a shoot from anywhere.
   pill and the action button — is themed from one set of CSS custom properties in `public/css/app.css`
   (palette, radii, elevation and the navigation metrics), so a re-skin is a token edit, not a hunt.
 - **Profile view** — the fourth destination in the bottom bar, opening as a full view like the others
-  (no popup): the signed-in account with its avatar, email and role, plus **Sign out** and, for owners,
-  **People with access**.
+  (no popup): the signed-in account with its avatar, email and role, plus **Sign Out** and, for owners,
+  **People with Access**.
 - **Import (server-side)** — an **HTML spreadsheet export / CSV / JSON** sheet can be loaded via the REST
   API (`POST /api/import`) or the CLI (`npm run import`). Columns like `date`, `client`, `coordinator`,
   `fee`, `venue`, `status`, `payment` are auto-mapped (many date formats, `Paid`/`50%`/amounts for
@@ -138,7 +141,7 @@ the sign-in screen. Signed-in sessions use an HTTP-only, same-site cookie and ex
 
 Managing who can sign in — **no code changes and no restart needed**:
 
-- From the app: an owner opens the **Profile** tab → *People with access* (add,
+- From the app: an owner opens the **Profile** tab → *People with Access* (add,
   activate/deactivate, promote, remove).
 - From the database: `INSERT INTO app_users (email, name, role) VALUES ('new@example.com', 'New', 'member');`
   or `UPDATE app_users SET is_active = false WHERE lower(email) = '…';`

@@ -52,7 +52,7 @@ test('legacy statuses fold into the two the app knows', async () => {
   assert.equal(appStatus('cancelled'), 'completed');
   assert.equal(appStatus('completed'), 'completed');
   assert.equal(statusLabel('planned'), 'Planned');
-  assert.equal(paymentLabel('partial'), 'Partially paid');
+  assert.equal(paymentLabel('partial'), 'Partially Paid');
   assert.match(statusPill('cancelled'), /class="pill completed">Completed</);
 });
 
