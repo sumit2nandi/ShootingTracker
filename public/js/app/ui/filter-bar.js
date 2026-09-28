@@ -48,6 +48,7 @@ export class FilterBar {
     setDatalist('#dl-coordinators', (meta.coordinators || []).map((coordinator) => coordinator.name));
     setDatalist('#dl-clients', meta.clients || []);
     setDatalist('#dl-types', meta.types || []);
+    setDatalist('#dl-titles', meta.titles || []);
   }
 
   read() {

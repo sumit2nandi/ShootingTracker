@@ -4,6 +4,72 @@ What changed when the codebase was restructured around the layering described
 in [`ARCHITECTURE.md`](ARCHITECTURE.md), and what that means for anyone using
 the app or the API.
 
+## 2026-09 · Account-scoped reference data, title suggestions, mobile tour
+
+**`GET /api/meta` is now scoped to the account on screen, and grows a `titles`
+list.** Before, the coordinator list was the global `coordinators` table —
+every signed-in account saw everyone's coordinators. Now all five lists come
+from the *viewed* account's own data (`scope.targetId`, so an owner viewing a
+member sees the member's lists):
+
+- `coordinators` — `[{ id, name }]`, the coordinators that appear on the
+  account's own shoots (distinct, alphabetical) —
+  `MetadataRepository.distinctCoordinators`;
+- `titles` (new) — the account's distinct non-empty shoot titles, the one
+  most recently touched first, capped at 100 — `MetadataRepository.pastTitles`;
+- `clients`, `types`, `months` — as before, but they were already
+  owner-scoped and now ride the same `targetId`.
+
+`MetadataService` lost its `coordinatorRepository` dependency; it only takes
+`{ metadataRepository }` (the container already passed the whole repository
+object, so nothing else moved).
+
+**Frontend.** The coordinator `<select>`, the coordinator datalist and the
+filter-bar options all consume `meta.coordinators`, so they are per-account
+with no further change. The title input (`name="title"`, no id — the form
+reaches it via `form.elements.namedItem`) now carries `list="dl-titles"` and
+`autocomplete="off"`, backed by a new `<datalist id="dl-titles">` next to the
+other `dl-*`s; the filter bar's `populate()` fills it from `meta.titles`.
+Native datalist — no new dependency.
+
+**The tour is mobile-browser friendly.** `public/js/app/ui/tour.js` was laid
+out against the *layout* viewport (`window.innerWidth/innerHeight` + a one-shot
+`resize` listener), so on phones — where the browser chrome slides and the
+visible area moves — the card and the spotlight drifted, and the welcome step
+had no scrim at all (its “spotlight” was hidden, taking the 9999px shadow that
+dims the page with it). Now:
+
+- every measurement goes through `window.visualViewport` (`width/height/
+  offsetTop/offsetLeft`, falling back to `window` where the API is absent);
+  the layout re-runs on `visualViewport` *resize and scroll* as well as
+  `window` resize/scroll, and the page itself is locked (`body.tour-open {
+  overflow: hidden }`) while the tour runs;
+- the welcome step gets a real full-surface scrim
+  (`.tour-highlight.full` — no border, no cut-out shadow);
+- on narrow screens (≤ 640px) the card is a full-width sheet pinned to the
+  side of the highlighted element with the more room, with 46px-tall
+  equal-width Back / Skip / Next buttons and a `safe-area-inset-bottom`
+  padding for the home indicator; the card is `max-height`-capped and
+  internally scrollable as a safety net;
+- a target pushed out of the visible area (behind the expanded URL bar) gets
+  its cut-out clamped to the nearest edge as a marker sliver and the card
+  stays centred in the open middle;
+- the cut-out and card always use explicit `top/left/width/height` (no
+  `bottom`-anchoring, which iOS handles badly), clamped to the visual area;
+- two latent bugs fixed along the way: `.btn`'s `display` overrode the
+  `hidden` attribute on the Back button (`.tour-card [hidden]` rule), and the
+  Calendar/Shoots steps pointed at ids that didn't exist — the mobile
+  bottom-nav buttons now carry `id="tab-calendar"` / `id="tab-shoots"`,
+  matching `tab-profile`.
+
+**Tests.** The metadata unit test now asserts all five lists are queried with
+the *viewed* account's id and that coordinators/titles pass through. New
+`scripts/tour-layout-check.mjs` drives the real tour class through all seven
+steps across five viewport scenarios (URL-bar expanded/collapsed, 320px phone,
+scrolled visual viewport, desktop) with a stub DOM and asserts the card and
+spotlight stay in the visible area and the card never covers the spotlight by
+more than the unavoidable amount. `npm test` stays at 161 passing.
+
 ## 2026-09 · Per-user data, owner view mode, consent sign-in and first-login tour
 
 This section **supersedes “Contract: unchanged”** for the endpoints it names.

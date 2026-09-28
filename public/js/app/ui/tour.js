@@ -9,6 +9,13 @@ import { $ } from '../core/dom.js';
  * bottom navigation, the new-shoot button), so no view has to load first, and
  * a missing anchor degrades to a centred card instead of breaking the tour.
  *
+ * Mobile: browsers on phones move their chrome (the URL bar, the home
+ * indicator) under the page, so every measurement goes through
+ * `window.visualViewport` — the part of the screen that is actually visible —
+ * and the layout re-runs on visual-viewport scroll/resize as well as on page
+ * scroll. On narrow screens the card becomes a full-width sheet pinned to the
+ * free side of the highlighted element, with 44px-tall buttons.
+ *
  * Finishing or skipping both report completion — the app then tells the server
  * so the tour never plays again for that account.
  */
@@ -58,7 +65,7 @@ const STEPS = [
     index: 6,
     target: '#tab-profile',
     title: 'Profile',
-    body: 'Your account, sign out — and, for owners, the list of people with access to this workspace. That is everything. Happy shooting!'
+    body: 'Your account and sign out live here — owners also manage the people with access from here. That is everything. Happy shooting!'
   }
 ];
 
@@ -79,6 +86,7 @@ export class SiteTour {
 
   start() {
     this.#build();
+    document.body.classList.add('tour-open'); // the page does not scroll under the tour
     this.#show(0);
   }
 
@@ -89,7 +97,7 @@ export class SiteTour {
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', 'ShootingTracker tour');
     overlay.innerHTML = `
-      <div class="tour-highlight" hidden></div>
+      <div class="tour-highlight"></div>
       <div class="tour-card">
         <div class="tour-step" aria-live="polite"></div>
         <h3 class="tour-title"></h3>
@@ -109,7 +117,21 @@ export class SiteTour {
     overlay.querySelector('.tour-next').addEventListener('click', () => this.#next());
     overlay.querySelector('.tour-skip').addEventListener('click', () => this.#finish(true));
     document.addEventListener('keydown', this.#onKey);
-    window.addEventListener('resize', () => this.#layout());
+    window.addEventListener('resize', this.#onReflow);
+    window.addEventListener('scroll', this.#onReflow, { passive: true });
+    // on phones the visible area moves with the browser chrome — follow it
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', this.#onReflow);
+      window.visualViewport.addEventListener('scroll', this.#onReflow);
+    }
+  }
+
+  /** The visible part of the screen, in layout-viewport coordinates. */
+  #metrics() {
+    const vv = window.visualViewport;
+    return vv
+      ? { width: vv.width, height: vv.height, top: vv.offsetTop, left: vv.offsetLeft }
+      : { width: window.innerWidth, height: window.innerHeight, top: 0, left: 0 };
   }
 
   #onKey = (event) => {
@@ -118,10 +140,11 @@ export class SiteTour {
     else if (event.key === 'ArrowLeft' && this.index > 0) this.#move(-1);
   };
 
+  #onReflow = () => this.#layout();
+
   #show(index) {
     this.index = index;
     const step = STEPS[index];
-    const card = this.overlay.querySelector('.tour-card');
 
     this.overlay.querySelector('.tour-step').textContent = `${index + 1} of ${STEPS.length}`;
     this.overlay.querySelector('.tour-title').textContent = step.title;
@@ -137,58 +160,116 @@ export class SiteTour {
     const target = step.target ? $(step.target) : null;
     const highlight = this.overlay.querySelector('.tour-highlight');
     if (target) {
-      highlight.hidden = false;
       highlight.dataset.for = step.target;
     } else {
-      highlight.hidden = true;
       delete highlight.dataset.for;
     }
     this.#layout();
   }
 
-  /** Place the spotlight over the current target and the card beside it. */
+  /**
+   * Place the spotlight over the current target and the card where there is
+   * room. Everything is measured against the visual viewport, so the card and
+   * the cut-out stay where the user can see them while a phone's browser
+   * chrome slides. The page never scrolls for the tour (the body is locked),
+   * so a target pushed out of the visible area simply gets its cut-out
+   * clamped to the nearest edge.
+   */
   #layout() {
     if (!this.overlay) return;
     const step = STEPS[this.index];
     const highlight = this.overlay.querySelector('.tour-highlight');
     const card = this.overlay.querySelector('.tour-card');
+    const { width, height, top, left } = this.#metrics();
+    const margin = 12;
     const target = step.target ? $(step.target) : null;
 
-    if (target) {
-      const rect = target.getBoundingClientRect();
-      const pad = 6;
-      Object.assign(highlight.style, {
-        top: `${Math.max(0, rect.top - pad)}px`,
-        left: `${Math.max(0, rect.left - pad)}px`,
-        width: `${Math.max(24, rect.width + pad * 2)}px`,
-        height: `${Math.max(24, rect.height + pad * 2)}px`
-      });
-
-      const cardW = Math.min(420, window.innerWidth - 32);
-      const below = rect.bottom + 12;
-      const cardH = card.offsetHeight || 220;
-      const top = below + cardH + 16 > window.innerHeight ? Math.max(12, rect.top - cardH - 12) : below;
-      const left = Math.min(
-        Math.max(16, rect.left + rect.width / 2 - cardW / 2),
-        window.innerWidth - cardW - 16
-      );
-      Object.assign(card.style, {
-        width: `${cardW}px`,
-        top: `${top}px`,
-        left: `${left}px`,
-        bottom: 'auto',
-        right: 'auto'
-      });
-    } else {
-      Object.assign(card.style, {
-        width: 'min(420px, calc(100vw - 32px))',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        bottom: 'auto',
-        right: 'auto'
-      });
+    if (!target) {
+      // no element to spotlight: full scrim, card in the middle of the screen
+      highlight.classList.add('full');
+      Object.assign(highlight.style, { top: '0', left: '0', right: '0', bottom: '0', width: 'auto', height: 'auto' });
+      this.#centerCard(card, { width, height, top, left, margin });
+      return;
     }
+    highlight.classList.remove('full');
+
+    const rect = target.getBoundingClientRect();
+    const right = left + width;
+    const bottom = top + height;
+    const pad = 6;
+    const inArea = rect.bottom > top + 8 && rect.top < bottom - 8 && rect.right > left + 8 && rect.left < right - 8;
+
+    if (!inArea) {
+      // the target sits behind the phone's browser chrome (or is otherwise
+      // off-screen): mark the nearest edge with a sliver and keep the card in
+      // the open middle of the visible area
+      const x1 = Math.min(Math.max(rect.left, left + 24), right - 24);
+      const x2 = Math.min(Math.max(rect.left + rect.width, left + 24), right - 24);
+      Object.assign(highlight.style, {
+        top: rect.bottom <= top ? `${top}px` : `${bottom - 24}px`,
+        left: `${x1}px`,
+        right: 'auto',
+        bottom: 'auto',
+        width: `${Math.max(24, x2 - x1)}px`,
+        height: '24px'
+      });
+      this.#centerCard(card, { width, height, top, left, margin });
+      return;
+    }
+
+    const x1 = Math.max(rect.left - pad, left);
+    const y1 = Math.max(rect.top - pad, top);
+    const x2 = Math.min(rect.left + rect.width + pad, right);
+    const y2 = Math.min(rect.top + rect.height + pad, bottom);
+    Object.assign(highlight.style, {
+      top: `${y1}px`,
+      left: `${x1}px`,
+      right: 'auto',
+      bottom: 'auto',
+      width: `${Math.max(24, x2 - x1)}px`,
+      height: `${Math.max(24, y2 - y1)}px`
+    });
+
+    const compact = width <= 640; // phone-sized: the card becomes a full-width sheet
+    const cardW = compact ? width - margin * 2 : Math.min(420, width - 32);
+    card.style.width = `${cardW}px`;
+    const cardH = card.offsetHeight || 220;
+    const gap = 12;
+
+    // the sheet sits on the side of the target with the more free space, so
+    // the spotlight is never buried under the card
+    const rectBottom = Math.min(rect.bottom, bottom);
+    const rectTop = Math.max(rect.top, top);
+    const freeBelow = bottom - rectBottom;
+    const freeAbove = rectTop - top;
+    const ideal = freeBelow >= freeAbove ? rectBottom + gap : rectTop - cardH - gap;
+    const clampedTop = Math.max(top + margin, Math.min(ideal, bottom - cardH - margin));
+
+    Object.assign(card.style, {
+      width: `${cardW}px`,
+      top: `${clampedTop}px`,
+      left: compact
+        ? `${left + margin}px`
+        : `${Math.min(Math.max(16, rect.left + rect.width / 2 - cardW / 2), right - cardW - 16)}px`,
+      transform: 'none',
+      bottom: 'auto',
+      right: 'auto'
+    });
+  }
+
+  /** A centred card (the welcome step): width capped, never past the edges. */
+  #centerCard(card, { width, height, top, left, margin }) {
+    const cardW = Math.min(420, width - margin * 2);
+    card.style.width = `${cardW}px`;
+    const cardH = card.offsetHeight || 220;
+    Object.assign(card.style, {
+      width: `${cardW}px`,
+      top: `${Math.max(top + margin, top + (height - cardH) / 2)}px`,
+      left: `${left + Math.max(margin, (width - cardW) / 2)}px`,
+      transform: 'none',
+      bottom: 'auto',
+      right: 'auto'
+    });
   }
 
   #next() {
@@ -212,7 +293,13 @@ export class SiteTour {
     if (!this.overlay) return;
     this.overlay.remove();
     this.overlay = null;
+    document.body.classList.remove('tour-open');
     document.removeEventListener('keydown', this.#onKey);
-    window.removeEventListener('resize', this.#layout);
+    window.removeEventListener('resize', this.#onReflow);
+    window.removeEventListener('scroll', this.#onReflow);
+    if (window.visualViewport) {
+      window.visualViewport.removeEventListener('resize', this.#onReflow);
+      window.visualViewport.removeEventListener('scroll', this.#onReflow);
+    }
   }
 }

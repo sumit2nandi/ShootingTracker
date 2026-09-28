@@ -218,20 +218,26 @@ test('the dashboard passes one identical, owner-scoped filter to every aggregate
   assert.deepEqual(seen[0].criteria, { month: '2026-04', owner: '5' });
 });
 
-test('metadata exposes the two statuses the domain knows', async () => {
+test('metadata offers the viewed account’s own values, coordinators and titles', async () => {
   const seenOwners = [];
+  const call = (result) => async (ownerId) => (seenOwners.push(ownerId), result);
   const service = new MetadataService({
-    coordinatorRepository: new FakeCoordinatorRepository([{ id: 1, name: 'Riya' }]),
     metadataRepository: {
-      distinctClients: async (ownerId) => (seenOwners.push(ownerId), ['acme']),
-      distinctTypes: async () => ['wedding'],
-      months: async () => ['2026-04']
+      distinctCoordinators: call([{ id: 7, name: 'Riya Saha' }]),
+      distinctClients: call(['acme']),
+      distinctTypes: call(['wedding']),
+      months: call(['2026-04']),
+      pastTitles: call(['Amritsar wedding', 'Mumbai product shoot'])
     }
   });
-  const meta = await service.describe(DataScope.forSelf(9));
+
+  // an owner viewing account 9 gets account 9’s reference data
+  const meta = await service.describe(new DataScope({ selfId: 1, targetId: 9 }));
   assert.deepEqual(meta.statuses, ['planned', 'completed']);
+  assert.deepEqual(meta.coordinators, [{ id: 7, name: 'Riya Saha' }], 'coordinators come from the account’s own shoots');
   assert.deepEqual(meta.clients, ['acme']);
-  assert.deepEqual(seenOwners, [9], 'distinct values are scoped to the viewed account');
+  assert.deepEqual(meta.titles, ['Amritsar wedding', 'Mumbai product shoot'], 'past titles feed the title suggestions');
+  assert.ok(seenOwners.length === 5 && seenOwners.every((owner) => owner === 9), 'every list is scoped to the viewed account');
 });
 
 /* ---------------- data scope ---------------- */

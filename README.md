@@ -28,10 +28,15 @@ that adds a shoot from anywhere.
   still refused and cannot re-activate themselves.
 - **First-login tour** — a newly created account gets a short, skippable **spotlight tour** of the app
   (dashboard → filters → calendar → shoots → new shoot) on its first login; it is recorded in
-  `app_users.tour_completed` and never shown again.
+  `app_users.tour_completed` and never shown again. It is mobile-first: the spotlight and the card are
+  laid out against the browser's *visual* viewport (so the phone's sliding URL bar never hides them),
+  and on narrow screens the card becomes a full-width sheet with thumb-sized buttons.
 - **Shoot tracking (CRUD)** — a minimal form (title, date, client, coordinator, fee, status) with the rest
   (type, end date/times, venue, location, contacts, notes) tucked under “More details”. Anything that
   doesn't fit a column is preserved in a JSON `extra` field, so you never lose data from a sheet.
+- **Your own reference data** — the coordinator dropdown offers the coordinators *this account* has used
+  in its own past shoots (not everyone's), and typing a shoot title auto-suggests that account's past
+  titles, most recent first. When an owner views a member's data, both lists follow the account on screen.
 - **Two statuses, everywhere** — a shoot is either **Planned** (still to come) or **Completed** (closed
   out). Filters, pills, calendar chips, the legend and the donut all speak those two words, and an import
   that says “booked”, “confirmed”, “postponed” or “cancelled” is folded into the right one.
@@ -292,7 +297,7 @@ Every `/api` route except `/api/auth/config`, `/api/auth/google` and
 | `POST /api/auth/me/tour-completed`         | Record that the signed-in user has finished the first-login tour. |
 | `POST /api/auth/logout`                    | Clear the session cookie                           |
 | `GET /api/health`                          | DB connectivity + latency                          |
-| `GET /api/meta`                            | Coordinator/client/type/month lists for filters    |
+| `GET /api/meta`                            | Coordinator/client/type/month lists + past shoot **titles**, all scoped to the account being viewed (drives the filters, the coordinator dropdown, and the title auto-suggest) |
 | `GET /api/dashboard`                       | KPIs + aggregates (honours all filters)            |
 | `GET /api/shoots`                          | List, filtered (see below) — **of the signed-in account** |
 | `GET /api/shoots/:id`                      | Detail + payments + media (must be owned by the viewer) |
