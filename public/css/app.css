@@ -328,8 +328,9 @@ main { padding: 16px 16px calc(110px + env(safe-area-inset-bottom)); max-width: 
 .row-btn:active:not(:disabled) { transform: scale(.9); }
 /* ticked: the glyph fills with the settled colour and the control stops asking */
 .row-btn.is-on { color: var(--green); background: var(--green-soft); border-color: var(--green-line); }
-.row-btn:disabled { cursor: default; }
-.row-btn:disabled:not(.is-on) { opacity: .45; }
+.row-btn:disabled { cursor: default; opacity: .45; }
+/* a ticked toggle stays live: tapping it again undoes the change */
+.row-btn.is-on:hover:not(:disabled) { filter: brightness(1.04); }
 table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 th {
   text-align: left; color: var(--muted); font-size: 12px; letter-spacing: .1px; font-weight: 650;
@@ -579,17 +580,20 @@ tbody tr:hover { background: var(--surface-2); }
 .pay-row .amt { font-weight: 700; color: var(--green); margin-left: auto; white-space: nowrap; }
 .pay-row button { background: none; border: 0; color: var(--red); cursor: pointer; font-size: 13px; }
 .pay-total { font-size: 13px; margin-top: 10px; }
-/* closing a shoot out: complete first, then collect what is due */
-.quick-actions { display: grid; gap: 8px; margin-top: 12px; }
-.btn-complete {
-  width: 100%; justify-content: center; padding: 10px 14px;
-  color: var(--green); background: var(--green-soft); border-color: var(--green-line);
+/* Closing a shoot out: completed and paid, one pair of identical buttons side
+   by side. Tinted while the job is open, solid once it is done — and still
+   clickable then, so an accidental tap can be taken back. */
+.quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.btn-settle {
+  width: 100%; justify-content: center; padding: 10px 12px;
+  color: var(--green); background: var(--green-soft); border-color: var(--green-line); box-shadow: none;
 }
-.btn-complete:hover:not(:disabled) { background: var(--green); border-color: var(--green); color: #fff; }
-.btn-complete:disabled { color: var(--muted); background: var(--surface-2); border-color: var(--line); }
-.btn-complete svg { width: 16px; height: 16px; }
-.pay-mark { width: 100%; justify-content: center; padding: 10px 14px; }
-.pay-mark:disabled { background: var(--surface-2); color: var(--muted); border-color: var(--line-2); box-shadow: none; cursor: default; }
+.btn-settle:hover:not(:disabled) { color: var(--green); background: var(--green-soft); border-color: var(--green); }
+.btn-settle.is-on { color: #fff; background: var(--green); border-color: var(--green); }
+.btn-settle.is-on:hover { filter: brightness(1.06); color: #fff; }
+.btn-settle:disabled { color: var(--muted); background: var(--surface-2); border-color: var(--line); }
+.btn-settle svg { width: 16px; height: 16px; flex: none; }
+@media (max-width: 380px) { .btn-settle { padding: 10px 8px; font-size: 12.5px; } }
 .pay-hint { margin-top: 6px; }
 .extra-keys { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; }
 .extra-keys span { color: var(--muted); }

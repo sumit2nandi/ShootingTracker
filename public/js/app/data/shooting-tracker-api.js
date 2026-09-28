@@ -67,6 +67,20 @@ export class ShootingTrackerApi {
     return this.client.delete(`/api/payments/${paymentId}`);
   }
 
+  /**
+   * Undo the most recent collection on a shoot — the counterpart of the
+   * one-tap "mark paid".
+   *
+   * @returns {Promise<object|null>} the payment that was removed, if any
+   */
+  async undoLastPayment(shootId) {
+    const shoot = await this.getShoot(shootId);
+    const [latest] = shoot.payments || [];   // the API lists the newest first
+    if (!latest) return null;
+    await this.deletePayment(latest.id);
+    return latest;
+  }
+
   /* ---- access ---- */
   listUsers() {
     return this.client.get('/api/users').then((data) => data.users || []);

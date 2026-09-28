@@ -3,6 +3,10 @@ import { dayKey, formatDate, formatMoney, formatTime } from '../core/format.js';
 import { appStatus, paymentLabel, statusPill } from '../domain/shoot-status.js';
 import { closeOverlay, openOverlay } from '../core/motion.js';
 
+/* The settle buttons wear the same two glyphs as the dashboard row toggles. */
+const BOX = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.6"/></svg>';
+const TICK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.6" fill="currentColor" stroke="none"/><path d="M8.3 12.2l2.6 2.6 5-5.5" stroke="var(--surface)" stroke-width="2.1" stroke-linecap="round"/></svg>';
+
 /** One key/value row; rows without a value are dropped by the caller. */
 const kvRow = (label, value, attrs = '') =>
   value ? `<span class="k">${label}</span><span${attrs ? ' ' + attrs : ''}>${value}</span>` : '';
@@ -56,8 +60,9 @@ export class ShootDrawer {
     const canCollect = balance > 0;
 
     const completed = appStatus(shoot.status) === 'completed';
-    this.element.innerHTML = this.#shootHtml(shoot, { paid, fee, balance, canCollect, completed });
-    this.#bindShoot(shoot, { balance, canCollect, completed });
+    const settled = fee > 0 && !canCollect;
+    this.element.innerHTML = this.#shootHtml(shoot, { paid, fee, balance, settled, completed });
+    this.#bindShoot(shoot, { balance, canCollect, completed, settled });
   }
 
   /** The "+N more" panel for a calendar day. */
@@ -90,7 +95,7 @@ export class ShootDrawer {
     });
   }
 
-  #shootHtml(shoot, { paid, fee, balance, canCollect, completed }) {
+  #shootHtml(shoot, { paid, fee, balance, settled, completed }) {
     const contact = [text(shoot.contact_name), text(shoot.contact_phone)].filter(Boolean).join(' · ');
     const hasMoney = fee > 0 || paid > 0; // nothing booked → leave the money rows out
     const detailRows = [
@@ -135,14 +140,18 @@ export class ShootDrawer {
         </div>
         <div class="pay-total">Collected <b style="color:var(--green)">${formatMoney(paid)}</b> of ${formatMoney(fee)} (${fee ? Math.round((paid / fee) * 100) : 0}%)</div>
         <div class="quick-actions">
-          <button class="btn btn-complete" id="mark-complete" ${completed ? 'disabled' : ''}
-                  title="${completed ? 'This shoot is already completed' : 'Mark this shoot completed'}">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.2 12.3l2.6 2.6 5-5.4"/></svg>
-            Mark Complete
+          <button class="btn btn-settle${completed ? ' is-on' : ''}" id="mark-complete" aria-pressed="${completed}"
+                  title="${completed ? 'Completed — tap to move it back to planned' : 'Mark this shoot completed'}">
+            ${completed ? TICK : BOX}
+            ${completed ? 'Completed' : 'Mark Complete'}
           </button>
-          <button class="btn btn-primary pay-mark" id="pay-mark" ${canCollect ? '' : 'disabled'}>Mark Paid</button>
+          <button class="btn btn-settle${settled ? ' is-on' : ''}" id="pay-mark" aria-pressed="${settled}" ${fee ? '' : 'disabled'}
+                  title="${settled ? 'Paid — tap to undo the last payment' : fee ? `Collect ${formatMoney(balance)}` : 'Set a fee first'}">
+            ${settled ? TICK : BOX}
+            ${settled ? 'Paid' : 'Mark Paid'}
+          </button>
         </div>
-        <div class="muted small pay-hint">${!fee ? 'Set a fee on this shoot first — then it can be marked paid.' : canCollect ? `Books the remaining ${formatMoney(balance)} as collected today.` : 'Nothing to collect — this shoot is already paid in full.'}</div>
+        <div class="muted small pay-hint">${!fee ? 'Set a fee on this shoot first — then it can be marked paid.' : settled ? 'Paid in full — tap Paid again to undo the last payment.' : `Books the remaining ${formatMoney(balance)} as collected today.`}</div>
       </div>
       <div class="drawer-actions">
         <button class="btn" id="dr-edit">✏️ Edit</button>
@@ -151,16 +160,15 @@ export class ShootDrawer {
       </div>`;
   }
 
-  #bindShoot(shoot, { balance, canCollect, completed }) {
+  #bindShoot(shoot, { balance, canCollect, completed, settled }) {
     this.#bindClose();
 
     const markComplete = $('#mark-complete');
     markComplete.addEventListener('click', async () => {
-      if (completed) return;
       markComplete.disabled = true;
       try {
-        await this.api.updateShoot(shoot.id, { status: 'completed' });
-        this.actions.notify('Shoot marked complete');
+        await this.api.updateShoot(shoot.id, { status: completed ? 'planned' : 'completed' });
+        this.actions.notify(completed ? 'Shoot moved back to planned' : 'Shoot marked complete');
         this.showShoot(shoot.id);
         this.actions.dataChanged({ reloadMeta: false });
       } catch (error) {
@@ -188,15 +196,20 @@ export class ShootDrawer {
 
     const markPaid = $('#pay-mark');
     markPaid.addEventListener('click', async () => {
-      if (!canCollect) return;
+      if (settled && !this.confirm('Remove the last payment on this shoot?')) return;
       markPaid.disabled = true;
       try {
-        await this.api.addPayment(shoot.id, {
-          amount: balance,
-          paid_on: dayKey(this.today()),
-          note: 'Collected'
-        });
-        this.actions.notify(`Marked ${formatMoney(balance)} as paid`);
+        if (settled) {
+          const removed = await this.api.undoLastPayment(shoot.id);
+          this.actions.notify(removed ? `Removed ${formatMoney(removed.amount)} from the ledger` : 'Nothing to undo');
+        } else {
+          await this.api.addPayment(shoot.id, {
+            amount: balance,
+            paid_on: dayKey(this.today()),
+            note: 'Collected'
+          });
+          this.actions.notify(`Marked ${formatMoney(balance)} as paid`);
+        }
         this.showShoot(shoot.id);
         this.actions.dataChanged({ reloadMeta: false });
       } catch (error) {

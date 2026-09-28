@@ -5,10 +5,11 @@ import { isWrapUpTime, outstandingAmount } from '../domain/wrap-up.js';
 
 /** KPI tiles, charts and breakdowns. Reads data, writes HTML, emits actions. */
 export class DashboardView {
-  constructor({ api, actions, now = () => new Date() }) {
+  constructor({ api, actions, now = () => new Date(), confirm = window.confirm.bind(window) }) {
     this.api = api;
     this.actions = actions;
     this.now = now;
+    this.confirm = confirm;
   }
 
   mount() {
@@ -57,11 +58,8 @@ export class DashboardView {
     this.#renderStatusDonut(summary.byStatus || []);
     this.#renderCoordinators(summary.byCoordinator || []);
     this.#renderTypes(summary.byType || []);
-    this.#renderShootList($('#upcoming-table'), summary.upcoming || [], {
-      empty: 'Nothing scheduled in the next 7 days 🎉'
-    });
+    this.#renderShootList($('#upcoming-table'), summary.upcoming || []);
     this.#renderShootList($('#attention-table'), summary.attention || [], {
-      empty: 'Nothing needs your attention 🎉',
       alwaysActions: true,   // these have already slipped; no need to wait for the evening
       reason: true
     });
@@ -204,14 +202,18 @@ export class DashboardView {
    * The two "what now?" lists — Upcoming Shoots and Needs Attention — are the
    * same table: date, title and the two closing actions.
    *
+   * A card with nothing in it is noise, so an empty list hides the whole card.
+   *
    * @param {Element} wrap
    * @param {object[]} list
-   * @param {{ empty: string, alwaysActions?: boolean, reason?: boolean }} options
+   * @param {{ alwaysActions?: boolean, reason?: boolean }} [options]
    */
-  #renderShootList(wrap, list, { empty, alwaysActions = false, reason = false }) {
+  #renderShootList(wrap, list, { alwaysActions = false, reason = false } = {}) {
     if (!wrap) return;
+    const card = wrap.closest('.card');
+    if (card) card.classList.toggle('hidden', list.length === 0);
     if (!list.length) {
-      wrap.innerHTML = `<div class="empty">${empty}</div>`;
+      wrap.innerHTML = '';
       return;
     }
     wrap.innerHTML = `
@@ -245,8 +247,8 @@ export class DashboardView {
 
   /**
    * Two toggles per row: completed, and paid. Both are always drawn — an empty
-   * outline while the job is open, filled once it is done — so a row never
-   * loses a control just because half of it is finished.
+   * outline while the job is open, filled once it is done — and both stay
+   * clickable, so a mis-tap can be undone on the spot.
    */
   #rowActions(shoot, always) {
     if (!always && !isWrapUpTime(shoot.shoot_date, this.now())) return '';
@@ -257,23 +259,32 @@ export class DashboardView {
 
     return `
       <button type="button" class="row-btn check${completed ? ' is-on' : ''}" data-act="complete" data-id="${shoot.id}"
-              aria-pressed="${completed}" ${completed ? 'disabled' : ''}
-              title="${completed ? 'Already completed' : 'Mark Complete'}" aria-label="Mark Complete">
+              aria-pressed="${completed}"
+              title="${completed ? 'Completed — tap to undo' : 'Mark Complete'}" aria-label="Mark Complete">
         ${completed ? CHECK_FILLED : CHECK_EMPTY}
       </button>
       <button type="button" class="row-btn note${settled ? ' is-on' : ''}" data-act="paid" data-id="${shoot.id}"
-              data-amount="${balance}" aria-pressed="${settled}" ${settled || !fee ? 'disabled' : ''}
-              title="${settled ? 'Paid in full' : fee ? `Mark Paid — ${formatMoney(balance)}` : 'Set a fee first'}" aria-label="Mark Paid">
+              data-amount="${balance}" aria-pressed="${settled}" ${fee ? '' : 'disabled'}
+              title="${settled ? 'Paid — tap to undo' : fee ? `Mark Paid — ${formatMoney(balance)}` : 'Set a fee first'}" aria-label="Mark Paid">
         ${settled ? NOTE_FILLED : NOTE_EMPTY}
       </button>`;
   }
 
+  /** Apply — or undo — one of the row toggles. */
   async #runWrapUp(button) {
     const id = Number(button.dataset.id);
     const isPayment = button.dataset.act === 'paid';
+    const undo = button.classList.contains('is-on');
+
+    // taking money back out of the ledger deletes a record, so it is asked for
+    if (isPayment && undo && !this.confirm('Remove the last payment on this shoot?')) return;
+
     button.disabled = true;
     try {
-      if (isPayment) {
+      if (isPayment && undo) {
+        const removed = await this.api.undoLastPayment(id);
+        this.actions.notify(removed ? `Removed ${formatMoney(removed.amount)} from the ledger` : 'Nothing to undo');
+      } else if (isPayment) {
         await this.api.addPayment(id, {
           amount: Number(button.dataset.amount),
           paid_on: dayKey(this.now()),
@@ -281,8 +292,8 @@ export class DashboardView {
         });
         this.actions.notify(`Marked ${formatMoney(button.dataset.amount)} as paid`);
       } else {
-        await this.api.updateShoot(id, { status: 'completed' });
-        this.actions.notify('Shoot marked complete');
+        await this.api.updateShoot(id, { status: undo ? 'planned' : 'completed' });
+        this.actions.notify(undo ? 'Shoot moved back to planned' : 'Shoot marked complete');
       }
       this.actions.dataChanged({ reloadMeta: false });
     } catch (error) {
