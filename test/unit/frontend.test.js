@@ -217,6 +217,48 @@ test('the event bus supports unsubscription', async () => {
   assert.equal(count, 1);
 });
 
+test('overlays wait for their exit animation before hiding', async () => {
+  const { openOverlay, closeOverlay, prefersReducedMotion } = await load('core/motion.js');
+  const overlay = () => {
+    const classes = new Set(['hidden']);
+    return {
+      classes,
+      firstElementChild: null,
+      classList: { add: (c) => classes.add(c), remove: (c) => classes.delete(c), contains: (c) => classes.has(c) }
+    };
+  };
+
+  global.window = { matchMedia: () => ({ matches: false }) };
+  assert.equal(prefersReducedMotion(), false);
+
+  const animated = overlay();
+  openOverlay(animated);
+  assert.equal(animated.classes.has('hidden'), false);
+
+  closeOverlay(animated);
+  assert.equal(animated.classes.has('closing'), true, 'it plays the exit animation first');
+  assert.equal(animated.classes.has('hidden'), false);
+  await new Promise((resolve) => setTimeout(resolve, 420));
+  assert.deepEqual([...animated.classes], ['hidden'], 'and only then leaves the screen');
+
+  // someone who asked for less motion gets the same result, immediately
+  global.window = { matchMedia: () => ({ matches: true }) };
+  assert.equal(prefersReducedMotion(), true);
+  const instant = overlay();
+  openOverlay(instant);
+  closeOverlay(instant);
+  assert.equal(instant.classes.has('hidden'), true);
+  assert.equal(instant.classes.has('closing'), false);
+  delete global.window;
+});
+
+test('a disclosure without the animation API keeps working natively', async () => {
+  const { animateDisclosure } = await load('core/motion.js');
+  const details = { dataset: {}, querySelector: () => null, children: [] };
+  assert.doesNotThrow(() => animateDisclosure(details));
+  assert.equal(details.dataset.motion, undefined, 'no listener is attached when it cannot animate');
+});
+
 test('the theme follows storage first and the OS second', async () => {
   const { ThemeController } = await load('core/theme.js');
   const attributes = {};

@@ -40,6 +40,10 @@ that adds a shoot from anywhere.
   **Status** and **Payment** columns; the fee itself turns into a **green bubble when paid** and a **red
   bubble when a balance is due**. A **Show All** button appears whenever a filter is applied, and **Export
   (CSV)** lives next to the filter icon in the same header.
+- **Motion** — views cross-fade, month groups expand and collapse to their real height, the filter bar
+  slides open, and every sheet, dialog and drawer animates both in *and* out (the "+" button raises the
+  shoot form, closing it lets the sheet fall away). Anyone whose OS asks for reduced motion gets the same
+  interactions instantly, with no animation at all.
 - **Wording** — everything the UI labels (tabs, headings, table columns, form fields, buttons, status
   chips) is **Title Case**; anything that reads as a sentence (empty states, hints, toasts, tooltips) stays
   sentence case.

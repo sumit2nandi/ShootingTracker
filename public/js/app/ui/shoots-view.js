@@ -1,6 +1,7 @@
 import { $, $$, escapeHtml } from '../core/dom.js';
 import { formatDate, formatMoney, formatMonth, formatShortDate, daySpan } from '../core/format.js';
 import { paymentLabel, statusPill } from '../domain/shoot-status.js';
+import { animateDisclosure } from '../core/motion.js';
 
 /**
  * The shoots list, grouped into collapsible months.
@@ -61,7 +62,7 @@ export class ShootsView {
         ([yearMonth, monthRows]) => `
     <details class="shoot-month" ${this.expandAll || yearMonth === currentMonth ? 'open' : ''}>
       <summary><span>${escapeHtml(yearMonth === 'undated' ? 'Undated' : formatMonth(yearMonth))}</span><span class="month-count">${monthRows.length} shoot${monthRows.length === 1 ? '' : 's'}</span></summary>
-      ${monthTable(monthRows)}
+      <div class="shoot-month-body">${monthTable(monthRows)}</div>
     </details>`
       )
       .join('');
@@ -69,6 +70,7 @@ export class ShootsView {
     $$('#shoots-table tbody tr').forEach((row) =>
       row.addEventListener('click', () => this.actions.openShoot(+row.dataset.id))
     );
+    $$('#shoots-table details.shoot-month').forEach((group) => animateDisclosure(group));
   }
 }
 

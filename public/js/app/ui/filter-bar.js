@@ -76,7 +76,8 @@ export class FilterBar {
   }
 
   setVisible(visible) {
-    if (this.element) this.element.classList.toggle('hidden', !visible);
+    // `collapsed` animates the bar's height away; `hidden` would snap it out
+    if (this.element) this.element.classList.toggle('collapsed', !visible);
   }
 
   setContext(view) {

@@ -1,4 +1,5 @@
 import { $, $$, escapeHtml } from '../core/dom.js';
+import { closeOverlay, openOverlay } from '../core/motion.js';
 
 /**
  * "People with Access" (owners only).
@@ -25,13 +26,13 @@ export class AccessView {
   }
 
   async open() {
-    this.modal.classList.remove('hidden');
+    openOverlay(this.modal);
     $('#access-list').innerHTML = '<div class="empty">Loading…</div>';
     await this.refresh();
   }
 
   close() {
-    this.modal.classList.add('hidden');
+    closeOverlay(this.modal);
   }
 
   async refresh() {

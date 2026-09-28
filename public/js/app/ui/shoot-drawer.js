@@ -1,6 +1,7 @@
 import { $, $$, escapeHtml, text } from '../core/dom.js';
 import { dayKey, formatDate, formatMoney, formatTime } from '../core/format.js';
 import { paymentLabel, statusPill } from '../domain/shoot-status.js';
+import { closeOverlay, openOverlay } from '../core/motion.js';
 
 /** One key/value row; rows without a value are dropped by the caller. */
 const kvRow = (label, value, attrs = '') =>
@@ -29,11 +30,11 @@ export class ShootDrawer {
   }
 
   open() {
-    this.backdrop.classList.remove('hidden');
+    openOverlay(this.backdrop);
   }
 
   close() {
-    this.backdrop.classList.add('hidden');
+    closeOverlay(this.backdrop);
   }
 
   /** Load a shoot and render its detail panel. */

@@ -1,5 +1,6 @@
 import { $, $$, escapeHtml } from '../core/dom.js';
 import { dayKey } from '../core/format.js';
+import { animateDisclosure, closeOverlay, openOverlay } from '../core/motion.js';
 import { appStatus } from '../domain/shoot-status.js';
 
 const NEW_COORDINATOR = '__new__';
@@ -26,6 +27,7 @@ export class ShootForm {
     this.modal.addEventListener('click', (event) => {
       if (event.target.id === 'shoot-modal') this.close();
     });
+    animateDisclosure($('.more-details'));
     $('#sel-coordinator').addEventListener('change', () => {
       const input = $('#coord-new-input');
       const isNew = $('#sel-coordinator').value === NEW_COORDINATOR;
@@ -100,12 +102,12 @@ export class ShootForm {
     newInput.hidden = select.value !== NEW_COORDINATOR;
 
     $('#sel-status').value = appStatus(shoot?.status);
-    this.modal.classList.remove('hidden');
+    openOverlay(this.modal);
     setTimeout(() => this.field('title').focus(), 50);
   }
 
   close() {
-    this.modal.classList.add('hidden');
+    closeOverlay(this.modal);
   }
 
   /** The chosen coordinator: an existing name, or the one being typed. */
