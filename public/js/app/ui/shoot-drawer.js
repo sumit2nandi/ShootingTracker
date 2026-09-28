@@ -6,6 +6,7 @@ import { closeOverlay, openOverlay } from '../core/motion.js';
 /* The settle buttons wear the same two glyphs as the dashboard row toggles. */
 const BOX = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.6"/></svg>';
 const TICK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.6" fill="currentColor" stroke="none"/><path d="M8.3 12.2l2.6 2.6 5-5.5" stroke="var(--accent-fill)" stroke-width="2.1" stroke-linecap="round"/></svg>';
+const DETAIL_LOADER = '<div class="detail-loader" role="status"><span class="detail-loader-spinner" aria-hidden="true"></span><span>Loading entry…</span></div>';
 
 /** One key/value row; rows without a value are dropped by the caller. */
 const kvRow = (label, value, attrs = '') =>
@@ -44,7 +45,7 @@ export class ShootDrawer {
 
   /** Load a shoot and render its detail panel. */
   async showShoot(id) {
-    this.element.innerHTML = '<div class="empty">Loading…</div>';
+    this.element.innerHTML = DETAIL_LOADER;
     this.open();
     let shoot;
     try {

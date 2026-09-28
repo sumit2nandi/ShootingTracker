@@ -227,6 +227,53 @@ test('the shoots table groups rows by month in API order', async () => {
   assert.equal(groups.get('2026-05').length, 2);
 });
 
+test('open popups lock background scrolling until the last stacked popup closes', async () => {
+  const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  class ClassList {
+    values = new Set();
+    add(value) { this.values.add(value); }
+    remove(value) { this.values.delete(value); }
+    contains(value) { return this.values.has(value); }
+    toggle(value, force) {
+      const enabled = force === undefined ? !this.contains(value) : force;
+      if (enabled) this.add(value);
+      else this.remove(value);
+      return enabled;
+    }
+  }
+  const root = { classList: new ClassList() };
+  const body = { classList: new ClassList() };
+  globalThis.document = { documentElement: root, body };
+  globalThis.window = { matchMedia: () => ({ matches: true }) };
+
+  try {
+    const { openOverlay, closeOverlay } = await load('core/motion.js');
+    const overlay = () => ({
+      classList: new ClassList(),
+      firstElementChild: null
+    });
+    const drawer = overlay();
+    const confirm = overlay();
+
+    openOverlay(drawer);
+    openOverlay(confirm);
+    assert.equal(root.classList.contains('overlay-open'), true);
+    assert.equal(body.classList.contains('overlay-open'), true);
+
+    closeOverlay(confirm);
+    assert.equal(root.classList.contains('overlay-open'), true, 'the underlying drawer remains locked');
+    closeOverlay(drawer);
+    assert.equal(root.classList.contains('overlay-open'), false);
+    assert.equal(body.classList.contains('overlay-open'), false);
+  } finally {
+    if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
+    else delete globalThis.document;
+    if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
+    else delete globalThis.window;
+  }
+});
+
 test('a shoot can be wrapped up from the dashboard after 7 pm on its own date', async () => {
   const { isWrapUpTime, zonedNow, outstandingAmount, WRAP_UP_HOUR, userTimeZone } = await load('domain/wrap-up.js');
   const timeZone = 'Asia/Kolkata';
