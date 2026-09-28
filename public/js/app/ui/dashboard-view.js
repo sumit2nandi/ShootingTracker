@@ -44,12 +44,12 @@ export class DashboardView {
     const kpi = summary.kpi || {};
     // Unquoted SQL aliases come back lowercased, hence `paidshoots`.
     $('#kpi-row').innerHTML = `
-    <div class="kpi accent" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Total Shoots</div><div class="kpi-value">${kpi.shoots ?? 0}</div><div class="kpi-sub">${kpi.active ?? 0} planned · ${kpi.completed ?? 0} completed</div></div>
-    <div class="kpi violet" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Total Fee</div><div class="kpi-value">${formatMoney(kpi.total_fee)}</div><div class="kpi-sub">booked earnings</div></div>
-    <div class="kpi green" data-goto='{"status":"completed"}' role="button" tabindex="0"><div class="kpi-label">Completed</div><div class="kpi-value">${kpi.completed ?? 0}</div><div class="kpi-sub">of ${kpi.shoots ?? 0} total</div></div>
-    <div class="kpi green" data-goto='{"paymentStatus":"paid"}' role="button" tabindex="0"><div class="kpi-label">Total Received</div><div class="kpi-value">${formatMoney(kpi.total_paid)}</div><div class="kpi-sub">${kpi.paidshoots ?? 0} shoots fully paid</div></div>
-    <div class="kpi" data-goto='{"status":"planned"}' role="button" tabindex="0"><div class="kpi-label">Planned</div><div class="kpi-value">${kpi.active ?? 0}</div><div class="kpi-sub">still to come</div></div>
-    <div class="kpi amber" data-goto='{"paymentStatus":"outstanding"}' role="button" tabindex="0"><div class="kpi-label">Outstanding</div><div class="kpi-value">${formatMoney(kpi.outstanding)}</div><div class="kpi-sub">${kpi.outstandingshoots ?? 0} shoots with a balance</div></div>`;
+    <div class="kpi accent" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Total Shoots</div><div class="kpi-value">${kpi.shoots ?? 0}</div><div class="kpi-sub">${kpi.active ?? 0} Planned · ${kpi.completed ?? 0} Completed</div></div>
+    <div class="kpi violet" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Total Fee</div><div class="kpi-value">${formatMoney(kpi.total_fee)}</div><div class="kpi-sub">Booked Earnings</div></div>
+    <div class="kpi green" data-goto='{"status":"completed"}' role="button" tabindex="0"><div class="kpi-label">Completed</div><div class="kpi-value">${kpi.completed ?? 0}</div><div class="kpi-sub">Of ${kpi.shoots ?? 0} Total</div></div>
+    <div class="kpi green" data-goto='{"paymentStatus":"paid"}' role="button" tabindex="0"><div class="kpi-label">Total Received</div><div class="kpi-value">${formatMoney(kpi.total_paid)}</div><div class="kpi-sub">${kpi.paidshoots ?? 0} Shoots Fully Paid</div></div>
+    <div class="kpi" data-goto='{"status":"planned"}' role="button" tabindex="0"><div class="kpi-label">Planned</div><div class="kpi-value">${kpi.active ?? 0}</div><div class="kpi-sub">Still to Come</div></div>
+    <div class="kpi amber" data-goto='{"paymentStatus":"outstanding"}' role="button" tabindex="0"><div class="kpi-label">Outstanding</div><div class="kpi-value">${formatMoney(kpi.outstanding)}</div><div class="kpi-sub">${kpi.outstandingshoots ?? 0} Shoots with a Balance</div></div>`;
 
     this.#renderEarnings(summary.monthly || [], daily);
     this.#renderStatusDonut(summary.byStatus || []);

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ShootingTracker</title>
-  <link rel="stylesheet" href="css/app.css?v=24" />
+  <link rel="stylesheet" href="css/app.css?v=25" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=4" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=4" />
   <link rel="apple-touch-icon" href="favicon.png?v=4" />
@@ -24,8 +24,8 @@
   </script>
 </head>
 <body>
-  <!-- boot splash: painted before anything else, faded out once the first view is ready -->
-  <div class="app-loader" id="app-loader" role="status" aria-live="polite">
+  <!-- boot splash: painted before anything else, gone within 1.5s -->
+  <div class="app-loader" id="app-loader" role="status" aria-label="Loading ShootingTracker">
     <div class="app-loader-mark">
       <svg class="app-loader-ring" viewBox="0 0 80 80" aria-hidden="true">
         <circle class="ring-track" cx="40" cy="40" r="35" />
@@ -35,8 +35,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg>
       </span>
     </div>
-    <p class="app-loader-name">ShootingTracker</p>
-    <p class="app-loader-hint">Loading your shoots<span class="app-loader-dots"><i></i><i></i><i></i></span></p>
   </div>
 
   <header class="topbar">
@@ -321,6 +319,6 @@
 
   <div id="toasts" class="toasts"></div>
 
-  <script type="module" src="js/app/main.js?v=22"></script>
+  <script type="module" src="js/app/main.js?v=23"></script>
 </body>
 </html>

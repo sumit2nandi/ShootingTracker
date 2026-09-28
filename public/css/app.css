@@ -304,6 +304,7 @@ main { padding: 16px 16px calc(110px + env(safe-area-inset-bottom)); max-width: 
   background: var(--surface-2); border: 1px solid var(--line); padding: 8px 13px; border-radius: 999px;
   font-size: 13px; display: flex; gap: 7px; align-items: baseline;
 }
+.type-chip { text-transform: capitalize; }
 .type-chip b { color: var(--accent); font-size: 14.5px; }
 .type-chip .amt { color: var(--muted); font-size: 11.5px; }
 
@@ -818,13 +819,14 @@ tbody tr:hover { background: var(--surface-2); }
 
 /* ---------- boot splash ----------
    Painted straight from the HTML (before any script runs) so the first frame is
-   the brand rather than a blank page, and removed from the document once the
-   first view has data. */
+   the brand rather than a blank page. Wordless on purpose — a mark that is
+   gone inside 1.5s has no time to be read — and removed from the document as
+   soon as the first view has data. */
 .app-loader {
   position: fixed; inset: 0; z-index: 200;
-  display: grid; place-content: center; justify-items: center; gap: 4px;
+  display: grid; place-content: center; justify-items: center;
   background: var(--bg); color: var(--text);
-  transition: opacity .38s ease, visibility .38s ease;
+  transition: opacity .3s ease, visibility .3s ease;
 }
 body.app-ready .app-loader { opacity: 0; visibility: hidden; pointer-events: none; }
 .app-loader-mark { position: relative; display: grid; place-items: center; width: 80px; height: 80px; }
@@ -845,24 +847,6 @@ body.app-ready .app-loader { opacity: 0; visibility: hidden; pointer-events: non
 }
 .app-loader-badge svg { width: 24px; height: 24px; }
 @keyframes badge-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
-.app-loader-name {
-  margin: 16px 0 0; font-size: 16px; font-weight: 700; letter-spacing: -.2px;
-  animation: loader-rise .5s .05s both cubic-bezier(.2, .8, .2, 1);
-}
-.app-loader-hint {
-  margin: 2px 0 0; font-size: 12.5px; color: var(--muted);
-  display: inline-flex; align-items: baseline; gap: 1px;
-  animation: loader-rise .5s .12s both cubic-bezier(.2, .8, .2, 1);
-}
-@keyframes loader-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.app-loader-dots { display: inline-flex; gap: 2px; margin-left: 1px; }
-.app-loader-dots i {
-  width: 3px; height: 3px; border-radius: 50%; background: currentColor;
-  animation: dot-fade 1.2s ease-in-out infinite;
-}
-.app-loader-dots i:nth-child(2) { animation-delay: .15s; }
-.app-loader-dots i:nth-child(3) { animation-delay: .3s; }
-@keyframes dot-fade { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
 
 /* ---------- reduced motion ----------
    One switch for visitors who asked the OS for less movement: everything still

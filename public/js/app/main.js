@@ -105,8 +105,9 @@ class Application {
 
   async start() {
     this.mount();
-    // whatever happens next, the splash never traps the app on screen
-    setTimeout(() => this.#hideLoader(), 8000);
+    // the splash is capped: 1.2s on screen + a 0.3s fade = 1.5s, whatever the
+    // network is doing. It still leaves earlier, the moment the data is in.
+    setTimeout(() => this.#hideLoader(), 1200);
 
     let user;
     try {
@@ -129,7 +130,7 @@ class Application {
     const loader = $('#app-loader');
     if (!loader || document.body.classList.contains('app-ready')) return;
     document.body.classList.add('app-ready');
-    setTimeout(() => loader.remove(), 500);
+    setTimeout(() => loader.remove(), 320); // once the fade is done
   }
 
   /* ---------------- shared data ---------------- */
@@ -172,6 +173,7 @@ class Application {
     this.shoots.setExpandAll(Boolean(filters));
     if (view === 'calendar') this.calendar.resetToToday();
 
+    window.scrollTo(0, 0); // a fresh tab starts at the top, not where the last one was
     this.filterBar.write(filters || FilterCriteria.empty());
     this.filterBar.setContext(view);
     this.#syncFilterVisibility(view);
