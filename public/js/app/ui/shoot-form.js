@@ -169,7 +169,7 @@ export class ShootForm {
   open(shoot, presetDate) {
     const form = this.form;
     form.reset();
-    $('#shoot-modal-title').textContent = shoot ? 'Edit Shoot' : 'New Shoot';
+    $('#shoot-modal-title').textContent = shoot ? 'Edit Entry' : 'New Entry';
 
     const set = (name, value) => {
       this.field(name).value = value ?? '';
@@ -255,17 +255,17 @@ export class ShootForm {
   async save() {
     const body = this.readValues();
     if (!body.title || !body.shoot_date) {
-      this.actions.notifyError('Title and shoot date are required');
+      this.actions.notifyError('Title and date are required');
       return;
     }
     const id = this.field('id').value;
     try {
       if (id) {
         await this.api.updateShoot(id, body);
-        this.actions.notify('Shoot updated');
+        this.actions.notify('Entry updated');
       } else {
         await this.api.createShoot(body);
-        this.actions.notify('Shoot added');
+        this.actions.notify('Entry added');
       }
       this.close();
       this.actions.dataChanged();

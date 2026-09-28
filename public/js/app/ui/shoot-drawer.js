@@ -50,7 +50,7 @@ export class ShootDrawer {
     try {
       shoot = await this.api.getShoot(id);
     } catch (error) {
-      this.element.innerHTML = `<div class="empty">Could not load shoot: ${escapeHtml(error.message)}</div>`;
+      this.element.innerHTML = `<div class="empty">Could not load entry: ${escapeHtml(error.message)}</div>`;
       return;
     }
 
@@ -68,7 +68,7 @@ export class ShootDrawer {
   /** The "+N more" panel for a calendar day. */
   showDay(dateKey, shoots) {
     this.element.innerHTML = `
-    ${drawerHead(formatDate(dateKey), `${shoots.length} shoot${shoots.length === 1 ? '' : 's'} on this day`)}
+    ${drawerHead(formatDate(dateKey), `${shoots.length} entr${shoots.length === 1 ? 'y' : 'ies'} on this day`)}
     ${shoots
       .map(
         (shoot) => `
@@ -80,7 +80,7 @@ export class ShootDrawer {
       )
       .join('')}
     <div class="drawer-actions">
-      <button class="btn btn-primary" id="dp-add">+ Add Shoot on ${formatDate(dateKey)}</button>
+      <button class="btn btn-primary" id="dp-add">+ Add Entry on ${formatDate(dateKey)}</button>
       <button class="btn btn-ghost" data-close>Close</button>
     </div>`;
     this.open();
@@ -103,7 +103,7 @@ export class ShootDrawer {
     const hasMoney = fee > 0 || paid > 0; // nothing booked → leave the money rows out
     const detailRows = [
       kvRow('Coordinator', text(shoot.coordinator)),
-      hasMoney ? kvRow('Fee', formatMoney(fee), 'class="td-mono"') : '',
+      hasMoney ? kvRow('Expected Income', formatMoney(fee), 'class="td-mono"') : '',
       hasMoney ? kvRow('Collected', formatMoney(paid), 'class="td-mono" style="color:var(--green)"') : '',
       hasMoney ? kvRow('Balance', formatMoney(Math.max(0, fee - paid)), 'class="td-mono"') : '',
       kvRow('Client', text(shoot.client_name)),
@@ -139,22 +139,22 @@ export class ShootDrawer {
               <button data-pay-id="${payment.id}" title="Delete payment">✕</button>
             </div>`
             )
-            .join('') || `<div class="muted small">${fee ? 'Nothing collected yet.' : 'Set a fee to start collecting.'}</div>`}
+            .join('') || `<div class="muted small">${fee ? 'Nothing collected yet.' : 'Set an expected amount to start collecting.'}</div>`}
         </div>
         <div class="pay-total">Collected <b style="color:var(--green)">${formatMoney(paid)}</b> of ${formatMoney(fee)} (${fee ? Math.round((paid / fee) * 100) : 0}%)</div>
         <div class="quick-actions">
           <button class="btn btn-settle${completed ? ' is-on' : ''}" id="mark-complete" aria-pressed="${completed}"
-                  title="${completed ? 'Completed — tap to move it back to planned' : 'Mark this shoot completed'}">
+                  title="${completed ? 'Completed — tap to move it back to planned' : 'Mark this entry complete'}">
             ${completed ? TICK : BOX}
             ${completed ? 'Completed' : 'Mark Complete'}
           </button>
           <button class="btn btn-settle${settled ? ' is-on' : ''}" id="pay-mark" aria-pressed="${settled}" ${fee ? '' : 'disabled'}
-                  title="${settled ? 'Paid — tap to undo the last payment' : fee ? `Collect ${formatMoney(balance)}` : 'Set a fee first'}">
+                  title="${settled ? 'Paid — tap to undo the last payment' : fee ? `Collect ${formatMoney(balance)}` : 'Set an amount first'}">
             ${settled ? TICK : BOX}
             ${settled ? 'Paid' : 'Mark Paid'}
           </button>
         </div>
-        <div class="muted small pay-hint">${!fee ? 'Set a fee on this shoot first — then it can be marked paid.' : settled ? 'Paid in full — tap Paid again to undo the last payment.' : `Books the remaining ${formatMoney(balance)} as collected today.`}</div>
+        <div class="muted small pay-hint">${!fee ? 'Set an amount for this entry first — then it can be marked paid.' : settled ? 'Paid in full — tap Paid again to undo the last payment.' : `Books the remaining ${formatMoney(balance)} as collected today.`}</div>
       </div>
       <div class="drawer-actions">
         <button class="btn" id="dr-edit">✏️ Edit</button>
@@ -171,7 +171,7 @@ export class ShootDrawer {
       markComplete.disabled = true;
       try {
         await this.api.updateShoot(shoot.id, { status: completed ? 'planned' : 'completed' });
-        this.actions.notify(completed ? 'Shoot moved back to planned' : 'Shoot marked complete');
+        this.actions.notify(completed ? 'Entry moved back to planned' : 'Entry marked complete');
         this.showShoot(shoot.id);
         this.actions.dataChanged({ reloadMeta: false });
       } catch (error) {
@@ -189,7 +189,7 @@ export class ShootDrawer {
       if (!this.confirm(`Delete "${shoot.title}"? Its payments will be removed too.`)) return;
       try {
         await this.api.deleteShoot(shoot.id);
-        this.actions.notify('Shoot deleted');
+        this.actions.notify('Entry deleted');
         this.close();
         this.actions.dataChanged();
       } catch (error) {

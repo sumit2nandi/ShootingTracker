@@ -48,8 +48,8 @@ export class ShootsView {
     if (!this.rows.length) {
       wrap.innerHTML =
         this.filters && this.filters.isActive
-          ? '<div class="empty">No shoots match this filter — tap “Show All” to clear it.</div>'
-          : '<div class="empty">No shoots yet — add one with “+ New Shoot”.</div>';
+          ? '<div class="empty">No entries match this filter — tap “Show All” to clear it.</div>'
+          : '<div class="empty">No entries yet — add one with “+ Add Entry”.</div>';
       return;
     }
 
@@ -61,7 +61,7 @@ export class ShootsView {
       .map(
         ([yearMonth, monthRows]) => `
     <details class="shoot-month" ${this.expandAll || yearMonth === currentMonth ? 'open' : ''}>
-      <summary><span>${escapeHtml(yearMonth === 'undated' ? 'Undated' : formatMonth(yearMonth))}</span><span class="month-count">${monthRows.length} shoot${monthRows.length === 1 ? '' : 's'}</span></summary>
+      <summary><span>${escapeHtml(yearMonth === 'undated' ? 'Undated' : formatMonth(yearMonth))}</span><span class="month-count">${monthRows.length} entr${monthRows.length === 1 ? 'y' : 'ies'}</span></summary>
       <div class="shoot-month-body">${monthTable(monthRows)}</div>
     </details>`
       )
@@ -88,7 +88,7 @@ export function groupByMonth(rows) {
 function monthTable(rows) {
   return `
     <table class="shoots-table">
-      <thead><tr><th>Date</th><th>Title</th><th>Coordinator</th><th class="num">Fee</th><th class="col-pay">Payment</th><th class="col-status">Status</th></tr></thead>
+      <thead><tr><th>Date</th><th>Title</th><th>Coordinator</th><th class="num">Amount</th><th class="col-pay">Payment</th><th class="col-status">Status</th></tr></thead>
       <tbody>${rows.map(shootRow).join('')}</tbody>
     </table>`;
 }
@@ -104,7 +104,7 @@ function shootRow(shoot) {
 
   return `
           <tr data-id="${shoot.id}" title="${escapeHtml(fullDate)}">
-            <td class="td-mono cell-date"><span class="d-full">${formatDate(shoot.shoot_date)}</span><span class="d-short">${escapeHtml(formatShortDate(shoot.shoot_date))}</span>${multiDay ? `<span class="cell-range"> → ${formatDate(shoot.end_date)}</span>` : ''}${span > 1 ? `<span class="cell-days" title="${span}-day shoot">+${span - 1}d</span>` : ''}</td>
+            <td class="td-mono cell-date"><span class="d-full">${formatDate(shoot.shoot_date)}</span><span class="d-short">${escapeHtml(formatShortDate(shoot.shoot_date))}</span>${multiDay ? `<span class="cell-range"> → ${formatDate(shoot.end_date)}</span>` : ''}${span > 1 ? `<span class="cell-days" title="${span}-day entry">+${span - 1}d</span>` : ''}</td>
             <td class="cell-title">${escapeHtml(shoot.title)}</td>
             <td class="cell-coord">${escapeHtml(shoot.coordinator || '—')}</td>
             <td class="num td-mono">

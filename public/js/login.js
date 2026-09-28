@@ -136,7 +136,7 @@
       };
       render();
     } catch (_error) {
-      setMessage('Could not reach ShootingTracker. Please refresh and try again.', 'error');
+      setMessage('Could not reach Income Tracker. Please refresh and try again.', 'error');
     }
   }
 

@@ -28,44 +28,44 @@ const STEPS = [
   {
     index: 0,
     target: null,
-    title: 'Welcome to ShootingTracker',
-    body: 'Everything you book, shoot and get paid for — in one place. This takes about a minute.'
+    title: 'Welcome to Income Tracker',
+    body: 'Track your income, payments and upcoming work — in one place. This takes about a minute.'
   },
   {
     index: 1,
     target: '#kpi-row',
     title: 'Dashboard',
-    body: 'Your totals at a glance: shoots, fees, what you have collected and what is still outstanding. The cards below split it by month, status, coordinator and type.'
+    body: 'Your totals at a glance: entries, expected income, what you have collected and what is still outstanding. The cards below split it by month, status, coordinator and type.'
   },
   {
     index: 2,
     target: '#filterbar',
     title: 'Filters',
-    body: 'Narrow anything by month, coordinator, client, status, payment state, type, fee range — or just type to search. Filters apply to the dashboard and the shoot list.'
+    body: 'Narrow anything by month, coordinator, client, status, payment state, type, income range — or just type to search. Filters apply to the dashboard and the entry list.'
   },
   {
     index: 3,
     target: '#tab-calendar',
     title: 'Calendar',
-    body: 'A month grid with every shoot on its date. Tap a day to add a shoot on it; tap a shoot to open its details.'
+    body: 'A month grid shows your entries by date. Tap a day to add an entry, or tap an entry to see its details.'
   },
   {
     index: 4,
     target: '#tab-shoots',
-    title: 'Shoots',
-    body: 'The full list, grouped by month. Every row opens the details: payments, photos and notes. Export downloads the original calendar CSV.'
+    title: 'Entries',
+    body: 'The full list, grouped by month. Every row opens its payments, contact information and notes. Export downloads your entries.'
   },
   {
     index: 5,
     target: '#btn-new-shoot-fab',
-    title: 'New Shoot',
-    body: 'Add a shoot from anywhere with this button. The basics are three fields; “More Details” keeps the rest out of your way.'
+    title: 'Add Entry',
+    body: 'Add an entry from anywhere with this button. The basics are three fields; “More Details” keeps the rest out of your way.'
   },
   {
     index: 6,
     target: '#tab-profile',
     title: 'Profile',
-    body: 'Your account and sign out live here — owners also manage the people with access from here. That is everything. Happy shooting!'
+    body: 'Your account and sign out live here — owners also manage the people with access from here. That is everything. You’re all set!'
   }
 ];
 
@@ -95,7 +95,7 @@ export class SiteTour {
     overlay.className = 'tour-overlay';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', 'ShootingTracker tour');
+    overlay.setAttribute('aria-label', 'Income Tracker tour');
     overlay.innerHTML = `
       <div class="tour-highlight"></div>
       <div class="tour-card">
