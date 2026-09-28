@@ -152,6 +152,47 @@ test('the API facade maps use cases onto endpoints', async () => {
   assert.deepEqual(calls[4], ['GET', '/api/auth/me', undefined]);
 });
 
+test('the owner’s viewing choice rides along on reads, never on writes', async () => {
+  const { ShootingTrackerApi } = await load('data/shooting-tracker-api.js');
+  const calls = [];
+  const record = (method) => (path, arg) => {
+    calls.push([method, path, arg]);
+    return Promise.resolve({ user: { email: 'a@example.com' }, users: [] });
+  };
+  const api = new ShootingTrackerApi({
+    client: { get: record('GET'), post: record('POST'), put: record('PUT'), patch: record('PATCH'), delete: record('DELETE') }
+  });
+
+  assert.equal(api.withViewing('month=2026-04'), 'month=2026-04', 'no choice → the query is untouched');
+
+  api.setViewingAs('Other@Example.com');
+  const viewingAs = encodeURIComponent('other@example.com');
+  await api.listShoots('month=2026-04');
+  await api.dashboard('');
+  await api.listShootsBetween('2026-04-01', '2026-04-30');
+  await api.meta();
+  await api.createShoot({ title: 'X' });
+  await api.updateShoot(7, { fee: 1 });
+
+  assert.deepEqual(calls[0], ['GET', '/api/shoots', `month=2026-04&viewingAs=${viewingAs}`]);
+  assert.deepEqual(calls[1], ['GET', '/api/dashboard', `viewingAs=${viewingAs}`]);
+  assert.deepEqual(calls[2], ['GET', '/api/shoots', `from=2026-04-01&to=2026-04-30&viewingAs=${viewingAs}`]);
+  assert.deepEqual(calls[3], ['GET', '/api/meta', `viewingAs=${viewingAs}`]);
+  assert.deepEqual(calls[4], ['POST', '/api/shoots', { title: 'X' }], 'writes never carry the choice');
+  assert.deepEqual(calls[5], ['PUT', '/api/shoots/7', { fee: 1 }]);
+
+  api.setViewingAs(null);
+  assert.equal(api.withViewing(''), '', 'and it can be switched back off');
+});
+
+test('the tour-completion call hits the auth endpoint', async () => {
+  const { ShootingTrackerApi } = await load('data/shooting-tracker-api.js');
+  const calls = [];
+  const api = new ShootingTrackerApi({ client: { post: (path, body) => calls.push([path, body]) } });
+  await api.markTourCompleted();
+  assert.deepEqual(calls, [['/api/auth/me/tour-completed', undefined]]);
+});
+
 test('calendar grouping spreads multi-day shoots across their range', async () => {
   const { groupByDay, pageDelta } = await load('ui/calendar-view.js');
 

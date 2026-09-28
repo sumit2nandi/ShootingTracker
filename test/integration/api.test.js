@@ -73,7 +73,94 @@ test('a signed-in user gets their own profile', async () => {
   await withApp({}, async (server) => {
     const response = await server.request('/api/auth/me');
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body.user, { email: 'owner@example.com', name: 'Owner', role: 'owner' });
+    assert.deepEqual(response.body.user, {
+      id: 1,
+      email: 'owner@example.com',
+      name: 'Owner',
+      role: 'owner',
+      tour_completed: true
+    });
+  });
+});
+
+test('a new account signs in flagged for consent, with no session cookie', async () => {
+  const services = {
+    authenticationService: {
+      describeClientConfig: () => ({ clientId: 'test-client-id' }),
+      resolveCurrentUser: async () => null,
+      signInWithGoogle: async (credential) => {
+        assert.equal(credential, 'google-jwt');
+        return { user: { email: 'new@example.com', name: 'New' }, needsConsent: true };
+      }
+    }
+  };
+  await withApp({ user: null, services }, async (server) => {
+    const response = await server.request('/api/auth/google', { method: 'POST', body: { credential: 'google-jwt' } });
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { user: { email: 'new@example.com', name: 'New' }, needsConsent: true });
+    assert.equal(response.headers.get('set-cookie'), null, 'no cookie before the profile exists');
+  });
+});
+
+test('consent completes a first sign-in with a session cookie', async () => {
+  const services = {
+    authenticationService: {
+      describeClientConfig: () => ({ clientId: 'test-client-id' }),
+      resolveCurrentUser: async () => null,
+      acceptConsent: async (credential, name) => {
+        assert.equal(credential, 'google-jwt');
+        return { user: { email: 'new@example.com', name: name || 'New' }, token: 'signed-token' };
+      }
+    }
+  };
+  await withApp({ user: null, services }, async (server) => {
+    const response = await server.request('/api/auth/consent', {
+      method: 'POST',
+      body: { credential: 'google-jwt', name: 'New Name' }
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { user: { email: 'new@example.com', name: 'New Name' } });
+    assert.match(response.headers.get('set-cookie'), /shootingtracker_session=signed-token/);
+  });
+});
+
+test('the tour-completed flag is saved for the signed-in account', async () => {
+  const calls = [];
+  const services = {
+    accessService: {
+      markTourCompleted: async (email) => calls.push(email)
+    }
+  };
+  await withApp({ services }, async (server) => {
+    assert.equal((await server.request('/api/auth/me/tour-completed', { method: 'POST' })).status, 200);
+    assert.deepEqual(calls, ['owner@example.com']);
+  });
+  await withApp({ user: null, services }, async (server) => {
+    assert.equal((await server.request('/api/auth/me/tour-completed', { method: 'POST' })).status, 401);
+  });
+});
+
+test('the owner’s viewingAs choice becomes the request’s data scope', async () => {
+  const calls = [];
+  const services = {
+    shootService: {
+      list: async (query, scope) => {
+        calls.push(scope);
+        return [];
+      }
+    }
+  };
+  await withApp({ services }, async (server) => {
+    await server.request('/api/shoots?viewingAs=other@example.com');
+    await server.request('/api/shoots');
+    assert.equal(calls[0].targetId, 2, 'the chosen account is the read target');
+    assert.equal(calls[0].selfId, 1, '…while writes would still go to the owner');
+    assert.equal(calls[1].targetId, 1, 'no choice → own data');
+  });
+
+  await withApp({ user: { id: 2, email: 'member@example.com', name: 'M', role: 'member' }, services }, async (server) => {
+    await server.request('/api/shoots?viewingAs=owner@example.com');
+    assert.equal(calls[2].targetId, 2, 'a member’s viewingAs is ignored, not honoured');
   });
 });
 

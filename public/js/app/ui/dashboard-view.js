@@ -250,9 +250,11 @@ export class DashboardView {
   /**
    * Two toggles per row: completed, and paid. Both are always drawn — an empty
    * outline while the job is open, filled once it is done — and both stay
-   * clickable, so a mis-tap can be undone on the spot.
+   * clickable, so a mis-tap can be undone on the spot. They disappear entirely
+   * while an owner views another account's data: that view is read-only.
    */
   #rowActions(shoot, always) {
+    if (this.actions.isReadOnly && this.actions.isReadOnly()) return '';
     if (!always && !isWrapUpTime(shoot.shoot_date, this.now())) return '';
     const completed = appStatus(shoot.status) === 'completed';
     const fee = Number(shoot.fee) || 0;

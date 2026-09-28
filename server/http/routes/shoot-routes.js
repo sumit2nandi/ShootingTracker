@@ -7,8 +7,9 @@ const { parseId } = require('../../domain/identifier');
 /**
  * `/api/shoots` — CRUD.
  *
- * Handlers do three things only: read the request, call one service method and
- * choose a status code. No SQL, no business rules, no error formatting.
+ * Handlers do three things only: read the request, call one service method
+ * (with the request's data scope) and choose a status code. No SQL, no
+ * business rules, no error formatting.
  *
  * @param {{ shootService: import('../../services/shoot-service').ShootService }} deps
  */
@@ -18,28 +19,28 @@ function createShootRouter({ shootService }) {
   router.get(
     '/shoots',
     asyncHandler(async (req, res) => {
-      res.json(await shootService.list(req.query));
+      res.json(await shootService.list(req.query, req.scope));
     })
   );
 
   router.get(
     '/shoots/:id',
     asyncHandler(async (req, res) => {
-      res.json(await shootService.getDetail(parseId(req.params.id, 'shoot id')));
+      res.json(await shootService.getDetail(parseId(req.params.id, 'shoot id'), req.scope));
     })
   );
 
   router.post(
     '/shoots',
     asyncHandler(async (req, res) => {
-      res.status(201).json(await shootService.create(req.body || {}));
+      res.status(201).json(await shootService.create(req.body || {}, req.scope));
     })
   );
 
   router.put(
     '/shoots/:id',
     asyncHandler(async (req, res) => {
-      await shootService.update(parseId(req.params.id, 'shoot id'), req.body || {});
+      await shootService.update(parseId(req.params.id, 'shoot id'), req.body || {}, req.scope);
       res.json({ ok: true });
     })
   );
@@ -47,7 +48,7 @@ function createShootRouter({ shootService }) {
   router.delete(
     '/shoots/:id',
     asyncHandler(async (req, res) => {
-      await shootService.remove(parseId(req.params.id, 'shoot id'));
+      await shootService.remove(parseId(req.params.id, 'shoot id'), req.scope);
       res.json({ ok: true });
     })
   );

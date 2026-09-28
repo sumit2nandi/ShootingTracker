@@ -3,7 +3,7 @@
 const { AccessPolicy } = require('../domain/access-policy');
 const { withTranslatedErrors } = require('../persistence/pg-error-translator');
 
-const USER_COLUMNS = 'id, email, name, role, is_active';
+const USER_COLUMNS = 'id, email, name, role, is_active, tour_completed';
 
 /** SQL for `app_users` — the list of accounts allowed to sign in. */
 class UserRepository {
@@ -33,6 +33,27 @@ class UserRepository {
       `SELECT ${USER_COLUMNS}, created_at FROM app_users ORDER BY is_active DESC, lower(email)`
     );
     return result.rows;
+  }
+
+  /**
+   * Create an account that does not exist yet.
+   *
+   * Unlike {@link upsert} this never reactivates or alters an existing row —
+   * it is the consent flow's insert, and a deactivated account must stay
+   * deactivated no matter how often its owner tries to "sign in".
+   *
+   * @param {{ email: string, name?: string|null }} user
+   * @returns {Promise<object|null>} the new row, or null when the email was already taken
+   */
+  async createNewUser({ email, name }) {
+    const result = await this.database.query(
+      `INSERT INTO app_users (email, name, role, tour_completed)
+       VALUES ($1, $2, 'member', FALSE)
+       ON CONFLICT (lower(email)) DO NOTHING
+       RETURNING ${USER_COLUMNS}`,
+      [AccessPolicy.normalizeEmail(email), (name && String(name).trim()) || null]
+    );
+    return result.rows[0] || null;
   }
 
   /**
@@ -86,6 +107,19 @@ class UserRepository {
       params
     );
     return result.rows[0] || null;
+  }
+
+  /**
+   * Remember that an account has seen the first-login tour.
+   *
+   * @returns {Promise<boolean>} whether a row was updated
+   */
+  async markTourCompleted(email) {
+    const result = await this.database.query(
+      'UPDATE app_users SET tour_completed = TRUE WHERE lower(email) = $1 AND tour_completed = FALSE',
+      [AccessPolicy.normalizeEmail(email)]
+    );
+    return result.rowCount > 0;
   }
 
   /** @returns {Promise<{ id: number, email: string }|null>} */

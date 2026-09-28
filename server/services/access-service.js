@@ -1,6 +1,6 @@
 'use strict';
 
-const { NotFoundError } = require('../core/errors');
+const { ConflictError, NotFoundError } = require('../core/errors');
 const { AccessPolicy } = require('../domain/access-policy');
 
 /**
@@ -38,6 +38,36 @@ class AccessService {
     const user = await this.userRepository.upsert({ email, name: input.name, role: input.role });
     this.userDirectory.invalidate();
     return user;
+  }
+
+  /**
+   * Create the profile of a brand-new sign-in (the consent flow).
+   *
+   * The account always arrives as a *member* — ownership is granted
+   * deliberately, from "People with Access" — and the first-login tour is
+   * left uncompleted so it plays on their very first visit to the app.
+   *
+   * @param {{ email: string, name?: string|null }} input
+   * @returns {Promise<object>} the created account
+   * @throws {ValidationError} on a bad address, or when the account already exists
+   */
+  async createNewUser(input = {}) {
+    const email = AccessPolicy.assertValidEmail(input.email);
+    await this.schemaInitializer.ensureApplied();
+    const user = await this.userRepository.createNewUser({ email, name: input.name });
+    if (!user) throw new ConflictError('That email is already in the list');
+    this.userDirectory.invalidate();
+    return user;
+  }
+
+  /**
+   * Remember that an account saw the first-login tour.
+   *
+   * @param {string} email of the signed-in account
+   */
+  async markTourCompleted(email) {
+    await this.userRepository.markTourCompleted(email);
+    this.userDirectory.invalidate();
   }
 
   /**

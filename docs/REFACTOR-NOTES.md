@@ -4,7 +4,64 @@ What changed when the codebase was restructured around the layering described
 in [`ARCHITECTURE.md`](ARCHITECTURE.md), and what that means for anyone using
 the app or the API.
 
-## Contract: unchanged
+## 2026-09 · Per-user data, owner view mode, consent sign-in and first-login tour
+
+This section **supersedes “Contract: unchanged”** for the endpoints it names.
+The app used to show every signed-in account the same global data; now each
+account has its own.
+
+**Schema.** `app_users` gains `tour_completed` (default `FALSE`); `shoots`
+gains `owner_id` (FK → `app_users.id`, `ON DELETE SET NULL`, indexed). Payments
+and media follow their shoot. The DDL in `server/schema.sql` is still
+idempotent and now *converges* older databases: missing columns are added and
+the FK is attached in a `DO` block that checks `pg_constraint` (Postgres has no
+`ADD CONSTRAINT IF NOT EXISTS`).
+
+**Data scope.** Every `/api` request resolves a `DataScope { selfId, targetId }`
+(`server/domain/data-scope.js` + `services/data-scope-service.js` +
+`http/middleware/data-scope.js`):
+
+- reads filter by `targetId` — the signed-in account by default;
+- writes always belong to `selfId`;
+- `?viewingAs=account@x.com` on read endpoints switches an **owner**'s reads
+  to another account (case-insensitive; deactivated accounts are viewable);
+  members' `viewingAs` is ignored, an unknown email is a `400`;
+- a record that isn't yours (or that isn't the owner's viewing target) is a
+  `404` — update, delete, payments and media all enforce this.
+
+**Sign-in contract.** `POST /api/auth/google` for an account **not in
+`app_users`** now answers `200 { user, needsConsent: true }` with **no**
+session cookie; the login page shows a consent form and calls the new public
+`POST /api/auth/consent { credential, name? }`, which re-verifies the token,
+creates the account as a member (`tour_completed = FALSE`) and issues the
+session. Deactivated accounts are refused by both endpoints with `403`
+(`This account has been deactivated…`) — no self re-activation.
+
+**`GET /api/auth/me`** now returns `{ id, email, name, role, tour_completed }`.
+New `POST /api/auth/me/tour-completed` marks the flag so the front-end's
+spotlight tour (`public/js/app/ui/tour.js`) runs once, for new accounts.
+
+**Frontend.** The Profile tab gains a *Viewing* switch for owners (persisted
+in `localStorage: shootingtracker-viewing-as`, validated against the user list
+at boot); while viewing another account an amber banner is shown, the
+`body.viewing-other` class hides the “new shoot” buttons and the drawer and
+dashboard row actions go read-only. Members see their own profile only, as
+before.
+
+**CLI.** `npm run import` accepts `--owner email` (rows belong to that account;
+without it they stay unowned and a warning is printed).
+`npm run assign:existing [email] [--all]` re-homes pre-existing shoots to an
+account (default `sushmitaghosh0099@gmail.com`), creates it if missing, marks
+tours done, and is idempotent.
+
+**Tests.** `npm test` now covers 153 cases, including the data-scope rules,
+the consent flow and the `viewingAs` passthrough. `scripts/api-test.py` passes
+unmodified (47 checks; its one “test coordinators removed” quirk when running
+against a `seed:demo` database predates this change — the demo and the suite
+use the same coordinator names, and the delete is correctly refused while demo
+shoots still reference them).
+
+## Contract: unchanged (superseded where the 2026-09 section says otherwise)
 
 Every route path, query parameter and successful JSON response shape is the
 same as before — including the lowercase KPI aliases (`paidshoots`,

@@ -28,6 +28,6 @@ WITH base AS (
 const SHOOT_COLUMNS = `b.id, b.title, b.client_name, b.shoot_type, b.shoot_date, b.end_date,
        b.start_time, b.end_time, b.venue, b.location, b.coordinator_id,
        b.coordinator, b.fee, b.paid_amount, b.payment_status, b.status,
-       b.contact_name, b.contact_phone, b.notes, b.extra, b.created_at, b.updated_at`;
+       b.contact_name, b.contact_phone, b.notes, b.owner_id, b.extra, b.created_at, b.updated_at`;
 
 module.exports = { BASE_CTE, SHOOT_COLUMNS };

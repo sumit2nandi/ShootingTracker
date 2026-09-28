@@ -16,7 +16,7 @@ function createImportRouter({ importService }) {
     '/import',
     asyncHandler(async (req, res) => {
       const request = ImportService.readRequest(req.body);
-      res.json(await importService.execute(request));
+      res.json(await importService.execute(request, req.scope));
     })
   );
 

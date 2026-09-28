@@ -16,14 +16,14 @@ function createMediaRouter({ mediaService }) {
     '/shoots/:id/media',
     asyncHandler(async (req, res) => {
       const shootId = parseId(req.params.id, 'shoot id');
-      res.status(201).json(await mediaService.attach(shootId, req.body || {}));
+      res.status(201).json(await mediaService.attach(shootId, req.body || {}, req.scope));
     })
   );
 
   router.delete(
     '/media/:id',
     asyncHandler(async (req, res) => {
-      await mediaService.remove(parseId(req.params.id, 'media id'));
+      await mediaService.remove(parseId(req.params.id, 'media id'), req.scope);
       res.json({ ok: true });
     })
   );

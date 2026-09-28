@@ -133,6 +133,15 @@ const FILTER_RULES = Object.freeze([
       };
       collector.add(predicates[value]);
     }
+  },
+  {
+    // Whose data a read targets — an app_users id, resolved by the caller
+    // (the HTTP layer never trusts a raw id from the query string for this).
+    param: 'owner',
+    apply(value, { alias, collector }) {
+      if (!/^\d+$/.test(value)) return;
+      collector.add(`${alias}.owner_id = ?::int`, value);
+    }
   }
 ]);
 

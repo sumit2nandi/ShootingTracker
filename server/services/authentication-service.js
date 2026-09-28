@@ -3,28 +3,36 @@
 const { AppError, ForbiddenError, ServiceUnavailableError, UnauthorizedError } = require('../core/errors');
 const { silentLogger } = require('../core/logger');
 
-const NOT_ALLOWED = 'This Google account is not allowed to access ShootingTracker';
 const NOT_VERIFIED = 'Google sign-in could not be verified. Please try again.';
 const NOT_CONFIGURED = 'Google sign-in is not configured. Set GOOGLE_CLIENT_ID on the server.';
+const DEACTIVATED = 'This account has been deactivated. Ask an owner to re-enable it in People with Access.';
 
 /**
  * Sign-in and "who is calling?" in one place.
  *
- * Two independent checks, deliberately kept apart:
- *  1. the identity provider proves *who* the visitor is;
- *  2. the allow-list decides whether that person may come in, on every request
- *     — so revoking access takes effect without invalidating cookies.
+ * The identity provider proves *who* the visitor is; what happens next depends
+ * on the allow-list:
+ *  - an active account signs straight in;
+ *  - a deactivated account is refused (the owner must re-enable it);
+ *  - an account the app has never seen is *not* refused — it is sent back to
+ *    the client flagged `needsConsent`, and its profile is created only once
+ *    the visitor accepts, via {@link acceptConsent}.
+ *
+ * Every request afterwards re-checks the allow-list through the user directory,
+ * so revoking access takes effect without invalidating cookies.
  */
 class AuthenticationService {
   /**
    * @param {{ identityVerifier: import('./google-identity-verifier').GoogleIdentityVerifier,
    *           userDirectory: import('./user-directory').UserDirectory,
+   *           accessService: import('./access-service').AccessService,
    *           sessionService: import('./session-service').SessionService,
    *           googleClientId?: string|null, logger?: object }} deps
    */
-  constructor({ identityVerifier, userDirectory, sessionService, googleClientId, devSignInEmail, logger = silentLogger }) {
+  constructor({ identityVerifier, userDirectory, accessService, sessionService, googleClientId, devSignInEmail, logger = silentLogger }) {
     this.identityVerifier = identityVerifier;
     this.userDirectory = userDirectory;
+    this.accessService = accessService;
     this.sessionService = sessionService;
     this.googleClientId = googleClientId || null;
     this.devSignInEmail = devSignInEmail || null;
@@ -44,21 +52,55 @@ class AuthenticationService {
    * Exchange a Google credential for an app session.
    *
    * @param {string} credential
-   * @returns {Promise<{ user: { email: string, name: string }, token: string }>}
+   * @returns {Promise<{ user: object, token?: string, needsConsent?: boolean }>}
+   *          `token` when a session was issued; `needsConsent: true` when the
+   *          account is new and must first accept the consent form.
    */
   async signInWithGoogle(credential) {
     if (!this.isGoogleConfigured) throw new ServiceUnavailableError(NOT_CONFIGURED);
 
     const identity = await this.#verifyIdentity(credential);
-    if (!(await this.userDirectory.isAllowed(identity.email))) throw new ForbiddenError(NOT_ALLOWED);
+    const account = await this.userDirectory.lookup(identity.email);
+    if (!account) return { user: identity, needsConsent: true };
+    if (!account.is_active) throw new ForbiddenError(DEACTIVATED);
 
     return { user: identity, token: this.sessionService.issue(identity) };
   }
 
   /**
+   * Complete a first sign-in: the visitor accepted the consent form, so their
+   * profile may now exist.
+   *
+   * The credential is verified again — the client holds it, the server holds
+   * no pending state — and the account is created only when it is genuinely
+   * new, as a member. An existing active account simply gets a session
+   * (someone raced the consent form); a deactivated one stays refused.
+   *
+   * @param {string} credential
+   * @param {string} [name] display name from the form (defaults to Google's)
+   * @returns {Promise<{ user: object, token: string }>}
+   */
+  async acceptConsent(credential, name) {
+    if (!this.isGoogleConfigured) throw new ServiceUnavailableError(NOT_CONFIGURED);
+
+    const identity = await this.#verifyIdentity(credential);
+    const displayName = (name && String(name).trim()) || identity.name;
+
+    const account = await this.userDirectory.lookup(identity.email);
+    if (account) {
+      if (!account.is_active) throw new ForbiddenError(DEACTIVATED);
+      return { user: identity, token: this.sessionService.issue(identity) };
+    }
+
+    const created = await this.accessService.createNewUser({ email: identity.email, name: displayName });
+    this.logger.info(`new account created via consent: ${created.email}`);
+    return { user: { ...identity, name: created.name || identity.name }, token: this.sessionService.issue(identity) };
+  }
+
+  /**
    * Resolve the caller of a request.
    *
-   * @returns {Promise<{ email: string, name: string, role: string }|null>}
+   * @returns {Promise<{ id: number, email: string, name: string, role: string, tour_completed: boolean }|null>}
    *          null when there is no valid session or the account is not active
    */
   async resolveCurrentUser(req) {
@@ -66,7 +108,13 @@ class AuthenticationService {
     if (!session) return null;
     const account = await this.userDirectory.lookup(session.email);
     if (!account || !account.is_active) return null;
-    return { email: session.email, name: session.name || account.name, role: account.role };
+    return {
+      id: account.id,
+      email: session.email,
+      name: session.name || account.name,
+      role: account.role,
+      tour_completed: account.tour_completed !== false
+    };
   }
 
   /**
@@ -91,4 +139,4 @@ class AuthenticationService {
   }
 }
 
-module.exports = { AuthenticationService, NOT_ALLOWED, NOT_VERIFIED, NOT_CONFIGURED };
+module.exports = { AuthenticationService, NOT_VERIFIED, NOT_CONFIGURED, DEACTIVATED };

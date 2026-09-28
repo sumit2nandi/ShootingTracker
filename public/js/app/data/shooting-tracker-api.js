@@ -4,11 +4,34 @@
  * Views depend on this vocabulary (`listShoots`, `markCollected`), so an
  * endpoint can be renamed or reshaped in one file, and a view can be tested
  * against a two-line stub.
+ *
+ * Data scoping rides here too: `setViewingAs()` tells the facade whose data
+ * the owner is currently looking at, and every *read* of business data (shoots,
+ * dashboard, calendar, meta) carries it. Writes never carry it — the server
+ * always attributes them to the signed-in account.
  */
 export class ShootingTrackerApi {
   /** @param {{ client: import('./api-client.js').ApiClient }} deps */
   constructor({ client }) {
     this.client = client;
+    this.viewingAs = null;
+  }
+
+  /**
+   * Remember whose data an owner is viewing (null = their own). The server
+   * re-validates the choice on every request; this only mirrors it.
+   *
+   * @param {string|null} email
+   */
+  setViewingAs(email) {
+    this.viewingAs = email ? String(email).trim().toLowerCase() : null;
+  }
+
+  /** Append the `viewingAs` parameter to a query string, when set. */
+  withViewing(query) {
+    if (!this.viewingAs) return query;
+    const suffix = `viewingAs=${encodeURIComponent(this.viewingAs)}`;
+    return query ? `${query}&${suffix}` : suffix;
   }
 
   /* ---- session ---- */
@@ -20,26 +43,31 @@ export class ShootingTrackerApi {
     return this.client.post('/api/auth/logout');
   }
 
+  /** Tell the server the first-login tour was seen. */
+  markTourCompleted() {
+    return this.client.post('/api/auth/me/tour-completed');
+  }
+
   /* ---- reference data ---- */
   health() {
     return this.client.get('/api/health');
   }
 
   meta() {
-    return this.client.get('/api/meta');
+    return this.client.get('/api/meta', this.withViewing(''));
   }
 
   dashboard(query) {
-    return this.client.get('/api/dashboard', query);
+    return this.client.get('/api/dashboard', this.withViewing(query));
   }
 
   /* ---- shoots ---- */
   listShoots(query) {
-    return this.client.get('/api/shoots', query);
+    return this.client.get('/api/shoots', this.withViewing(query));
   }
 
   listShootsBetween(from, to) {
-    return this.client.get('/api/shoots', `from=${from}&to=${to}`);
+    return this.client.get('/api/shoots', this.withViewing(`from=${from}&to=${to}`));
   }
 
   getShoot(id) {

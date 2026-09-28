@@ -5,12 +5,15 @@ const { ShootFilter } = require('../domain/shoot-filter');
 const { ShootInput } = require('../domain/shoot-input');
 
 /**
- * Use cases for shoots.
+ * Use cases for shoots — always inside a {@link import('../domain/data-scope').DataScope}.
  *
- * Owns the rules that span more than one table — "creating a shoot with a new
- * coordinator name is one atomic step", "a detail view is the shoot plus its
- * ledger and media" — while repositories own the SQL and the HTTP layer owns
- * request/response translation.
+ * Reads are scoped to `scope.targetId`: a member sees their own data, an owner
+ * sees their own or, when they chose to view another account, that account's.
+ * Writes always belong to `scope.selfId` — nobody can create, edit or delete
+ * a shoot through another account's data, even an owner while viewing it.
+ *
+ * A shoot outside the scope is indistinguishable from a missing one (404), so
+ * an id can never be used to probe another account's records.
  */
 class ShootService {
   /**
@@ -28,15 +31,20 @@ class ShootService {
     this.coordinatorRepository = coordinatorRepository;
   }
 
-  /** @param {Record<string, string>} query filter parameters straight from the request */
-  list(query) {
-    return this.shootRepository.findMany(ShootFilter.fromQuery(query));
+  /**
+   * @param {Record<string, string>} query filter parameters straight from the request
+   * @param {import('../domain/data-scope').DataScope} scope
+   */
+  list(query, scope) {
+    return this.shootRepository.findMany(ShootFilter.fromQuery({ ...query, owner: scope.filterOwner }));
   }
 
-  /** @returns {Promise<object>} shoot + payments + media @throws {NotFoundError} */
-  async getDetail(id) {
+  /**
+   * @returns {Promise<object>} shoot + payments + media @throws {NotFoundError}
+   */
+  async getDetail(id, scope) {
     const shoot = await this.shootRepository.findById(id);
-    if (!shoot) throw new NotFoundError();
+    if (!shoot || shoot.owner_id !== scope.targetId) throw new NotFoundError();
     const [payments, media] = await Promise.all([
       this.paymentRepository.listByShoot(id),
       this.mediaRepository.listByShoot(id)
@@ -44,18 +52,22 @@ class ShootService {
     return { ...shoot, payments, media };
   }
 
-  /** @returns {Promise<{ id: number }>} */
-  async create(body) {
+  /**
+   * @returns {Promise<{ id: number }>}
+   */
+  async create(body, scope) {
     const input = ShootInput.forCreate(body);
     const id = await this.database.withTransaction(async (executor) => {
       const values = await this.#withResolvedCoordinator(input, executor);
+      values.owner_id = scope.selfId; // a new shoot always belongs to the person who made it
       return this.shootRepository.insert(values, executor);
     });
     return { id };
   }
 
-  /** @throws {NotFoundError} when the shoot does not exist */
-  async update(id, body) {
+  /** @throws {NotFoundError} when the shoot does not exist or is not the caller's */
+  async update(id, body, scope) {
+    await this.#assertOwnsShoot(id, scope);
     const input = ShootInput.forUpdate(body);
     const updated = await this.database.withTransaction(async (executor) => {
       const values = await this.#withResolvedCoordinator(input, executor);
@@ -64,10 +76,20 @@ class ShootService {
     if (!updated) throw new NotFoundError();
   }
 
-  /** @throws {NotFoundError} when the shoot does not exist */
-  async remove(id) {
+  /** @throws {NotFoundError} when the shoot does not exist or is not the caller's */
+  async remove(id, scope) {
+    await this.#assertOwnsShoot(id, scope);
     const deleted = await this.shootRepository.deleteById(id);
     if (!deleted) throw new NotFoundError();
+  }
+
+  /**
+   * The write-side gate: fetches the shoot and refuses anything that is not
+   * the caller's own, answering 404 either way.
+   */
+  async #assertOwnsShoot(id, scope) {
+    const shoot = await this.shootRepository.findById(id);
+    if (!shoot || shoot.owner_id !== scope.selfId) throw new NotFoundError();
   }
 
   /**

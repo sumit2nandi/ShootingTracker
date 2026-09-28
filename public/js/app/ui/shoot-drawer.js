@@ -61,12 +61,15 @@ export class ShootDrawer {
 
     const completed = appStatus(shoot.status) === 'completed';
     const settled = fee > 0 && !canCollect;
-    this.element.innerHTML = this.#shootHtml(shoot, { paid, fee, balance, settled, completed });
-    this.#bindShoot(shoot, { balance, canCollect, completed, settled });
+    // an owner viewing another account's data gets the record, not the pen
+    const readOnly = this.actions.isReadOnly && this.actions.isReadOnly();
+    this.element.innerHTML = this.#shootHtml(shoot, { paid, fee, balance, settled, completed, readOnly });
+    this.#bindShoot(shoot, { balance, canCollect, completed, settled, readOnly });
   }
 
   /** The "+N more" panel for a calendar day. */
   showDay(dateKey, shoots) {
+    const readOnly = this.actions.isReadOnly && this.actions.isReadOnly();
     this.element.innerHTML = `
     ${drawerHead(formatDate(dateKey), `${shoots.length} shoot${shoots.length === 1 ? '' : 's'} on this day`)}
     ${shoots
@@ -80,7 +83,7 @@ export class ShootDrawer {
       )
       .join('')}
     <div class="drawer-actions">
-      <button class="btn btn-primary" id="dp-add">+ Add Shoot on ${formatDate(dateKey)}</button>
+      ${readOnly ? '' : `<button class="btn btn-primary" id="dp-add">+ Add Shoot on ${formatDate(dateKey)}</button>`}
       <button class="btn btn-ghost" data-close>Close</button>
     </div>`;
     this.open();
@@ -89,13 +92,16 @@ export class ShootDrawer {
       row.addEventListener('click', () => this.showShoot(+row.dataset.id))
     );
     this.#bindClose();
-    $('#dp-add').addEventListener('click', () => {
-      this.close();
-      this.actions.newShoot(dateKey);
-    });
+    const add = $('#dp-add');
+    if (add) {
+      add.addEventListener('click', () => {
+        this.close();
+        this.actions.newShoot(dateKey);
+      });
+    }
   }
 
-  #shootHtml(shoot, { paid, fee, balance, settled, completed }) {
+  #shootHtml(shoot, { paid, fee, balance, settled, completed, readOnly = false }) {
     const contact = [text(shoot.contact_name), text(shoot.contact_phone)].filter(Boolean).join(' · ');
     const hasMoney = fee > 0 || paid > 0; // nothing booked → leave the money rows out
     const detailRows = [
@@ -133,13 +139,16 @@ export class ShootDrawer {
               <span class="muted small">${formatDate(payment.paid_on)}</span>
               <span>${[payment.method, payment.note].filter(Boolean).map(escapeHtml).join(' <span class="muted small">· </span>')}</span>
               <span class="amt">${formatMoney(payment.amount)}</span>
-              <button data-pay-id="${payment.id}" title="Delete payment">✕</button>
+              ${readOnly ? '' : `<button data-pay-id="${payment.id}" title="Delete payment">✕</button>`}
             </div>`
             )
             .join('') || `<div class="muted small">${fee ? 'Nothing collected yet.' : 'Set a fee to start collecting.'}</div>`}
         </div>
         <div class="pay-total">Collected <b style="color:var(--green)">${formatMoney(paid)}</b> of ${formatMoney(fee)} (${fee ? Math.round((paid / fee) * 100) : 0}%)</div>
-        <div class="quick-actions">
+        ${
+          readOnly
+            ? '<div class="muted small pay-hint">Read-only — this shoot belongs to the account you are viewing.</div>'
+            : `<div class="quick-actions">
           <button class="btn btn-settle${completed ? ' is-on' : ''}" id="mark-complete" aria-pressed="${completed}"
                   title="${completed ? 'Completed — tap to move it back to planned' : 'Mark this shoot completed'}">
             ${completed ? TICK : BOX}
@@ -151,17 +160,19 @@ export class ShootDrawer {
             ${settled ? 'Paid' : 'Mark Paid'}
           </button>
         </div>
-        <div class="muted small pay-hint">${!fee ? 'Set a fee on this shoot first — then it can be marked paid.' : settled ? 'Paid in full — tap Paid again to undo the last payment.' : `Books the remaining ${formatMoney(balance)} as collected today.`}</div>
+        <div class="muted small pay-hint">${!fee ? 'Set a fee on this shoot first — then it can be marked paid.' : settled ? 'Paid in full — tap Paid again to undo the last payment.' : `Books the remaining ${formatMoney(balance)} as collected today.`}</div>`
+        }
       </div>
       <div class="drawer-actions">
-        <button class="btn" id="dr-edit">✏️ Edit</button>
-        <button class="btn btn-danger" id="dr-delete">🗑 Delete</button>
+        ${readOnly ? '' : '<button class="btn" id="dr-edit">✏️ Edit</button>\n        <button class="btn btn-danger" id="dr-delete">🗑 Delete</button>'}
         <button class="btn btn-ghost" data-close>Close</button>
       </div>`;
   }
 
-  #bindShoot(shoot, { balance, canCollect, completed, settled }) {
+  #bindShoot(shoot, { balance, canCollect, completed, settled, readOnly = false }) {
     this.#bindClose();
+
+    if (readOnly) return; // nothing to bind: the whole panel is read-only
 
     const markComplete = $('#mark-complete');
     markComplete.addEventListener('click', async () => {

@@ -152,34 +152,84 @@ test('non-RS256 tokens are refused outright', async () => {
 
 /* ---------------- sign-in flow ---------------- */
 
-function authServiceWith({ allowed = true, verify = async () => ({ email: 'a@example.com', name: 'A' }) } = {}) {
-  return new AuthenticationService({
-    identityVerifier: { verify },
-    userDirectory: {
-      isAllowed: async () => allowed,
-      lookup: async () => (allowed ? { email: 'a@example.com', role: 'owner', is_active: true, name: 'A' } : null)
-    },
-    sessionService: sessionService(),
-    googleClientId: CLIENT_ID
-  });
+const knownAccount = { id: 1, email: 'a@example.com', role: 'owner', is_active: true, name: 'A', tour_completed: true };
+
+function authServiceWith({ account = knownAccount, verify = async () => ({ email: 'a@example.com', name: 'A' }) } = {}) {
+  const created = [];
+  return {
+    service: new AuthenticationService({
+      identityVerifier: { verify },
+      userDirectory: {
+        lookup: async (email) => (account && String(account.email).toLowerCase() === String(email).toLowerCase() ? account : null)
+      },
+      accessService: {
+        createNewUser: async (input) => {
+          created.push(input);
+          return { id: 9, ...input, role: 'member' };
+        },
+        markTourCompleted: async () => {}
+      },
+      sessionService: sessionService(),
+      googleClientId: CLIENT_ID
+    }),
+    created
+  };
 }
 
-test('sign-in issues a session for an allow-listed account', async () => {
-  const { user, token } = await authServiceWith().signInWithGoogle('credential');
+test('sign-in issues a session for a known active account', async () => {
+  const { service } = authServiceWith();
+  const { user, token, needsConsent } = await service.signInWithGoogle('credential');
   assert.equal(user.email, 'a@example.com');
   assert.ok(token.includes('.'));
+  assert.equal(needsConsent, undefined);
 });
 
-test('an account outside the allow-list is forbidden, not unauthorized', async () => {
-  await assert.rejects(authServiceWith({ allowed: false }).signInWithGoogle('credential'), (error) => {
+test('a brand-new account is not refused — it is sent to the consent form', async () => {
+  const { service, created } = authServiceWith({ account: null });
+  const result = await service.signInWithGoogle('credential');
+  assert.equal(result.needsConsent, true, 'flagged for the consent step');
+  assert.equal(result.token, undefined, 'no session before consent');
+  assert.equal(result.user.email, 'a@example.com');
+  assert.equal(created.length, 0, 'and no profile was created yet');
+});
+
+test('a deactivated account is refused, not sent to consent', async () => {
+  const { service } = authServiceWith({ account: { ...knownAccount, is_active: false } });
+  await assert.rejects(service.signInWithGoogle('credential'), (error) => {
     assert.ok(error instanceof ForbiddenError);
-    assert.match(error.message, /not allowed to access ShootingTracker/);
+    assert.match(error.message, /deactivated/);
     return true;
   });
 });
 
+test('consent creates the profile as a member and issues a session', async () => {
+  const { service, created } = authServiceWith({ account: null });
+  const { user, token } = await service.acceptConsent('credential', 'A. Person');
+  assert.ok(token.includes('.'));
+  assert.equal(user.email, 'a@example.com');
+  assert.deepEqual(created, [{ email: 'a@example.com', name: 'A. Person' }], 'exactly one creation, with the form name');
+});
+
+test('consent falls back to the Google-provided name', async () => {
+  const { service, created } = authServiceWith({ account: null });
+  await service.acceptConsent('credential', '  ');
+  assert.equal(created[0].name, 'A');
+});
+
+test('consent for an existing active account just signs them in', async () => {
+  const { service, created } = authServiceWith();
+  const { token } = await service.acceptConsent('credential');
+  assert.ok(token);
+  assert.equal(created.length, 0, 'no second account');
+});
+
+test('consent cannot re-activate a deactivated account', async () => {
+  const { service } = authServiceWith({ account: { ...knownAccount, is_active: false } });
+  await assert.rejects(service.acceptConsent('credential'), ForbiddenError);
+});
+
 test('verification details are replaced by a generic message', async () => {
-  const service = authServiceWith({
+  const { service } = authServiceWith({
     verify: async () => {
       throw new UnauthorizedError('kid 42 not in JWKS cache');
     }
@@ -192,7 +242,7 @@ test('verification details are replaced by a generic message', async () => {
 });
 
 test('a database outage during sign-in is not reported as a bad credential', async () => {
-  const service = authServiceWith({
+  const { service } = authServiceWith({
     verify: async () => {
       throw new ServiceUnavailableError('allow-list unreachable');
     }
@@ -203,7 +253,8 @@ test('a database outage during sign-in is not reported as a bad credential', asy
 test('sign-in is refused when Google is not configured', async () => {
   const service = new AuthenticationService({
     identityVerifier: { verify: async () => ({}) },
-    userDirectory: { isAllowed: async () => true },
+    userDirectory: { lookup: async () => null },
+    accessService: {},
     sessionService: sessionService(),
     googleClientId: null
   });
@@ -211,17 +262,26 @@ test('sign-in is refused when Google is not configured', async () => {
   await assert.rejects(service.signInWithGoogle('x'), /GOOGLE_CLIENT_ID/);
 });
 
-test('the current user combines the session with the live account role', async () => {
+test('the current user combines the session with the live account row', async () => {
   const sessions = sessionService();
   const service = new AuthenticationService({
     identityVerifier: { verify: async () => ({}) },
-    userDirectory: { lookup: async () => ({ email: 'a@example.com', name: 'Stored', role: 'owner', is_active: true }) },
+    userDirectory: {
+      lookup: async () => ({ id: 7, email: 'a@example.com', name: 'Stored', role: 'owner', is_active: true, tour_completed: true })
+    },
+    accessService: {},
     sessionService: sessions,
     googleClientId: CLIENT_ID
   });
   const token = sessions.issue({ email: 'a@example.com', name: 'Session Name' });
   const user = await service.resolveCurrentUser({ headers: { cookie: `shootingtracker_session=${token}` } });
-  assert.deepEqual(user, { email: 'a@example.com', name: 'Session Name', role: 'owner' });
+  assert.deepEqual(user, {
+    id: 7,
+    email: 'a@example.com',
+    name: 'Session Name',
+    role: 'owner',
+    tour_completed: true
+  });
 });
 
 test('a deactivated account has no current user even with a valid cookie', async () => {
@@ -229,6 +289,7 @@ test('a deactivated account has no current user even with a valid cookie', async
   const service = new AuthenticationService({
     identityVerifier: { verify: async () => ({}) },
     userDirectory: { lookup: async () => ({ email: 'a@example.com', role: 'member', is_active: false }) },
+    accessService: {},
     sessionService: sessions,
     googleClientId: CLIENT_ID
   });
@@ -241,14 +302,21 @@ test('DEV_SIGN_IN_EMAIL signs in without a cookie but still respects the allow-l
     new AuthenticationService({
       identityVerifier: { verify: async () => ({}) },
       userDirectory: { lookup: async () => account },
+      accessService: {},
       sessionService: sessionService(),
       googleClientId: CLIENT_ID,
       devSignInEmail: 'dev@example.com'
     });
 
-  const active = await build({ email: 'dev@example.com', name: 'Dev', role: 'owner', is_active: true })
+  const active = await build({ id: 3, email: 'dev@example.com', name: 'Dev', role: 'owner', is_active: true, tour_completed: true })
     .resolveCurrentUser({ headers: {} });
-  assert.deepEqual(active, { email: 'dev@example.com', name: 'Dev', role: 'owner' });
+  assert.deepEqual(active, {
+    id: 3,
+    email: 'dev@example.com',
+    name: 'Dev',
+    role: 'owner',
+    tour_completed: true
+  });
 
   assert.equal(await build(null).resolveCurrentUser({ headers: {} }), null, 'unknown accounts are still refused');
   assert.equal(

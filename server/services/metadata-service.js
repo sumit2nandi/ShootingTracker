@@ -13,12 +13,18 @@ class MetadataService {
     this.coordinatorRepository = coordinatorRepository;
   }
 
-  async describe() {
+  /**
+   * Coordinators stay global (shared reference data); clients, types and
+   * months come from the account whose data is being viewed.
+   *
+   * @param {import('../domain/data-scope').DataScope} scope
+   */
+  async describe(scope) {
     const [coordinators, clients, types, months] = await Promise.all([
       this.coordinatorRepository.list(),
-      this.metadataRepository.distinctClients(),
-      this.metadataRepository.distinctTypes(),
-      this.metadataRepository.months()
+      this.metadataRepository.distinctClients(scope.targetId),
+      this.metadataRepository.distinctTypes(scope.targetId),
+      this.metadataRepository.months(scope.targetId)
     ]);
     return { statuses: [...SHOOT_STATUSES], coordinators, clients, types, months };
   }

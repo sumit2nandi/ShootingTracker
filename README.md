@@ -13,6 +13,21 @@ that adds a shoot from anywhere.
 
 ## Features
 
+- **Per-user data** — every shoot (and with it its payments and media) belongs to the account that created
+  it. A signed-in account sees **only its own data**; another account's records are invisible to it, and the
+  server enforces this on every read and write — a record that isn't yours is simply *not found*.
+- **Owner view mode** — an **owner** can look at any other account's data from the **Profile** tab: pick a
+  name in *Viewing* and the dashboard, calendar, shoots, drawer and insights all switch to that person's
+  records (a banner says whose data is on screen and one tap goes back). While viewing, the app is
+  **read-only** — the “new shoot” buttons disappear, and any write still targets the owner's own account,
+  because the server only ever *reads* through the choice, never writes. Members never see the switch.
+- **Google sign-in for anyone** — any Google account may sign in. If the account isn't in `app_users` yet,
+  it is not refused: after verifying the token the app asks for a one-time **consent** (three short terms),
+  and confirming it creates the account as a **member** and starts the session. Deactivated accounts are
+  still refused and cannot re-activate themselves.
+- **First-login tour** — a newly created account gets a short, skippable **spotlight tour** of the app
+  (dashboard → filters → calendar → shoots → new shoot) on its first login; it is recorded in
+  `app_users.tour_completed` and never shown again.
 - **Shoot tracking (CRUD)** — a minimal form (title, date, client, coordinator, fee, status) with the rest
   (type, end date/times, venue, location, contacts, notes) tucked under “More details”. Anything that
   doesn't fit a column is preserved in a JSON `extra` field, so you never lose data from a sheet.
@@ -95,9 +110,23 @@ Tables created:
 | `shoots`       | One row per shoot + `extra` JSONB + `dedupe_hash` for imports. |
 | `payments`     | Earnings ledger (amount, date, method) per shoot.              |
 | `media`        | Photo / album / drive links per shoot.                         |
-| `app_users`    | Who may sign in (email, role `owner`/`member`, active flag).    |
+| `app_users`    | Who may sign in (email, role `owner`/`member`, active flag) + `tour_completed` for the first-login tour. |
 
-Key indexes: shoot date, coordinator, client, status, type, and a GIN index on `extra`.
+`shoots.owner_id` links each shoot to the account that owns it (its payments and media ride along through
+`shoot_id`). Key indexes: shoot date, **owner**, coordinator, client, status, type, and a GIN index on
+`extra`.
+
+> **Upgrading from an older schema:** `npm run migrate` (or re-pasting `server/schema.sql`) converges an
+> existing database — it adds the missing columns and links without touching data. To give one account the
+> shoots that were imported before ownership existed (e.g. the original `sushmitaghosh0099@gmail.com`), run:
+>
+> ```bash
+> npm run assign:existing                 # → sushmitaghosh0099@gmail.com
+> npm run assign:existing -- other@x.com  # any other account
+> npm run assign:existing -- --all        # re-home every row, not just unowned ones
+> ```
+>
+> It is idempotent — running it twice is a no-op.
 
 > **Aiven note:** Aiven blocks connections from cloud/datacenter IP ranges by default. If you see
 > “DB unreachable”, add your egress IP (or `0.0.0.0/0` for a quick test) to the service **IP allowlist** in
@@ -153,8 +182,14 @@ instead of at the first request. Optional settings:
 ### Google-only access
 
 The app and every `/api` endpoint require a Google sign-in. The server verifies Google's signed ID token and
-then checks the account against the **`app_users`** table; the allow-list is enforced on the server, not just by
+then checks the account against the **`app_users`** table — the check is enforced on the server, not just by
 the sign-in screen. Signed-in sessions use an HTTP-only, same-site cookie and expire after seven days.
+
+**Any** Google account may sign in. If the account is already in `app_users` (and active) it gets a session
+immediately. If it is not, the server answers with `needsConsent: true` and **no session**; the sign-in page
+then shows a short consent form, and confirming it creates the account as a **member**
+(`POST /api/auth/consent`) and issues the session. If it *is* in `app_users` but deactivated, sign-in and
+consent are both refused with a clear message — a deactivated account can only be re-activated by an owner.
 
 Managing who can sign in — **no code changes and no restart needed**:
 
@@ -193,9 +228,14 @@ Three equivalent ways. All are idempotent — safe to run repeatedly.
 **a) CLI → database**
 
 ```bash
-npm run import -- April.html              # insert into DATABASE_URL
-npm run import -- April.html --dry-run    # parse + summary only
+npm run import -- April.html                          # insert into DATABASE_URL
+npm run import -- April.html --dry-run                # parse + summary only
+npm run import -- April.html --owner someone@x.com    # assign the imported rows to an account
 ```
+
+> Imported rows belong to the importing account: via the API that is the signed-in owner; via the CLI it
+> must exist in `app_users` (`--owner`, or it is left unowned with a warning). Unowned rows are invisible
+> in the app — use `npm run assign:existing` to re-home them.
 
 **b) CLI → SQL file for the Aiven console** (when you'd rather paste SQL)
 
@@ -233,25 +273,33 @@ Every `/api` route except `/api/auth/config`, `/api/auth/google` and
 | Method & path                              | Description                                        |
 | ------------------------------------------ | -------------------------------------------------- |
 | `GET /api/auth/config`                     | Public Google client ID for the sign-in page       |
-| `GET /api/auth/me`                         | The signed-in account (email, name, role)          |
-| `POST /api/auth/google`                    | Exchange a Google credential for a session cookie  |
+| `GET /api/auth/me`                         | The signed-in account (id, email, name, role, `tour_completed`) |
+| `POST /api/auth/google`                    | Exchange a Google credential for a session cookie. **New** accounts return `{ user, needsConsent: true }` with no cookie instead. |
+| `POST /api/auth/consent`                   | Create the profile for a new account and issue its session cookie (public). Body `{ credential, name? }`. |
+| `POST /api/auth/me/tour-completed`         | Record that the signed-in user has finished the first-login tour. |
 | `POST /api/auth/logout`                    | Clear the session cookie                           |
 | `GET /api/health`                          | DB connectivity + latency                          |
 | `GET /api/meta`                            | Coordinator/client/type/month lists for filters    |
 | `GET /api/dashboard`                       | KPIs + aggregates (honours all filters)            |
-| `GET /api/shoots`                          | List, filtered (see below)                         |
-| `GET /api/shoots/:id`                      | Detail + payments + media                          |
-| `POST /api/shoots`                         | Create (auto-upserts coordinator by name)          |
-| `PUT /api/shoots/:id`                      | Update                                             |
-| `DELETE /api/shoots/:id`                   | Delete (cascades payments/media)                   |
-| `POST /api/shoots/:id/payments`            | Record a payment                                   |
-| `DELETE /api/payments/:id`                 | Remove a payment                                   |
-| `POST /api/shoots/:id/media`               | Add a media link                                   |
-| `DELETE /api/media/:id`                    | Remove a media link                                |
-| `POST /api/import`                         | `{ content, format?, dryRun }` → parse/import      |
+| `GET /api/shoots`                          | List, filtered (see below) — **of the signed-in account** |
+| `GET /api/shoots/:id`                      | Detail + payments + media (must be owned by the viewer) |
+| `POST /api/shoots`                         | Create **as the signed-in account** (auto-upserts coordinator by name) |
+| `PUT /api/shoots/:id`                      | Update (own record only)                           |
+| `DELETE /api/shoots/:id`                   | Delete (own record only; cascades payments/media)  |
+| `POST /api/shoots/:id/payments`            | Record a payment (own shoot only)                  |
+| `DELETE /api/payments/:id`                 | Remove a payment (own payment only)                |
+| `POST /api/shoots/:id/media`               | Add a media link (own shoot only)                  |
+| `DELETE /api/media/:id`                    | Remove a media link (own link only)                |
+| `POST /api/import`                         | `{ content, format?, dryRun }` → parse/import **as the signed-in account** |
 | `POST /api/coordinators`                   | Upsert a coordinator                               |
 | `DELETE /api/coordinators/:id`             | Delete one (409 while shoots still reference it)   |
 | `GET/POST /api/users`, `PATCH/DELETE /api/users/:id` | Manage the allow-list (owners only)      |
+
+**Owner view mode.** Any read endpoint above also accepts `?viewingAs=account@x.com`. When an **owner**
+passes it, that account's records are returned instead of their own (deactivated accounts included — the
+owner may look at anyone's data). For **members** the parameter is ignored and their own data is returned.
+Writes are never redirected by it: a create/import always belongs to the signed-in account, and a
+`PUT`/`DELETE`/payment on another account's record is a `404`.
 
 **Error shape.** Every failure is `{ "error": "…" }` with a meaningful status:
 `400` validation, `401` no session, `403` not an owner, `404` unknown id, `409`
@@ -267,7 +315,7 @@ generic `500` — internal details are never returned.
 ## 5 · Tests
 
 ```bash
-npm test             # 128 unit + integration tests — no database, no network
+npm test             # 153 unit + integration tests — no database, no network
 ```
 
 `npm test` uses the built-in Node test runner (no dependencies) and covers the
@@ -330,6 +378,7 @@ scripts/
   dev-postgres.js   # embedded local Postgres for dev
   dev-session.js    # mint a session cookie for local API testing
   api-test.py       # e2e API test suite
+  assign-existing-data-to-sushmita.js  # one-time: re-home pre-existing shoots to an account
 docs/
   ARCHITECTURE.md   # layers, SOLID rationale, how to add a feature
 data/

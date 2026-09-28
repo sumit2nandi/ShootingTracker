@@ -39,6 +39,7 @@ const { AccessService } = require('./services/access-service');
 const { SessionService } = require('./services/session-service');
 const { GoogleIdentityVerifier } = require('./services/google-identity-verifier');
 const { AuthenticationService } = require('./services/authentication-service');
+const { DataScopeService } = require('./services/data-scope-service');
 const { ShootImporter } = require('./services/shoot-importer');
 const { ImportService } = require('./services/import-service');
 
@@ -93,6 +94,21 @@ function createContainer({ config, logger, database }) {
   const sheetParser = new SheetParser();
   const shootImporter = new ShootImporter({ database: db, ...repositories });
 
+  const accessService = new AccessService({
+    userRepository: repositories.userRepository,
+    userDirectory,
+    schemaInitializer
+  });
+  const authenticationService = new AuthenticationService({
+    identityVerifier,
+    userDirectory,
+    accessService,
+    sessionService,
+    googleClientId: config.auth.googleClientId,
+    devSignInEmail: config.auth.devSignInEmail,
+    logger: log.child('auth')
+  });
+
   const services = {
     shootService: new ShootService({ database: db, ...repositories }),
     paymentService: new PaymentService(repositories),
@@ -102,21 +118,11 @@ function createContainer({ config, logger, database }) {
     metadataService: new MetadataService(repositories),
     healthService: new HealthService({ database: db, timeoutMs: config.database.healthCheckTimeoutMs }),
     userDirectory,
-    accessService: new AccessService({
-      userRepository: repositories.userRepository,
-      userDirectory,
-      schemaInitializer
-    }),
+    accessService,
+    dataScopeService: new DataScopeService({ userDirectory }),
     sessionService,
     identityVerifier,
-    authenticationService: new AuthenticationService({
-      identityVerifier,
-      userDirectory,
-      sessionService,
-      googleClientId: config.auth.googleClientId,
-      devSignInEmail: config.auth.devSignInEmail,
-      logger: log.child('auth')
-    }),
+    authenticationService,
     shootImporter,
     importService: new ImportService({ sheetParser, shootImporter })
   };

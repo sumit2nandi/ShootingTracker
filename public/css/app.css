@@ -912,3 +912,118 @@ body.app-ready .app-loader { opacity: 0; visibility: hidden; pointer-events: non
 @media (prefers-reduced-motion: reduce) {
   .app-loader-ring .ring-arc { stroke-dasharray: 220; opacity: .35; }
 }
+
+/* ============ owner "viewing" mode ============
+   A thin banner under the filter bar says whose data is on screen, and the
+   read-only chrome (new-shoot buttons) disappears while it is up. */
+.viewing-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--amber-soft);
+  border-bottom: 1px solid rgba(180, 83, 9, .18);
+}
+.viewing-banner-text {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--amber);
+  font-weight: 600;
+}
+.viewing-banner-back {
+  flex: none;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--amber);
+  border: 1px solid rgba(180, 83, 9, .3);
+  border-radius: var(--pill);
+  background: var(--surface);
+}
+.viewing-banner-back:hover { background: #fff7ec; }
+
+/* the profile tab's "whose data do you want to see" switch (owners only) */
+.viewing-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.viewing-select {
+  width: 100%;
+  appearance: none;
+  padding: 11px 34px 11px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface-2) var(--select-arrow) no-repeat right 12px center;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm);
+}
+.viewing-select:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
+.viewing-hint { margin: 10px 0 0; font-size: 12px; line-height: 1.5; }
+
+/* read-only chrome: nobody adds shoots while looking at someone else's data */
+body.viewing-other .fab,
+body.viewing-other #btn-new-shoot { display: none; }
+
+/* ============ first-login tour ============
+   A dark scrim with a cut-out spotlight over the described element and a card
+   beside it. Positioning is set inline by ui/tour.js; these are the materials. */
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  font-family: inherit;
+}
+.tour-highlight {
+  position: fixed;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--accent-fill);
+  box-shadow: 0 0 0 9999px rgba(15, 12, 34, .62), 0 0 0 6px rgba(124, 58, 237, .18);
+  pointer-events: none;
+  transition: top .22s ease, left .22s ease, width .22s ease, height .22s ease;
+}
+.tour-card {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 201;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 18px 20px 16px;
+  color: var(--text);
+  transition: top .22s ease, left .22s ease, transform .22s ease;
+}
+.tour-step {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.tour-title { margin: 0 0 8px; font-size: 18px; letter-spacing: -.3px; }
+.tour-body { margin: 0 0 14px; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+.tour-dots { display: flex; gap: 6px; margin-bottom: 14px; }
+.tour-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line-2);
+  transition: background .15s, transform .15s;
+}
+.tour-dot.active { background: var(--accent-fill); transform: scale(1.25); }
+.tour-actions { display: flex; align-items: center; gap: 8px; }
+.tour-spacer { flex: 1; }
+.tour-actions .btn { padding: 8px 14px; font-size: 13px; }
+.tour-actions .btn-primary { background: var(--accent-fill); box-shadow: var(--accent-fill-glow); }
+@media (max-width: 640px) {
+  .tour-card { padding: 15px 16px 13px; }
+  .tour-title { font-size: 16.5px; }
+  .tour-body { font-size: 13px; }
+}
