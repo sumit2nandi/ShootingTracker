@@ -68,11 +68,34 @@ class AccessPolicy {
     return !next.some(isActiveOwner);
   }
 
-  /** @throws {ConflictError} when the change would lock everybody out. */
-  static assertCanUpdate({ users, target, patch }) {
-    const touchesOwnership = patch.is_active === false || patch.role === MEMBER;
-    if (!touchesOwnership || target.role !== OWNER) return;
-    if (AccessPolicy.wouldRemoveLastOwner({ users, target, patch })) {
+  /**
+   * Validate a PATCH to the allow-list.
+   *
+   * An owner may change another account's role — promote a member to owner or
+   * demote an owner to member. Two rules still stand: nobody may change their
+   * *own* role from the app (that stays a deliberate database decision), and
+   * no change may leave the workspace without an active owner. The active
+   * flag stays owner-manageable under the same last-owner guard.
+   *
+   * @param {{ users: object[], target: object, patch: { role?: string, is_active?: boolean, name?: string }, actor: object }} input
+   * @throws {ValidationError} when the role is outside the vocabulary
+   * @throws {ForbiddenError}  when the actor patches their own role
+   * @throws {ConflictError}   when the change would leave the app without an owner
+   */
+  static assertCanUpdate({ users, target, patch, actor }) {
+    if (patch.role !== undefined) {
+      if (!ROLES.includes(patch.role)) {
+        throw new ValidationError(`role must be one of: ${ROLES.join(', ')}`);
+      }
+      if (sameAccount(target.email, actor && actor.email)) {
+        throw new ForbiddenError('You cannot change your own role');
+      }
+    }
+    if (
+      (patch.role !== undefined || patch.is_active === false) &&
+      target.role === OWNER &&
+      AccessPolicy.wouldRemoveLastOwner({ users, target, patch })
+    ) {
       throw new ConflictError('At least one active owner is required');
     }
   }

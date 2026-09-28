@@ -4,6 +4,7 @@ const http = require('http');
 const { loadConfig } = require('../../server/config');
 const { silentLogger } = require('../../server/core/logger');
 const { createApp } = require('../../server/app');
+const { DataScopeService } = require('../../server/services/data-scope-service');
 
 const BASE_ENV = {
   NODE_ENV: 'test',
@@ -26,12 +27,29 @@ const notImplemented = (name) => () => {
  *
  * @param {{ user?: object|null, env?: object, services?: object }} [options]
  */
-function createTestApp({ user = { email: 'owner@example.com', name: 'Owner', role: 'owner' }, env = {}, services = {} } = {}) {
+function createTestApp({
+  user = { id: 1, email: 'owner@example.com', name: 'Owner', role: 'owner', tour_completed: true },
+  env = {},
+  services = {}
+} = {}) {
   const config = loadConfig({ ...BASE_ENV, ...env });
+
+  // A two-account directory: the signed-in account (id 1) and, for the
+  // owner's viewingAs parameter, any other email (id 2).
+  const scopeDirectory = {
+    lookup: async (email) => {
+      const normalized = String(email).toLowerCase();
+      if (user && normalized === String(user.email).toLowerCase()) {
+        return { ...user, is_active: true };
+      }
+      return { id: 2, email: normalized, name: null, role: 'member', is_active: true, tour_completed: true };
+    }
+  };
 
   const container = {
     config,
     logger: silentLogger,
+    dataScopeService: new DataScopeService({ userDirectory: scopeDirectory }),
     authenticationService: {
       describeClientConfig: () => ({ clientId: config.auth.googleClientId }),
       resolveCurrentUser: async () => user,

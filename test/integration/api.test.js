@@ -73,7 +73,96 @@ test('a signed-in user gets their own profile', async () => {
   await withApp({}, async (server) => {
     const response = await server.request('/api/auth/me');
     assert.equal(response.status, 200);
-    assert.deepEqual(response.body.user, { email: 'owner@example.com', name: 'Owner', role: 'owner' });
+    assert.deepEqual(response.body.user, {
+      id: 1,
+      email: 'owner@example.com',
+      name: 'Owner',
+      role: 'owner',
+      tour_completed: true
+    });
+  });
+});
+
+test('a new account signs in flagged for consent, with no session cookie', async () => {
+  const services = {
+    authenticationService: {
+      describeClientConfig: () => ({ clientId: 'test-client-id' }),
+      resolveCurrentUser: async () => null,
+      signInWithGoogle: async (credential) => {
+        assert.equal(credential, 'google-jwt');
+        return { user: { email: 'new@example.com', name: 'New' }, needsConsent: true };
+      }
+    }
+  };
+  await withApp({ user: null, services }, async (server) => {
+    const response = await server.request('/api/auth/google', { method: 'POST', body: { credential: 'google-jwt' } });
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { user: { email: 'new@example.com', name: 'New' }, needsConsent: true });
+    assert.equal(response.headers.get('set-cookie'), null, 'no cookie before the profile exists');
+  });
+});
+
+test('consent completes a first sign-in with a session cookie', async () => {
+  const services = {
+    authenticationService: {
+      describeClientConfig: () => ({ clientId: 'test-client-id' }),
+      resolveCurrentUser: async () => null,
+      acceptConsent: async (credential, name) => {
+        assert.equal(credential, 'google-jwt');
+        return { user: { email: 'new@example.com', name: name || 'New' }, token: 'signed-token' };
+      }
+    }
+  };
+  await withApp({ user: null, services }, async (server) => {
+    const response = await server.request('/api/auth/consent', {
+      method: 'POST',
+      body: { credential: 'google-jwt', name: 'New Name' }
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(response.body, { user: { email: 'new@example.com', name: 'New Name' } });
+    assert.match(response.headers.get('set-cookie'), /shootingtracker_session=signed-token/);
+  });
+});
+
+test('the tour-completed flag is saved for the signed-in account', async () => {
+  const calls = [];
+  const services = {
+    accessService: {
+      markTourCompleted: async (email) => calls.push(email)
+    }
+  };
+  await withApp({ services }, async (server) => {
+    assert.equal((await server.request('/api/auth/me/tour-completed', { method: 'POST' })).status, 200);
+    assert.deepEqual(calls, ['owner@example.com']);
+  });
+  await withApp({ user: null, services }, async (server) => {
+    assert.equal((await server.request('/api/auth/me/tour-completed', { method: 'POST' })).status, 401);
+  });
+});
+
+test('the owner’s viewingAs choice becomes the request’s data scope', async () => {
+  const calls = [];
+  const services = {
+    shootService: {
+      list: async (query, scope) => {
+        calls.push(scope);
+        return [];
+      }
+    }
+  };
+  await withApp({ services }, async (server) => {
+    await server.request('/api/shoots?viewingAs=other@example.com');
+    await server.request('/api/shoots');
+    assert.equal(calls[0].targetId, 2, 'the chosen account is the read target');
+    assert.equal(calls[0].writeId, 2, '…and the write target, while an owner is viewing');
+    assert.equal(calls[0].selfId, 1, 'the signed-in owner is still who they are');
+    assert.equal(calls[1].targetId, 1, 'no choice → own data');
+    assert.equal(calls[1].writeId, 1, '…and writes stay on the owner’s own data');
+  });
+
+  await withApp({ user: { id: 2, email: 'member@example.com', name: 'M', role: 'member' }, services }, async (server) => {
+    await server.request('/api/shoots?viewingAs=owner@example.com');
+    assert.equal(calls[2].targetId, 2, 'a member’s viewingAs is ignored, not honoured');
   });
 });
 
@@ -217,6 +306,53 @@ test('only owners may reach the access endpoints', async () => {
     const patched = await server.request('/api/users/1', { method: 'PATCH', body: { is_active: false } });
     assert.equal(patched.body.user.actor, 'owner@example.com', 'the actor is passed to the policy');
     assert.deepEqual((await server.request('/api/users/1', { method: 'DELETE' })).body.removed.id, '1');
+  });
+});
+
+test('an owner can switch another account’s role through the API', async () => {
+  const { AccessService } = require('../../server/services/access-service');
+  const { UserDirectory } = require('../../server/services/user-directory');
+  const { FakeUserRepository, noopSchemaInitializer } = require('../helpers/fakes');
+
+  const userRepository = new FakeUserRepository([
+    { id: 1, email: 'owner@example.com', role: 'owner' },
+    { id: 2, email: 'second@example.com', role: 'owner' },
+    { id: 3, email: 'member@example.com', role: 'member' }
+  ]);
+  const userDirectory = new UserDirectory({ userRepository, schemaInitializer: noopSchemaInitializer });
+  const services = {
+    accessService: new AccessService({
+      userRepository,
+      userDirectory,
+      schemaInitializer: noopSchemaInitializer
+    })
+  };
+
+  await withApp({ services }, async (server) => {
+    // signed-in account is owner@example.com (id 1)
+    const promote = await server.request('/api/users/3', { method: 'PATCH', body: { role: 'owner' } });
+    assert.equal(promote.status, 200);
+    assert.equal(promote.body.user.role, 'owner');
+
+    const demote = await server.request('/api/users/2', { method: 'PATCH', body: { role: 'member' } });
+    assert.equal(demote.status, 200);
+    assert.equal(demote.body.user.role, 'member');
+
+    const selfChange = await server.request('/api/users/1', { method: 'PATCH', body: { role: 'member' } });
+    assert.equal(selfChange.status, 403);
+    assert.match(selfChange.body.error, /your own role/);
+
+    const badRole = await server.request('/api/users/3', { method: 'PATCH', body: { role: 'superuser' } });
+    assert.equal(badRole.status, 400);
+    assert.match(badRole.body.error, /role must be one of/);
+
+    const added = await server.request('/api/users', { method: 'POST', body: { email: 'fresh@example.com', role: 'owner' } });
+    assert.equal(added.status, 201);
+    assert.equal(added.body.user.role, 'member', 'a sent role is ignored — people join as members');
+
+    const rows = await userRepository.list();
+    assert.equal(rows.find((row) => row.id === 2).role, 'member', 'the demotion reached the row');
+    assert.equal(rows.find((row) => row.id === 3).role, 'owner', 'the promotion reached the row');
   });
 });
 

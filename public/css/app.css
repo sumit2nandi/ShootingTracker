@@ -534,9 +534,27 @@ tbody tr:hover { background: var(--surface-2); }
 .modal-head { border-bottom: 1px solid var(--line); }
 #shoot-form { padding: 14px 18px 8px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
-.field { display: flex; flex-direction: column; gap: 5px; }
+.field { display: flex; flex-direction: column; gap: 5px; position: relative; }
 .field.span-2 { grid-column: span 2; }
 .field label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 650; }
+/* the title field's past-title suggestions (a hand-rolled list — datalists
+   do not fire for inputs inside this modal's display:none life) */
+.field-suggest {
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 40;
+  margin-top: 3px; padding: 4px;
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: 10px;
+  box-shadow: var(--shadow-md);
+  max-height: 200px; overflow-y: auto;
+}
+.field-suggest[hidden] { display: none; }
+.field-suggest-item {
+  display: block; width: 100%; padding: 9px 10px;
+  font-size: 13.5px; font-family: inherit; text-align: left;
+  color: var(--text); background: none; border: 0; border-radius: 7px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.field-suggest-item:hover { background: var(--slate-soft); }
+.field-suggest-item.active { background: var(--accent-soft); color: var(--accent-strong); }
 @media (max-width: 560px) {
   .form-grid { grid-template-columns: 1fr; }
   .field.span-2 { grid-column: span 1; }
@@ -747,6 +765,7 @@ tbody tr:hover { background: var(--surface-2); }
 @keyframes toastin { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
 .toast.ok { border-color: var(--green-line); }
 .toast.err { border-color: var(--red-line); }
+.toast.info { border-color: var(--accent-line); }
 .toast.leaving { opacity: 0; transform: translateY(6px); transition: all .25s; }
 
 .empty { text-align: center; color: var(--muted); padding: 32px 10px; font-size: 13.5px; }
@@ -765,16 +784,34 @@ tbody tr:hover { background: var(--surface-2); }
 .access-who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .access-actions { display: flex; gap: 6px; flex: none; }
 .access-actions .btn { padding: 5px 10px; font-size: 12px; }
+.role-select {
+  flex: none;
+  appearance: none;
+  padding: 5px 26px 5px 10px;
+  font-size: 12px;
+  font-weight: 650;
+  font-family: inherit;
+  color: var(--muted);
+  background: var(--surface) var(--select-arrow) no-repeat right 8px center;
+  border: 1px solid var(--line-2);
+  border-radius: var(--pill);
+}
+.role-select.owner { color: var(--violet); border-color: rgba(124, 93, 250, .4); }
+.role-select:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.role-select:disabled { opacity: .55; cursor: not-allowed; }
 .access-add {
-  display: grid; grid-template-columns: 1fr 1fr auto; grid-template-areas: "email name role" "add add add";
+  display: grid; grid-template-columns: 1fr 1fr auto; grid-template-areas: "email name add";
   gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line);
 }
 .access-add input[name="email"] { grid-area: email; }
 .access-add input[name="name"] { grid-area: name; }
-.access-add select { grid-area: role; }
 .access-add button { grid-area: add; }
+.access-add-hint {
+  grid-column: 1 / -1; margin: 0; line-height: 1.45;
+}
+.access-add-hint code { font-size: .92em; }
 @media (max-width: 560px) {
-  .access-add { grid-template-columns: 1fr; grid-template-areas: "email" "name" "role" "add"; }
+  .access-add { grid-template-columns: 1fr; grid-template-areas: "email" "name" "add"; }
   .access-row { flex-wrap: wrap; }
   .access-actions { width: 100%; justify-content: flex-end; }
 }
@@ -911,4 +948,149 @@ body.app-ready .app-loader { opacity: 0; visibility: hidden; pointer-events: non
 }
 @media (prefers-reduced-motion: reduce) {
   .app-loader-ring .ring-arc { stroke-dasharray: 220; opacity: .35; }
+}
+
+/* ============ owner "viewing" mode ============
+   A thin banner under the filter bar says whose data is on screen while an
+   owner looks at another account. The `hidden` attribute is the source of
+   truth for visibility — the [hidden] rule below keeps it above display:flex. */
+.viewing-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--amber-soft);
+  border-bottom: 1px solid rgba(180, 83, 9, .18);
+}
+.viewing-banner[hidden] { display: none; }
+.viewing-banner-text {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--amber);
+  font-weight: 600;
+}
+.viewing-banner-back {
+  flex: none;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--amber);
+  border: 1px solid rgba(180, 83, 9, .3);
+  border-radius: var(--pill);
+  background: var(--surface);
+}
+.viewing-banner-back:hover { background: #fff7ec; }
+
+/* the profile tab's "whose data do you want to see" switch (owners only) */
+.viewing-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.viewing-select {
+  width: 100%;
+  appearance: none;
+  padding: 11px 34px 11px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface-2) var(--select-arrow) no-repeat right 12px center;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm);
+}
+.viewing-select:focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--accent); }
+.viewing-hint { margin: 10px 0 0; font-size: 12px; line-height: 1.5; }
+
+/* ============ first-login tour ============
+   A dark scrim with a cut-out spotlight over the described element and a card
+   beside it. Positioning is set inline by ui/tour.js; these are the materials. */
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  font-family: inherit;
+}
+/* while the tour is up the page itself must not scroll from under it */
+body.tour-open { overflow: hidden; }
+
+.tour-highlight {
+  position: fixed;
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--accent-fill);
+  box-shadow: 0 0 0 9999px rgba(15, 12, 34, .62), 0 0 0 6px rgba(124, 58, 237, .18);
+  pointer-events: none;
+  transition: top .22s ease, left .22s ease, width .22s ease, height .22s ease;
+}
+/* .btn sets display, which would otherwise override the hidden attribute */
+.tour-card [hidden] { display: none; }
+
+/* the welcome step has no spotlight: a plain full-screen scrim instead */
+.tour-highlight.full {
+  border: none;
+  border-radius: 0;
+  background: rgba(15, 12, 34, .62);
+  box-shadow: none;
+  transition: none;
+}
+.tour-card {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 201;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  padding: 18px 20px 16px;
+  color: var(--text);
+  transition: top .22s ease, left .22s ease, transform .22s ease;
+}
+.tour-step {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.tour-title { margin: 0 0 8px; font-size: 18px; letter-spacing: -.3px; }
+.tour-body { margin: 0 0 14px; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+.tour-dots { display: flex; gap: 6px; margin-bottom: 14px; }
+.tour-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line-2);
+  transition: background .15s, transform .15s;
+}
+.tour-dot.active { background: var(--accent-fill); transform: scale(1.25); }
+.tour-actions { display: flex; align-items: center; gap: 8px; }
+.tour-spacer { flex: 1; }
+.tour-actions .btn { padding: 8px 14px; font-size: 13px; }
+.tour-actions .btn-primary { background: var(--accent-fill); box-shadow: var(--accent-fill-glow); }
+/* phones: the card is a full-width sheet with roomy, thumb-sized buttons */
+@media (max-width: 640px) {
+  .tour-card {
+    padding: 14px 16px calc(13px + env(safe-area-inset-bottom, 0px));
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tour-title { font-size: 16.5px; }
+  .tour-body { font-size: 14px; line-height: 1.5; }
+  .tour-dots { gap: 7px; }
+  .tour-dot { width: 8px; height: 8px; }
+  .tour-spacer { display: none; }
+  .tour-actions { gap: 8px; }
+  .tour-actions .btn {
+    flex: 1;
+    min-height: 46px;
+    padding: 12px 8px;
+    font-size: 14.5px;
+  }
 }

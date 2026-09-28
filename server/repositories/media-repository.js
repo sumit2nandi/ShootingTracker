@@ -28,6 +28,19 @@ class MediaRepository {
     return result.rows[0].id;
   }
 
+  /**
+   * The `owner_id` of the shoot a media link belongs to.
+   *
+   * @returns {Promise<number|null>} null when the link does not exist
+   */
+  async ownerOfMedia(id) {
+    const result = await this.database.query(
+      'SELECT s.owner_id FROM media m JOIN shoots s ON s.id = m.shoot_id WHERE m.id = $1',
+      [id]
+    );
+    return result.rows.length ? result.rows[0].owner_id : null;
+  }
+
   /** @returns {Promise<boolean>} whether a row was deleted */
   async deleteById(id) {
     const result = await this.database.query('DELETE FROM media WHERE id = $1', [id]);

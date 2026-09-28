@@ -83,7 +83,16 @@ async function seed() {
   const { logger, container } = createRuntime({ timestamps: false });
   try {
     await container.database.query(`DELETE FROM shoots WHERE title LIKE '${DEMO_TITLE_PREFIX}%'`);
-    const result = await container.shootImporter.import(buildDemoRows());
+
+    // Data is per-user, so the demo rows need a home: the first active owner,
+    // else the first account in the list.
+    const owners = await container.database.query(
+      `SELECT id FROM app_users WHERE is_active ORDER BY (role = 'owner') DESC, id LIMIT 1`
+    );
+    const ownerId = owners.rows.length ? owners.rows[0].id : null;
+    if (ownerId === null) logger.warn('No accounts in app_users — demo rows will be invisible. Run the app first to create one.');
+
+    const result = await container.shootImporter.import(buildDemoRows(), ownerId);
     logger.info(`Demo seed: ${result.inserted} shoots, ${result.payments} payments.`);
     if (result.errors.length) logger.warn(`${result.errors.length} row(s) failed:`, result.errors[0].error);
   } catch (error) {

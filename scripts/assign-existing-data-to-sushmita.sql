@@ -1,3 +1,17 @@
+
+-- ============================================================
+-- ShootingTracker — one-time migration (paste this whole file
+-- into the Aiven web console and run it).
+--
+--   Part 1: the idempotent schema — creates missing objects and
+--           converges a database that predates per-user data
+--           (adds app_users.tour_completed and shoots.owner_id).
+--   Part 2: hands every unowned shoot to sushmitaghosh0099@gmail.com.
+--
+-- Equivalent to:  npm run assign:existing
+-- Safe to re-run: running it twice changes nothing.
+-- ============================================================
+
 -- ============================================================
 -- ShootingTracker schema (PostgreSQL)
 -- Idempotent: safe to run repeatedly (including in the Aiven
@@ -145,3 +159,45 @@ DROP TRIGGER IF EXISTS shoots_set_updated_at ON shoots;
 CREATE TRIGGER shoots_set_updated_at
   BEFORE UPDATE ON shoots
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ============================================================
+-- Part 2: give all pre-existing (unowned) shoots to
+-- sushmitaghosh0099@gmail.com
+-- ============================================================
+
+-- Make sure the account exists. An existing row is left exactly as-is
+-- (name, role, active flag untouched); it is only created when missing.
+INSERT INTO app_users (email, name, role, tour_completed)
+VALUES ('sushmitaghosh0099@gmail.com', 'Sushmita Ghosh', 'member', TRUE)
+ON CONFLICT (lower(email)) DO NOTHING;
+
+-- Point every shoot that has no owner yet at the account.
+UPDATE shoots
+SET owner_id = (SELECT id FROM app_users WHERE lower(email) = 'sushmitaghosh0099@gmail.com')
+WHERE owner_id IS NULL;
+
+-- Existing accounts have already "been here" — the first-login tour is only
+-- for accounts created from now on.
+UPDATE app_users
+SET tour_completed = TRUE
+WHERE tour_completed = FALSE;
+
+-- (Optional, --all variant) Re-home EVERY shoot, including ones already owned
+-- by another account — the three statements above only touch unowned rows.
+-- Uncomment and run ONLY if you really want that:
+--
+-- UPDATE shoots
+-- SET owner_id = (SELECT id FROM app_users WHERE lower(email) = 'sushmitaghosh0099@gmail.com');
+
+-- ------------------------------------------------------------
+-- Check the result (a result set appears below this query):
+--   total shoots, how many are owned by the account, how many unowned.
+-- ------------------------------------------------------------
+SELECT
+  count(*)                                            AS total_shoots,
+  count(*) FILTER (WHERE s.owner_id = u.id)           AS owned_by_sushmita,
+  count(*) FILTER (WHERE s.owner_id IS NULL)          AS still_unowned,
+  count(*) FILTER (WHERE s.owner_id IS NOT NULL
+                    AND s.owner_id <> u.id)           AS owned_by_someone_else
+FROM shoots s
+JOIN app_users u ON lower(u.email) = 'sushmitaghosh0099@gmail.com';

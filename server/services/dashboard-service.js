@@ -15,9 +15,12 @@ class DashboardService {
     this.analyticsRepository = analyticsRepository;
   }
 
-  /** @param {Record<string, string>} query */
-  async summarize(query) {
-    const filter = ShootFilter.fromQuery(query);
+  /**
+   * @param {Record<string, string>} query
+   * @param {import('../domain/data-scope').DataScope} scope the account whose data the dashboard shows
+   */
+  async summarize(query, scope) {
+    const filter = ShootFilter.fromQuery({ ...query, owner: scope.filterOwner });
     const [kpi, monthly, byCoordinator, byType, byStatus, upcoming, attention] = await Promise.all([
       this.analyticsRepository.kpis(filter),
       this.analyticsRepository.monthlyTotals(filter),

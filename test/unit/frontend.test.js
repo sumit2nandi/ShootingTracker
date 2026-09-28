@@ -152,6 +152,51 @@ test('the API facade maps use cases onto endpoints', async () => {
   assert.deepEqual(calls[4], ['GET', '/api/auth/me', undefined]);
 });
 
+test('the owner’s viewing choice rides along on reads and on writes', async () => {
+  const { ShootingTrackerApi } = await load('data/shooting-tracker-api.js');
+  const calls = [];
+  const record = (method) => (path, body, query) => {
+    calls.push([method, path, body, query]);
+    return Promise.resolve({ user: { email: 'a@example.com' }, users: [] });
+  };
+  const api = new ShootingTrackerApi({
+    client: { get: record('GET'), post: record('POST'), put: record('PUT'), patch: record('PATCH'), delete: record('DELETE') }
+  });
+
+  assert.equal(api.withViewing('month=2026-04'), 'month=2026-04', 'no choice → the query is untouched');
+
+  api.setViewingAs('Other@Example.com');
+  const viewingAs = encodeURIComponent('other@example.com');
+  await api.listShoots('month=2026-04');
+  await api.dashboard('');
+  await api.listShootsBetween('2026-04-01', '2026-04-30');
+  await api.meta();
+  await api.getShoot(9);
+  await api.createShoot({ title: 'X' });
+  await api.updateShoot(7, { fee: 1 });
+
+  assert.deepEqual(calls[0], ['GET', '/api/shoots', `month=2026-04&viewingAs=${viewingAs}`, undefined]);
+  assert.deepEqual(calls[1], ['GET', '/api/dashboard', `viewingAs=${viewingAs}`, undefined]);
+  assert.deepEqual(calls[2], ['GET', '/api/shoots', `from=2026-04-01&to=2026-04-30&viewingAs=${viewingAs}`, undefined]);
+  assert.deepEqual(calls[3], ['GET', '/api/meta', `viewingAs=${viewingAs}`, undefined]);
+  assert.deepEqual(calls[4], ['GET', '/api/shoots/9', `viewingAs=${viewingAs}`, undefined], 'the detail read follows the choice');
+  assert.deepEqual(calls[5], ['POST', '/api/shoots', { title: 'X' }, `viewingAs=${viewingAs}`], 'a create follows the choice too');
+  assert.deepEqual(calls[6], ['PUT', '/api/shoots/7', { fee: 1 }, `viewingAs=${viewingAs}`], '…and so does an update');
+
+  api.setViewingAs(null);
+  assert.equal(api.withViewing(''), undefined, 'and it can be switched back off');
+  await api.createShoot({ title: 'Y' });
+  assert.deepEqual(calls[7], ['POST', '/api/shoots', { title: 'Y' }, undefined], 'back on own data → plain write');
+});
+
+test('the tour-completion call hits the auth endpoint', async () => {
+  const { ShootingTrackerApi } = await load('data/shooting-tracker-api.js');
+  const calls = [];
+  const api = new ShootingTrackerApi({ client: { post: (path, body) => calls.push([path, body]) } });
+  await api.markTourCompleted();
+  assert.deepEqual(calls, [['/api/auth/me/tour-completed', undefined]]);
+});
+
 test('calendar grouping spreads multi-day shoots across their range', async () => {
   const { groupByDay, pageDelta } = await load('ui/calendar-view.js');
 
@@ -182,7 +227,7 @@ test('the shoots table groups rows by month in API order', async () => {
   assert.equal(groups.get('2026-05').length, 2);
 });
 
-test('a shoot can be wrapped up from the dashboard after 7 pm IST', async () => {
+test('a shoot can be wrapped up from the dashboard after 7 pm on its own date', async () => {
   const { isWrapUpTime, zonedNow, outstandingAmount, WRAP_UP_HOUR } = await load('domain/wrap-up.js');
 
   // 13:35 UTC is 19:05 in Kolkata (+5:30)
@@ -191,15 +236,16 @@ test('a shoot can be wrapped up from the dashboard after 7 pm IST', async () => 
 
   assert.equal(WRAP_UP_HOUR, 19);
   assert.deepEqual(zonedNow(evening), { date: '2026-04-02', hour: 19 });
-  assert.equal(isWrapUpTime('2026-04-02', evening), true);
-  assert.equal(isWrapUpTime('2026-04-02', lateAfternoon), false, 'not before 7 pm');
-  assert.equal(isWrapUpTime('2026-04-03', evening), false, 'only today’s shoots');
+  assert.equal(isWrapUpTime('2026-04-02', evening), true, 'past 7 pm on the shoot’s date');
+  assert.equal(isWrapUpTime('2026-04-02', lateAfternoon), false, 'not before 7 pm on that date');
+  assert.equal(isWrapUpTime('2026-04-03', evening), false, 'the shoot’s 7 pm has not come yet');
+  assert.equal(isWrapUpTime('2026-04-01', evening), true, 'a past shoot’s 7 pm has already passed');
   assert.equal(isWrapUpTime('', evening), false);
 
   // 19:00 UTC is already past midnight in Kolkata, so it is the next day at 00:30
   const pastMidnightIst = new Date('2026-04-02T19:00:00Z');
   assert.deepEqual(zonedNow(pastMidnightIst), { date: '2026-04-03', hour: 0 });
-  assert.equal(isWrapUpTime('2026-04-03', pastMidnightIst), false);
+  assert.equal(isWrapUpTime('2026-04-03', pastMidnightIst), false, '00:30 on the shoot’s day is before its 7 pm');
 
   assert.equal(outstandingAmount({ fee: '45000.00', paid_amount: '20000.00' }), 25000);
   assert.equal(outstandingAmount({ fee: 1000, paid_amount: 1000 }), 0);

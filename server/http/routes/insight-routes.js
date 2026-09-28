@@ -24,15 +24,15 @@ function createInsightRouter({ healthService, metadataService, dashboardService 
 
   router.get(
     '/meta',
-    asyncHandler(async (_req, res) => {
-      res.json(await metadataService.describe());
+    asyncHandler(async (req, res) => {
+      res.json(await metadataService.describe(req.scope));
     })
   );
 
   router.get(
     '/dashboard',
     asyncHandler(async (req, res) => {
-      res.json(await dashboardService.summarize(req.query));
+      res.json(await dashboardService.summarize(req.query, req.scope));
     })
   );
 

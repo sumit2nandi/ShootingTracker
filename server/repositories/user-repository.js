@@ -3,7 +3,7 @@
 const { AccessPolicy } = require('../domain/access-policy');
 const { withTranslatedErrors } = require('../persistence/pg-error-translator');
 
-const USER_COLUMNS = 'id, email, name, role, is_active';
+const USER_COLUMNS = 'id, email, name, role, is_active, tour_completed';
 
 /** SQL for `app_users` — the list of accounts allowed to sign in. */
 class UserRepository {
@@ -36,26 +36,48 @@ class UserRepository {
   }
 
   /**
+   * Create an account that does not exist yet.
+   *
+   * Unlike {@link upsert} this never reactivates or alters an existing row —
+   * it is the consent flow's insert, and a deactivated account must stay
+   * deactivated no matter how often its owner tries to "sign in".
+   *
+   * @param {{ email: string, name?: string|null }} user
+   * @returns {Promise<object|null>} the new row, or null when the email was already taken
+   */
+  async createNewUser({ email, name }) {
+    const result = await this.database.query(
+      `INSERT INTO app_users (email, name, role, tour_completed)
+       VALUES ($1, $2, 'member', FALSE)
+       ON CONFLICT (lower(email)) DO NOTHING
+       RETURNING ${USER_COLUMNS}`,
+      [AccessPolicy.normalizeEmail(email), (name && String(name).trim()) || null]
+    );
+    return result.rows[0] || null;
+  }
+
+  /**
    * Add an account, or reactivate one that already exists.
    *
-   * @param {{ email: string, name?: string|null, role?: string }} user
+   * New accounts always arrive as members. Re-adding an existing account
+   * updates the name and reactivates the row — it never touches the role,
+   * which can only be changed in the database (see AccessPolicy).
+   *
+   * @param {{ email: string, name?: string|null, role?: string }} user the
+   *        `role` is ignored on purpose (see above); kept in the signature so
+   *        callers cannot smuggle one in.
    */
-  async upsert({ email, name, role }) {
+  async upsert({ email, name }) {
     const result = await withTranslatedErrors(
       () =>
         this.database.query(
           `INSERT INTO app_users (email, name, role)
-           VALUES ($1, $2, COALESCE($3, 'member'))
+           VALUES ($1, $2, 'member')
            ON CONFLICT (lower(email)) DO UPDATE
              SET name = COALESCE(EXCLUDED.name, app_users.name),
-                 role = COALESCE($3, app_users.role),
                  is_active = TRUE
            RETURNING ${USER_COLUMNS}`,
-          [
-            AccessPolicy.normalizeEmail(email),
-            (name && String(name).trim()) || null,
-            AccessPolicy.coerceRole(role)
-          ]
+          [AccessPolicy.normalizeEmail(email), (name && String(name).trim()) || null]
         ),
       { conflictMessage: 'That email is already in the list' }
     );
@@ -65,6 +87,7 @@ class UserRepository {
   /**
    * @param {number|string} id
    * @param {{ name?: string|null, role?: string, is_active?: boolean }} patch
+   *        — values are validated upstream by {@link AccessPolicy}
    * @returns {Promise<object|null>} the updated row, or null when nothing matched
    */
   async update(id, patch = {}) {
@@ -75,7 +98,7 @@ class UserRepository {
       assignments.push(`${column} = $${params.length}`);
     };
     if (patch.name !== undefined) set('name', (patch.name && String(patch.name).trim()) || null);
-    if (patch.role !== undefined) set('role', AccessPolicy.coerceRole(patch.role));
+    if (patch.role !== undefined) set('role', patch.role);
     if (patch.is_active !== undefined) set('is_active', Boolean(patch.is_active));
     if (!assignments.length) return null;
 
@@ -86,6 +109,19 @@ class UserRepository {
       params
     );
     return result.rows[0] || null;
+  }
+
+  /**
+   * Remember that an account has seen the first-login tour.
+   *
+   * @returns {Promise<boolean>} whether a row was updated
+   */
+  async markTourCompleted(email) {
+    const result = await this.database.query(
+      'UPDATE app_users SET tour_completed = TRUE WHERE lower(email) = $1 AND tour_completed = FALSE',
+      [AccessPolicy.normalizeEmail(email)]
+    );
+    return result.rowCount > 0;
   }
 
   /** @returns {Promise<{ id: number, email: string }|null>} */

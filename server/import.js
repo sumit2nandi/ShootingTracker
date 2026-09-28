@@ -1,8 +1,11 @@
 'use strict';
 
 // CLI importer.
-//   node server/import.js <file.html|file.csv|file.json> [--dry-run] [--emit-sql out.sql]
+//   node server/import.js <file.html|file.csv|file.json> [--owner email] [--dry-run] [--emit-sql out.sql]
 //
+//   --owner email The account (app_users email) the imported data belongs to.
+//                 Data is per-user, so without this the rows are left
+//                 unassigned and no one will see them in the app.
 //   --dry-run     Parse only; print a summary and sample rows, touch no DB.
 //   --emit-sql    Write a standalone .sql (safe for the Aiven web console).
 //   (default)     Insert into the configured DATABASE_URL.
@@ -11,23 +14,29 @@ const fs = require('fs');
 const { createRuntime } = require('./bootstrap');
 const { emitSql } = require('./import/sql-emitter');
 
-const USAGE = 'Usage: node server/import.js <file.html|csv|json> [--dry-run] [--emit-sql out.sql]';
+const USAGE =
+  'Usage: node server/import.js <file.html|csv|json> [--owner email] [--dry-run] [--emit-sql out.sql]';
 
 /**
  * Pure argument parsing, so the CLI's contract is unit-testable.
  *
  * @param {string[]} argv
- * @returns {{ file: string|null, dryRun: boolean, emitSql: boolean, sqlOut: string|null }}
+ * @returns {{ file: string|null, dryRun: boolean, emitSql: boolean, sqlOut: string|null, ownerEmail: string|null }}
  */
 function parseArguments(argv) {
-  const positional = argv.filter((arg, index) => !arg.startsWith('--') && argv[index - 1] !== '--emit-sql');
+  const positional = argv.filter(
+    (arg, index) => !arg.startsWith('--') && argv[index - 1] !== '--emit-sql' && argv[index - 1] !== '--owner'
+  );
   const emitIndex = argv.indexOf('--emit-sql');
+  const ownerIndex = argv.indexOf('--owner');
   const next = emitIndex >= 0 ? argv[emitIndex + 1] : undefined;
+  const owner = ownerIndex >= 0 ? argv[ownerIndex + 1] : undefined;
   return {
     file: positional[0] || null,
     dryRun: argv.includes('--dry-run'),
     emitSql: emitIndex >= 0,
-    sqlOut: next && !next.startsWith('--') ? next : null
+    sqlOut: next && !next.startsWith('--') ? next : null,
+    ownerEmail: owner && !owner.startsWith('--') ? owner : null
   };
 }
 
@@ -84,7 +93,23 @@ async function run(argv = process.argv.slice(2)) {
       return;
     }
 
-    const result = await container.shootImporter.import(parsed.rows);
+    let ownerId = null;
+    if (options.ownerEmail) {
+      const result = await container.userRepository.findByEmail(options.ownerEmail);
+      if (!result) {
+        logger.error(`--owner ${options.ownerEmail} is not in app_users; the import would leave rows unassigned.`);
+        process.exitCode = 1;
+        return;
+      }
+      ownerId = result.id;
+    } else {
+      logger.warn(
+        'No --owner given: rows will be unassigned and invisible in the app. ' +
+          'Pass --owner <email> (an app_users email) to make them visible.'
+      );
+    }
+
+    const result = await container.shootImporter.import(parsed.rows, ownerId);
     logger.info('\nImport result:');
     logger.info(`  inserted shoots : ${result.inserted}`);
     logger.info(`  skipped (dupes) : ${result.skipped}`);

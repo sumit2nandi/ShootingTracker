@@ -16,14 +16,14 @@ function createPaymentRouter({ paymentService }) {
     '/shoots/:id/payments',
     asyncHandler(async (req, res) => {
       const shootId = parseId(req.params.id, 'shoot id');
-      res.status(201).json(await paymentService.record(shootId, req.body || {}));
+      res.status(201).json(await paymentService.record(shootId, req.body || {}, req.scope));
     })
   );
 
   router.delete(
     '/payments/:id',
     asyncHandler(async (req, res) => {
-      await paymentService.remove(parseId(req.params.id, 'payment id'));
+      await paymentService.remove(parseId(req.params.id, 'payment id'), req.scope);
       res.json({ ok: true });
     })
   );

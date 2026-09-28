@@ -43,9 +43,12 @@ class ImportService {
 
   /**
    * @param {{ content: string, format?: string, dryRun?: boolean }} request
+   * @param {import('../domain/data-scope').DataScope} [scope] when set, imported
+   *        rows belong to the account in the scope's write position — the
+   *        signed-in account, or the one an owner is viewing
    * @returns {Promise<object>} the API payload for `POST /api/import`
    */
-  async execute({ content, format, dryRun = false }) {
+  async execute({ content, format, dryRun = false }, scope) {
     const parsed = this.sheetParser.parse(content, format);
 
     if (dryRun) {
@@ -59,7 +62,7 @@ class ImportService {
       };
     }
 
-    const result = await this.shootImporter.import(parsed.rows);
+    const result = await this.shootImporter.import(parsed.rows, scope ? scope.writeId : null);
     return { dryRun: false, format: parsed.format, ...result, unmapped: parsed.unmapped };
   }
 }

@@ -9,6 +9,7 @@
     "test": "node --test \"test/**/*.test.js\"",
     "test:watch": "node --test --watch \"test/**/*.test.js\"",
     "migrate": "node server/migrate.js",
+    "assign:existing": "node scripts/assign-existing-data-to-sushmita.js",
     "import": "node server/import.js",
     "seed:demo": "node server/seed-demo.js",
     "dev:pg": "node scripts/dev-postgres.js",

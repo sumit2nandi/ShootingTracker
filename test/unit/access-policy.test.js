@@ -26,24 +26,63 @@ test('roles outside the vocabulary fall back to member', () => {
   assert.equal(AccessPolicy.coerceRole('superuser'), 'member');
 });
 
-test('the last active owner cannot be demoted or deactivated', () => {
+test('an owner may switch another account’s role — both directions', () => {
+  const users = [owner, secondOwner, member];
+  const actor = { email: 'second@example.com' };
+  // owner → member, with another active owner still around
+  assert.doesNotThrow(
+    () => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'member' }, actor })
+  );
+  // member → owner
+  assert.doesNotThrow(
+    () => AccessPolicy.assertCanUpdate({ users, target: member, patch: { role: 'owner' }, actor })
+  );
+  // and a no-op rewrite of an owner’s role (by a different account)
+  assert.doesNotThrow(
+    () => AccessPolicy.assertCanUpdate({ users, target: secondOwner, patch: { role: 'owner' }, actor: { email: 'owner@example.com' } })
+  );
+});
+
+test('nobody may change their own role from the app', () => {
+  const users = [owner, secondOwner, member];
+  assert.throws(
+    () => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'member' }, actor: { email: 'OWNER@example.com' } }),
+    /cannot change your own role/
+  );
+  assert.throws(
+    () => AccessPolicy.assertCanUpdate({ users, target: member, patch: { role: 'owner' }, actor: { email: 'member@example.com' } }),
+    /cannot change your own role/
+  );
+});
+
+test('the last active owner cannot be demoted', () => {
   const users = [owner, member, inactiveOwner];
-  assert.throws(() => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'member' } }), ConflictError);
+  assert.throws(
+    () => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'member' }, actor: member }),
+    /At least one active owner is required/
+  );
+});
+
+test('a role outside the vocabulary is rejected', () => {
+  const users = [owner, secondOwner, member];
+  assert.throws(
+    () => AccessPolicy.assertCanUpdate({ users, target: member, patch: { role: 'superuser' }, actor: secondOwner }),
+    ValidationError
+  );
+});
+
+test('the last active owner cannot be deactivated', () => {
+  const users = [owner, member, inactiveOwner];
   assert.throws(
     () => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { is_active: false } }),
     /At least one active owner is required/
   );
 });
 
-test('an owner may be demoted while another active owner remains', () => {
-  const users = [owner, secondOwner];
-  assert.doesNotThrow(() => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'member' } }));
-});
-
-test('harmless updates are never blocked', () => {
-  const users = [owner];
+test('deactivating a non-last owner and harmless updates are allowed', () => {
+  const users = [owner, secondOwner, member];
+  assert.doesNotThrow(() => AccessPolicy.assertCanUpdate({ users, target: secondOwner, patch: { is_active: false } }));
   assert.doesNotThrow(() => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { name: 'New Name' } }));
-  assert.doesNotThrow(() => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'owner' } }));
 });
 
 test('nobody can remove their own access', () => {

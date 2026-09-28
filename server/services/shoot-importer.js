@@ -28,9 +28,12 @@ class ShootImporter {
 
   /**
    * @param {object[]} rows rows produced by {@link SheetParser}
+   * @param {number} [ownerId] app_users id the imported data belongs to;
+   *        null (the CLI without `--owner`) leaves rows unassigned, and the
+   *        UI passes the signed-in account's id
    * @returns {Promise<{ inserted: number, skipped: number, payments: number, coordinators: string[], errors: object[] }>}
    */
-  async import(rows) {
+  async import(rows, ownerId = null) {
     const summary = { inserted: 0, skipped: 0, payments: 0, coordinators: new Set(), errors: [] };
 
     await this.database.withTransaction(async (executor) => {
@@ -58,6 +61,7 @@ class ShootImporter {
               contact_name: row.contact_name || null,
               contact_phone: row.contact_phone || null,
               notes: row.notes || null,
+              owner_id: ownerId,
               extra: row.extra || {},
               dedupe_hash: row.dedupe_hash || null
             },

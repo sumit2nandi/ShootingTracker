@@ -105,8 +105,8 @@ class ShootRepository {
     const result = await executor.query(
       `INSERT INTO shoots (title, client_name, shoot_type, shoot_date, end_date, start_time, end_time,
                            venue, location, coordinator_id, fee, status, contact_name, contact_phone,
-                           notes, extra, dedupe_hash)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17)
+                           notes, owner_id, extra, dedupe_hash)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17::jsonb,$18)
        ON CONFLICT (dedupe_hash) DO NOTHING
        RETURNING id`,
       [
@@ -125,6 +125,7 @@ class ShootRepository {
         record.contact_name,
         record.contact_phone,
         record.notes,
+        record.owner_id ?? null,
         JSON.stringify(record.extra || {}),
         record.dedupe_hash
       ]

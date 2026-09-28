@@ -89,10 +89,13 @@ export class ShootDrawer {
       row.addEventListener('click', () => this.showShoot(+row.dataset.id))
     );
     this.#bindClose();
-    $('#dp-add').addEventListener('click', () => {
-      this.close();
-      this.actions.newShoot(dateKey);
-    });
+    const add = $('#dp-add');
+    if (add) {
+      add.addEventListener('click', () => {
+        this.close();
+        this.actions.newShoot(dateKey);
+      });
+    }
   }
 
   #shootHtml(shoot, { paid, fee, balance, settled, completed }) {

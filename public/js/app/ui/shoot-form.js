@@ -14,6 +14,9 @@ export class ShootForm {
     this.modal = $('#shoot-modal');
     this.form = $('#shoot-form');
     this.coordinators = [];
+    this.titles = [];
+    this.titleMatches = [];
+    this.titleActive = -1;
   }
 
   mount() {
@@ -34,19 +37,117 @@ export class ShootForm {
       input.hidden = !isNew;
       if (isNew) input.focus();
     });
+    this.#mountTitleSuggestions();
   }
 
-  /** Refresh the coordinator dropdown from `/api/meta`. */
+  /**
+   * The title field offers the account's past titles while typing. It is a
+   * small hand-rolled list rather than a `<datalist>`: this modal spends most
+   * of its life `display: none`, and browsers suppress datalist suggestions
+   * for inputs inside a hidden container — the account's own titles never
+   * surfaced that way.
+   */
+  #mountTitleSuggestions() {
+    const input = this.field('title');
+    const wrap = input.closest('.field');
+    const box = document.createElement('div');
+    box.className = 'field-suggest';
+    box.hidden = true;
+    wrap.appendChild(box);
+    this.titleInput = input;
+    this.titleSuggest = box;
+
+    input.addEventListener('input', () => this.#refreshTitleSuggestions());
+    input.addEventListener('blur', () => setTimeout(() => this.#hideTitleSuggestions(), 120));
+    input.addEventListener('keydown', (event) => this.#onTitleKeydown(event));
+    box.addEventListener('pointerdown', (event) => {
+      const item = event.target.closest('.field-suggest-item');
+      if (!item) return;
+      event.preventDefault(); // keep focus on the input
+      const title = this.titleMatches[Number(item.dataset.index)];
+      if (title !== undefined) input.value = title;
+      this.#hideTitleSuggestions();
+    });
+  }
+
+  #refreshTitleSuggestions() {
+    const query = this.titleInput.value.trim().toLowerCase();
+    this.titleMatches = query ? this.#filterTitles(query) : [];
+    if (!this.titleMatches.length) {
+      this.#hideTitleSuggestions();
+      return;
+    }
+    this.titleActive = 0; // like a native datalist: the first match is the pick
+    this.titleSuggest.innerHTML = this.titleMatches
+      .map((title, index) =>
+        `<button type="button" class="field-suggest-item${index === this.titleActive ? ' active' : ''}" data-index="${index}">${escapeHtml(title)}</button>`)
+      .join('');
+    this.titleSuggest.hidden = false;
+  }
+
+  /** Titles starting with the typed text first, then the other matches. */
+  #filterTitles(query) {
+    const matches = this.titles.filter((title) => title.toLowerCase().includes(query));
+    const leading = matches.filter((title) => title.toLowerCase().startsWith(query));
+    return [...leading, ...matches.filter((title) => !title.toLowerCase().startsWith(query))].slice(0, 8);
+  }
+
+  #hideTitleSuggestions() {
+    this.titleMatches = [];
+    this.titleActive = -1;
+    this.titleSuggest.hidden = true;
+  }
+
+  #onTitleKeydown(event) {
+    const open = !this.titleSuggest.hidden;
+    if (event.key === 'ArrowDown' && !open && this.titles.length) {
+      this.#refreshTitleSuggestions(); // open the list, caret stays put
+      return;
+    }
+    if (!open) return;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const count = this.titleMatches.length;
+      if (!count) return;
+      const delta = event.key === 'ArrowDown' ? 1 : -1;
+      this.titleActive = (this.titleActive + delta + count) % count;
+      [...this.titleSuggest.children].forEach((element, index) =>
+        element.classList.toggle('active', index === this.titleActive));
+    } else if (event.key === 'Enter') {
+      // while the list is open, Enter accepts the highlighted title — it must
+      // not also submit the form (there is no submit, and the default would
+      // reload the page)
+      event.preventDefault();
+      const title = this.titleMatches[this.titleActive];
+      if (title !== undefined) {
+        this.titleInput.value = title;
+        this.#hideTitleSuggestions();
+      }
+    } else if (event.key === 'Escape') {
+      event.stopPropagation(); // close the list, not the modal
+      this.#hideTitleSuggestions();
+    }
+  }
+
+  /** Refresh the coordinator control and the title suggestions from `/api/meta`. */
   populate(meta) {
     this.coordinators = meta.coordinators || [];
+    this.titles = meta.titles || [];
     const select = $('#sel-coordinator');
+    const newInput = $('#coord-new-input');
     if (!select) return;
-    const current = select.value;
-    select.innerHTML =
-      '<option value="">— none —</option>' +
-      this.coordinators.map((coordinator) => `<option value="${escapeHtml(coordinator.name)}">${escapeHtml(coordinator.name)}</option>`).join('') +
-      `<option value="${NEW_COORDINATOR}">➕ New Coordinator…</option>`;
-    if (current && [...select.options].some((option) => option.value === current)) select.value = current;
+    // an account with no past coordinators gets a plain text box instead of a
+    // dropdown that could only say "none" or "new"
+    select.hidden = this.coordinators.length === 0;
+    if (this.coordinators.length) {
+      const current = select.value;
+      select.innerHTML =
+        '<option value="">— none —</option>' +
+        this.coordinators.map((coordinator) => `<option value="${escapeHtml(coordinator.name)}">${escapeHtml(coordinator.name)}</option>`).join('') +
+        `<option value="${NEW_COORDINATOR}">➕ New Coordinator…</option>`;
+      if (current && [...select.options].some((option) => option.value === current)) select.value = current;
+    }
+    newInput.hidden = this.coordinators.length > 0 && select.value !== NEW_COORDINATOR;
   }
 
   /**
@@ -88,9 +189,11 @@ export class ShootForm {
     set('contact_phone', shoot?.contact_phone);
     set('notes', shoot?.notes);
 
-    // coordinator: a known name selects it, an unknown one switches to "new"
+    // coordinator: a known name selects it, an unknown one goes into the
+    // text box; an account without past coordinators always uses the box
     const select = $('#sel-coordinator');
     const newInput = $('#coord-new-input');
+    const freeText = this.coordinators.length === 0;
     const known = shoot?.coordinator && this.coordinators.some((coordinator) => coordinator.name === shoot.coordinator);
     if (shoot?.coordinator) {
       select.value = known ? shoot.coordinator : NEW_COORDINATOR;
@@ -99,7 +202,8 @@ export class ShootForm {
       select.value = '';
       newInput.value = '';
     }
-    newInput.hidden = select.value !== NEW_COORDINATOR;
+    newInput.hidden = !freeText && select.value !== NEW_COORDINATOR;
+    this.#hideTitleSuggestions();
 
     $('#sel-status').value = appStatus(shoot?.status);
 
@@ -122,6 +226,7 @@ export class ShootForm {
   /** The chosen coordinator: an existing name, or the one being typed. */
   coordinatorValue() {
     const select = $('#sel-coordinator');
+    if (select.hidden) return $('#coord-new-input').value.trim(); // free-text mode
     return select.value === NEW_COORDINATOR ? $('#coord-new-input').value.trim() : select.value;
   }
 

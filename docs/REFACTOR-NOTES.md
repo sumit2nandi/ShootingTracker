@@ -4,7 +4,199 @@ What changed when the codebase was restructured around the layering described
 in [`ARCHITECTURE.md`](ARCHITECTURE.md), and what that means for anyone using
 the app or the API.
 
-## Contract: unchanged
+## 2026-09 · Account-scoped reference data, title suggestions, mobile tour
+
+**`GET /api/meta` is now scoped to the account on screen, and grows a `titles`
+list.** Before, the coordinator list was the global `coordinators` table —
+every signed-in account saw everyone's coordinators. Now all five lists come
+from the *viewed* account's own data (`scope.targetId`, so an owner viewing a
+member sees the member's lists):
+
+- `coordinators` — `[{ id, name }]`, the coordinators that appear on the
+  account's own shoots (distinct, alphabetical) —
+  `MetadataRepository.distinctCoordinators`;
+- `titles` (new) — the account's distinct non-empty shoot titles, the one
+  most recently touched first, capped at 100 — `MetadataRepository.pastTitles`;
+- `clients`, `types`, `months` — as before, but they were already
+  owner-scoped and now ride the same `targetId`.
+
+`MetadataService` lost its `coordinatorRepository` dependency; it only takes
+`{ metadataRepository }` (the container already passed the whole repository
+object, so nothing else moved).
+
+**Frontend.** The coordinator `<select>`, the coordinator datalist and the
+filter-bar options all consume `meta.coordinators`, so they are per-account
+with no further change. Two refinements followed the first pass:
+
+- **Title suggestions are a hand-rolled typeahead, not a `<datalist>`.** The
+  shoot modal spends most of its life `display: none` (the `.hidden` class),
+  and browsers suppress datalist suggestions for inputs inside a hidden
+  container — the account's past titles never surfaced. `ShootForm` now
+  builds a small `.field-suggest` list under the title input: it filters
+  `meta.titles` on every keystroke (titles starting with the typed text
+  first, then the rest, cap 8), supports ↑/↓ + Enter (Enter accepts the
+  highlighted title and is `preventDefault`-ed so it cannot trigger the
+  form's implicit submit) and Esc (which closes the list, not the modal).
+  The datalist and its `list=` attribute are gone.
+- **Coordinator field adapts to the account.** An account with **no** past
+  coordinators gets the existing text input (`#coord-new-input`) shown
+  directly instead of the `<select>` — a dropdown that could only say
+  “none” or “new” forced a detour before a first coordinator could be named.
+  `coordinatorValue()` reads the box straight through when the select is
+  hidden; an account *with* past coordinators keeps the dropdown (known name
+  selects it, a new name goes through “➕ New Coordinator…”). The two modes
+  flip automatically when an owner switches the viewed account, since both
+  are driven by `populate(meta)`.
+
+`scripts/shoot-form-check.mjs` drives the real `ShootForm` through both
+coordinator modes and the full suggestion keyboard flow.
+
+**The tour is mobile-browser friendly.** `public/js/app/ui/tour.js` was laid
+out against the *layout* viewport (`window.innerWidth/innerHeight` + a one-shot
+`resize` listener), so on phones — where the browser chrome slides and the
+visible area moves — the card and the spotlight drifted, and the welcome step
+had no scrim at all (its “spotlight” was hidden, taking the 9999px shadow that
+dims the page with it). Now:
+
+- every measurement goes through `window.visualViewport` (`width/height/
+  offsetTop/offsetLeft`, falling back to `window` where the API is absent);
+  the layout re-runs on `visualViewport` *resize and scroll* as well as
+  `window` resize/scroll, and the page itself is locked (`body.tour-open {
+  overflow: hidden }`) while the tour runs;
+- the welcome step gets a real full-surface scrim
+  (`.tour-highlight.full` — no border, no cut-out shadow);
+- on narrow screens (≤ 640px) the card is a full-width sheet pinned to the
+  side of the highlighted element with the more room, with 46px-tall
+  equal-width Back / Skip / Next buttons and a `safe-area-inset-bottom`
+  padding for the home indicator; the card is `max-height`-capped and
+  internally scrollable as a safety net;
+- a target pushed out of the visible area (behind the expanded URL bar) gets
+  its cut-out clamped to the nearest edge as a marker sliver and the card
+  stays centred in the open middle;
+- the cut-out and card always use explicit `top/left/width/height` (no
+  `bottom`-anchoring, which iOS handles badly), clamped to the visual area;
+- two latent bugs fixed along the way: `.btn`'s `display` overrode the
+  `hidden` attribute on the Back button (`.tour-card [hidden]` rule), and the
+  Calendar/Shoots steps pointed at ids that didn't exist — the mobile
+  bottom-nav buttons now carry `id="tab-calendar"` / `id="tab-shoots"`,
+  matching `tab-profile`.
+
+**Tests.** The metadata unit test now asserts all five lists are queried with
+the *viewed* account's id and that coordinators/titles pass through. New
+`scripts/tour-layout-check.mjs` drives the real tour class through all seven
+steps across five viewport scenarios (URL-bar expanded/collapsed, 320px phone,
+scrolled visual viewport, desktop) with a stub DOM and asserts the card and
+spotlight stay in the visible area and the card never covers the spotlight by
+more than the unavoidable amount. `npm test` stays at 161 passing.
+
+## 2026-09 · Per-user data, owner view mode, consent sign-in and first-login tour
+
+This section **supersedes “Contract: unchanged”** for the endpoints it names.
+The app used to show every signed-in account the same global data; now each
+account has its own.
+
+**Schema.** `app_users` gains `tour_completed` (default `FALSE`); `shoots`
+gains `owner_id` (FK → `app_users.id`, `ON DELETE SET NULL`, indexed). Payments
+and media follow their shoot. The DDL in `server/schema.sql` is still
+idempotent and now *converges* older databases: missing columns are added and
+the FK is attached in a `DO` block that checks `pg_constraint` (Postgres has no
+`ADD CONSTRAINT IF NOT EXISTS`).
+
+**Data scope.** Every `/api` request resolves a `DataScope { selfId, targetId }`
+(`server/domain/data-scope.js` + `services/data-scope-service.js` +
+`http/middleware/data-scope.js`):
+
+- reads filter by `targetId` — the signed-in account by default;
+- writes belong to `writeId` — the signed-in account, **or the account an
+  owner is viewing** (`DataScope.writeId` = `isViewingOther ? targetId :
+  selfId`), so an owner adding/editing while looking at a member files and
+  edits that member's records;
+- `?viewingAs=account@x.com` on any endpoint switches an **owner**'s scope
+  to another account (case-insensitive; deactivated accounts are viewable);
+  members' `viewingAs` is ignored, an unknown email is a `400`;
+- a record outside the resolved scope is a `404` — update, delete, payments
+  and media all enforce this.
+
+**Sign-in contract.** `POST /api/auth/google` for an account **not in
+`app_users`** now answers `200 { user, needsConsent: true }` with **no**
+session cookie; the login page shows a consent form and calls the new public
+`POST /api/auth/consent { credential, name? }`, which re-verifies the token,
+creates the account as a member (`tour_completed = FALSE`) and issues the
+session. Deactivated accounts are refused by both endpoints with `403`
+(`This account has been deactivated…`) — no self re-activation.
+
+**`GET /api/auth/me`** now returns `{ id, email, name, role, tour_completed }`.
+New `POST /api/auth/me/tour-completed` marks the flag so the front-end's
+spotlight tour (`public/js/app/ui/tour.js`) runs once, for new accounts.
+
+**Frontend.** The Profile tab gains a *Viewing* switch for owners (persisted
+in `localStorage: shootingtracker-viewing-as`, validated against the user list
+at boot); while viewing another account an amber banner names whose data is on
+screen, and every add/edit/delete (drawer, day panel, dashboard rows, FAB)
+works on that account's data — the API facade rides `viewingAs` on writes as
+well as reads. Members see their own profile only, as before, and the banner
+never renders for them (the `hidden` attribute is kept above the banner's
+`display:flex`).
+
+**CLI.** `npm run import` accepts `--owner email` (rows belong to that account;
+without it they stay unowned and a warning is printed).
+`npm run assign:existing [email] [--all]` re-homes pre-existing shoots to an
+account (default `sushmitaghosh0099@gmail.com`), creates it if missing, marks
+tours done, and is idempotent.
+
+**Tests.** `npm test` now covers 161 cases, including the data-scope rules,
+the consent flow, the `viewingAs` passthrough and the role-switch guards.
+`scripts/api-test.py` passes
+unmodified (47 checks; its one “test coordinators removed” quirk when running
+against a `seed:demo` database predates this change — the demo and the suite
+use the same coordinator names, and the delete is correctly refused while demo
+shoots still reference them).
+
+## 2026-09 · Access rules, viewing mode, wrap-up and roles
+
+- **Owners can switch another account's role (a later pass superseded the
+  earlier database-only rule).** `AccessPolicy.assertCanUpdate` now accepts a
+  `role` patch — `member`↔`owner` — when it targets *another* account, and
+  `UserRepository.update` writes the column again (the value is validated
+  upstream: `400` outside the vocabulary). Two guards remain: a self role
+  patch is `403 … your own role` (one's own role stays a deliberate database
+  job, `UPDATE app_users SET role = '…'`), and a patch that would leave the
+  workspace without an active owner is `409`. New people still always join as
+  **members**; an owner promotes them from the list. The row's role is now a
+  small select in *People with Access* (absent on the signed-in owner's own
+  row, disabled on the last active owner).
+- **The *People with Access* entry is gone from a member's profile.** The
+  button is removed from the page (not just hidden) for non-owners, the
+  modal's `open()` re-checks the role, and the `/api/users` router's
+  `requireOwner` guard already answered members with `403`.
+- **Wrap-up follows the shoot's own date.** `isWrapUpTime` is now "is it past
+  7 pm IST *on this shoot's date*?" rather than "is the shoot today and is it
+  past 7 pm?" — identical for today's and future rows, and it also covers a
+  shoot whose day has already passed.
+- **Shoot detail followed the viewing choice.** `getShoot` was the one read
+  that did not send `viewingAs`, so an owner opening a viewed account's shoot
+  got `404`. The detail read now carries the choice like every other call —
+  and so do the writes, which is what lets an owner edit the shoot they are
+  looking at.
+- **Consent form was stuck disabled.** The sign-in `busy` flag was left on
+  while the consent screen was on screen, so “Create my profile” never
+  enabled. It is released when the form appears (the Google button is hidden
+  underneath, so it cannot be re-clicked); Cancel is never locked.
+- **“Back to my data” is gone from one's own data.** Choosing one's own
+  account in the viewing switch (or restoring such a choice from storage)
+  now normalizes to *no choice*; the redundant “(you)” row left the
+  dropdown, so own data has exactly one representation and the banner can
+  never appear for it.
+- **The owner can add to and edit the data they are viewing.** An earlier
+  pass made viewing read-only; the requirement flipped, so the read-only
+  guards (the `isReadOnly` action, the `newShoot`/`editShoot` gate, the
+  `body.viewing-other` button-hiding CSS) are gone. The facade now rides
+  `viewingAs` on creates/updates/deletes/payments, and the server resolves
+  those writes against `scope.writeId`, so an owner's edits while looking at
+  a member land on that member's account. The banner now says so.
+- The consent page drops the “Owners can view, never edit” term.
+
+## Contract: unchanged (superseded where the 2026-09 section says otherwise)
 
 Every route path, query parameter and successful JSON response shape is the
 same as before — including the lowercase KPI aliases (`paidshoots`,

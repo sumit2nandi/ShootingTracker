@@ -39,6 +39,19 @@ class PaymentRepository {
     return result.rows[0].id;
   }
 
+  /**
+   * The `owner_id` of the shoot a payment belongs to.
+   *
+   * @returns {Promise<number|null>} null when the payment does not exist
+   */
+  async ownerOfPayment(id) {
+    const result = await this.database.query(
+      'SELECT s.owner_id FROM payments p JOIN shoots s ON s.id = p.shoot_id WHERE p.id = $1',
+      [id]
+    );
+    return result.rows.length ? result.rows[0].owner_id : null;
+  }
+
   /** @returns {Promise<boolean>} whether a row was deleted */
   async deleteById(id) {
     const result = await this.database.query('DELETE FROM payments WHERE id = $1', [id]);
