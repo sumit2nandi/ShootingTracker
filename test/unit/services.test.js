@@ -12,7 +12,7 @@ const { ShootService } = require('../../server/services/shoot-service');
 const { PaymentService } = require('../../server/services/payment-service');
 const { MediaService } = require('../../server/services/media-service');
 const { CoordinatorService } = require('../../server/services/coordinator-service');
-const { DashboardService } = require('../../server/services/dashboard-service');
+const { DashboardService, validDateKey } = require('../../server/services/dashboard-service');
 const { MetadataService } = require('../../server/services/metadata-service');
 const { AccessService } = require('../../server/services/access-service');
 const { UserDirectory } = require('../../server/services/user-directory');
@@ -195,8 +195,10 @@ test('a coordinator with shoots cannot be deleted', async () => {
 
 test('the dashboard passes one identical, owner-scoped filter to every aggregate', async () => {
   const seen = [];
-  const stub = (value) => async (filter) => {
+  const seenDays = [];
+  const stub = (value) => async (filter, _limit, today) => {
     seen.push(filter);
+    seenDays.push(today);
     return value;
   };
   const service = new DashboardService({
@@ -211,11 +213,14 @@ test('the dashboard passes one identical, owner-scoped filter to every aggregate
     }
   });
 
-  const result = await service.summarize({ month: '2026-04', bogus: 'ignored' }, DataScope.forSelf(5));
+  const result = await service.summarize({ month: '2026-04', today: '2026-04-02', bogus: 'ignored' }, DataScope.forSelf(5));
   assert.deepEqual(Object.keys(result), ['kpi', 'monthly', 'byCoordinator', 'byType', 'byStatus', 'upcoming', 'attention']);
   assert.equal(seen.length, 7);
   assert.ok(seen.every((filter) => filter === seen[0]), 'the same filter instance is reused');
   assert.deepEqual(seen[0].criteria, { month: '2026-04', owner: '5' });
+  assert.deepEqual(seenDays, [undefined, undefined, undefined, undefined, undefined, '2026-04-02', '2026-04-02']);
+  assert.equal(validDateKey('2026-09-29'), '2026-09-29');
+  assert.equal(validDateKey('2026-02-30'), undefined, 'invalid calendar days are discarded');
 });
 
 test('metadata offers the viewed account’s own values, coordinators and titles', async () => {

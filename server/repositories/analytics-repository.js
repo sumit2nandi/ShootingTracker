@@ -23,6 +23,24 @@ const ATTENTION_WINDOW =
   `(b.shoot_date < CURRENT_DATE AND ${STILL_OPEN})
    OR (b.status = 'completed' AND ${OWES_MONEY} AND b.shoot_date <> CURRENT_DATE)`;
 
+function upcomingWindow(today) {
+  if (!today) return UPCOMING_WINDOW;
+  return {
+    sql: `b.shoot_date >= ?::date AND b.shoot_date < (?::date + interval '7 days')
+          AND (${STILL_OPEN} OR b.shoot_date = ?::date)`,
+    params: [today, today, today]
+  };
+}
+
+function attentionWindow(today) {
+  if (!today) return `(${ATTENTION_WINDOW})`;
+  return {
+    sql: `((b.shoot_date < ?::date AND ${STILL_OPEN})
+          OR (b.status = 'completed' AND ${OWES_MONEY} AND b.shoot_date <> ?::date))`,
+    params: [today, today]
+  };
+}
+
 /**
  * Read-only aggregate queries behind the dashboard.
  *
@@ -111,9 +129,9 @@ class AnalyticsRepository {
     return result.rows;
   }
 
-  /** Shoots in the next seven days that still have to happen. */
-  async upcoming(filter, limit = 8) {
-    const { where, params } = filter.toSql({ extraConditions: [UPCOMING_WINDOW] });
+  /** Upcoming entries, using the viewer's local calendar day when supplied. */
+  async upcoming(filter, limit = 8, today) {
+    const { where, params } = filter.toSql({ extraConditions: [upcomingWindow(today)] });
     const result = await this.database.query(
       `${BASE_CTE}
       SELECT b.id, b.title, b.client_name, b.shoot_date, b.venue, b.location,
@@ -125,9 +143,9 @@ class AnalyticsRepository {
     return result.rows;
   }
 
-  /** Shoots that have slipped: overdue, or finished but unpaid. */
-  async needsAttention(filter, limit = 8) {
-    const { where, params } = filter.toSql({ extraConditions: [`(${ATTENTION_WINDOW})`] });
+  /** Overdue or unpaid entries, relative to the viewer's local calendar day. */
+  async needsAttention(filter, limit = 8, today) {
+    const { where, params } = filter.toSql({ extraConditions: [attentionWindow(today)] });
     const result = await this.database.query(
       `${BASE_CTE}
       SELECT b.id, b.title, b.client_name, b.shoot_date, b.venue, b.location,

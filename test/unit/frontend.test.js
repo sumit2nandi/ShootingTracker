@@ -228,24 +228,26 @@ test('the shoots table groups rows by month in API order', async () => {
 });
 
 test('a shoot can be wrapped up from the dashboard after 7 pm on its own date', async () => {
-  const { isWrapUpTime, zonedNow, outstandingAmount, WRAP_UP_HOUR } = await load('domain/wrap-up.js');
+  const { isWrapUpTime, zonedNow, outstandingAmount, WRAP_UP_HOUR, userTimeZone } = await load('domain/wrap-up.js');
+  const timeZone = 'Asia/Kolkata';
 
   // 13:35 UTC is 19:05 in Kolkata (+5:30)
   const evening = new Date('2026-04-02T13:35:00Z');
   const lateAfternoon = new Date('2026-04-02T13:25:00Z'); // 18:55 IST
 
   assert.equal(WRAP_UP_HOUR, 19);
-  assert.deepEqual(zonedNow(evening), { date: '2026-04-02', hour: 19 });
-  assert.equal(isWrapUpTime('2026-04-02', evening), true, 'past 7 pm on the shoot’s date');
-  assert.equal(isWrapUpTime('2026-04-02', lateAfternoon), false, 'not before 7 pm on that date');
-  assert.equal(isWrapUpTime('2026-04-03', evening), false, 'the shoot’s 7 pm has not come yet');
-  assert.equal(isWrapUpTime('2026-04-01', evening), true, 'a past shoot’s 7 pm has already passed');
-  assert.equal(isWrapUpTime('', evening), false);
+  assert.ok(userTimeZone(), 'the user timezone is available from the device');
+  assert.deepEqual(zonedNow(evening, timeZone), { date: '2026-04-02', hour: 19 });
+  assert.equal(isWrapUpTime('2026-04-02', evening, timeZone), true, 'past 7 pm on the shoot’s date');
+  assert.equal(isWrapUpTime('2026-04-02', lateAfternoon, timeZone), false, 'not before 7 pm on that date');
+  assert.equal(isWrapUpTime('2026-04-03', evening, timeZone), false, 'the shoot’s 7 pm has not come yet');
+  assert.equal(isWrapUpTime('2026-04-01', evening, timeZone), true, 'a past shoot’s 7 pm has already passed');
+  assert.equal(isWrapUpTime('', evening, timeZone), false);
 
   // 19:00 UTC is already past midnight in Kolkata, so it is the next day at 00:30
   const pastMidnightIst = new Date('2026-04-02T19:00:00Z');
-  assert.deepEqual(zonedNow(pastMidnightIst), { date: '2026-04-03', hour: 0 });
-  assert.equal(isWrapUpTime('2026-04-03', pastMidnightIst), false, '00:30 on the shoot’s day is before its 7 pm');
+  assert.deepEqual(zonedNow(pastMidnightIst, timeZone), { date: '2026-04-03', hour: 0 });
+  assert.equal(isWrapUpTime('2026-04-03', pastMidnightIst, timeZone), false, '00:30 on the shoot’s day is before its 7 pm');
 
   assert.equal(outstandingAmount({ fee: '45000.00', paid_amount: '20000.00' }), 25000);
   assert.equal(outstandingAmount({ fee: 1000, paid_amount: 1000 }), 0);

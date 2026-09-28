@@ -36,7 +36,10 @@ export class DashboardView {
   /** @param {import('../domain/filter-criteria.js').FilterCriteria} filters */
   async load(filters) {
     const query = filters.toQueryString();
-    const summary = await this.api.dashboard(query);
+    // Use the browser's local date for dashboard date windows. PostgreSQL's
+    // CURRENT_DATE follows the server timezone, which can still be yesterday.
+    const dashboardQuery = [query, `today=${encodeURIComponent(dayKey(this.now()))}`].filter(Boolean).join('&');
+    const summary = await this.api.dashboard(dashboardQuery);
     // With a month selected the earnings chart switches to a per-day view.
     const daily = filters.month ? groupFeesByDay(await this.api.listShoots(query)) : null;
     this.render(summary, daily);
