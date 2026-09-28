@@ -186,7 +186,7 @@ export class CalendarView {
               `<span class="legend-item"><i class="legend-swatch ${status}"></i>${escapeHtml(statusLabel(status))}<span class="legend-n">${idsByStatus.get(status).size}</span></span>`
           )
           .join('')
-      : `<span class="legend-empty">No shoots in ${MONTH_NAMES[this.month]} ${this.year}</span>`;
+      : `<span class="legend-empty">No entries in ${MONTH_NAMES[this.month]} ${this.year}</span>`;
   }
 
   #renderList() {
@@ -218,7 +218,7 @@ export class CalendarView {
 
     wrap.innerHTML = rows.length
       ? rows.join('')
-      : `<div class="empty">No shoots in ${MONTH_NAMES[this.month]} ${this.year} — use the Grid view to tap a day and add one.</div>`;
+      : `<div class="empty">No entries in ${MONTH_NAMES[this.month]} ${this.year} — use the Grid view to tap a day and add one.</div>`;
 
     $$('#cal-list .cl-event').forEach((element) =>
       element.addEventListener('click', (event) => {

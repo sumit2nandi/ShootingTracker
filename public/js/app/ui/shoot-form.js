@@ -15,8 +15,10 @@ export class ShootForm {
     this.form = $('#shoot-form');
     this.coordinators = [];
     this.titles = [];
+    this.titleSuggestions = [];
     this.titleMatches = [];
     this.titleActive = -1;
+    this.selectedSuggestionTitle = null;
   }
 
   mount() {
@@ -36,7 +38,10 @@ export class ShootForm {
       const isNew = $('#sel-coordinator').value === NEW_COORDINATOR;
       input.hidden = !isNew;
       if (isNew) input.focus();
+      this.#clearPrefilled('coordinator');
     });
+    $('#coord-new-input').addEventListener('input', () => this.#clearPrefilled('coordinator'));
+    this.field('fee').addEventListener('input', () => this.#clearPrefilled('fee'));
     this.#mountTitleSuggestions();
   }
 
@@ -65,13 +70,18 @@ export class ShootForm {
       if (!item) return;
       event.preventDefault(); // keep focus on the input
       const title = this.titleMatches[Number(item.dataset.index)];
-      if (title !== undefined) input.value = title;
+      if (title !== undefined) this.#selectTitleSuggestion(title);
       this.#hideTitleSuggestions();
     });
   }
 
   #refreshTitleSuggestions() {
-    const query = this.titleInput.value.trim().toLowerCase();
+    const currentTitle = this.titleInput.value.trim();
+    if (this.selectedSuggestionTitle && currentTitle !== this.selectedSuggestionTitle) {
+      this.selectedSuggestionTitle = null;
+      this.#clearPrefilled();
+    }
+    const query = currentTitle.toLowerCase();
     this.titleMatches = query ? this.#filterTitles(query) : [];
     if (!this.titleMatches.length) {
       this.#hideTitleSuggestions();
@@ -90,6 +100,50 @@ export class ShootForm {
     const matches = this.titles.filter((title) => title.toLowerCase().includes(query));
     const leading = matches.filter((title) => title.toLowerCase().startsWith(query));
     return [...leading, ...matches.filter((title) => !title.toLowerCase().startsWith(query))].slice(0, 8);
+  }
+
+  #selectTitleSuggestion(title) {
+    this.titleInput.value = title;
+    this.selectedSuggestionTitle = title;
+
+    const suggestion = this.titleSuggestions.find(
+      (item) => String(item.title).toLowerCase() === title.toLowerCase()
+    );
+    if (!suggestion) return;
+
+    const fee = this.field('fee');
+    const hasFee = suggestion.fee !== undefined && suggestion.fee !== null && suggestion.fee !== '';
+    fee.value = hasFee ? suggestion.fee : '';
+    this.#setPrefilled('fee', hasFee);
+
+    const coordinator = String(suggestion.coordinator || '').trim();
+    const select = $('#sel-coordinator');
+    const newInput = $('#coord-new-input');
+    const known = coordinator && this.coordinators.some((item) => item.name === coordinator);
+    if (known) {
+      select.value = coordinator;
+      newInput.value = '';
+      newInput.hidden = true;
+    } else if (coordinator) {
+      select.value = NEW_COORDINATOR;
+      newInput.value = coordinator;
+      newInput.hidden = false;
+    } else {
+      select.value = '';
+      newInput.value = '';
+      newInput.hidden = this.coordinators.length > 0;
+    }
+    this.#setPrefilled('coordinator', Boolean(coordinator));
+  }
+
+  #setPrefilled(name, isPrefilled) {
+    const control = name === 'coordinator' ? $('#sel-coordinator') : this.field(name);
+    control.closest('.field')?.classList.toggle('prefilled', isPrefilled);
+  }
+
+  #clearPrefilled(name) {
+    const names = name ? [name] : ['fee', 'coordinator'];
+    for (const fieldName of names) this.#setPrefilled(fieldName, false);
   }
 
   #hideTitleSuggestions() {
@@ -120,7 +174,7 @@ export class ShootForm {
       event.preventDefault();
       const title = this.titleMatches[this.titleActive];
       if (title !== undefined) {
-        this.titleInput.value = title;
+        this.#selectTitleSuggestion(title);
         this.#hideTitleSuggestions();
       }
     } else if (event.key === 'Escape') {
@@ -133,6 +187,7 @@ export class ShootForm {
   populate(meta) {
     this.coordinators = meta.coordinators || [];
     this.titles = meta.titles || [];
+    this.titleSuggestions = meta.titleSuggestions || [];
     const select = $('#sel-coordinator');
     const newInput = $('#coord-new-input');
     if (!select) return;
@@ -168,8 +223,10 @@ export class ShootForm {
    */
   open(shoot, presetDate) {
     const form = this.form;
+    this.#clearPrefilled();
+    this.selectedSuggestionTitle = null;
     form.reset();
-    $('#shoot-modal-title').textContent = shoot ? 'Edit Shoot' : 'New Shoot';
+    $('#shoot-modal-title').textContent = shoot ? 'Edit Entry' : 'New Entry';
 
     const set = (name, value) => {
       this.field(name).value = value ?? '';
@@ -184,7 +241,7 @@ export class ShootForm {
     set('end_time', shoot?.end_time ? String(shoot.end_time).slice(0, 5) : '');
     set('venue', shoot?.venue);
     set('location', shoot?.location);
-    set('fee', shoot?.fee ?? 0);
+    set('fee', shoot?.fee ?? '');
     set('contact_name', shoot?.contact_name);
     set('contact_phone', shoot?.contact_phone);
     set('notes', shoot?.notes);
@@ -255,17 +312,17 @@ export class ShootForm {
   async save() {
     const body = this.readValues();
     if (!body.title || !body.shoot_date) {
-      this.actions.notifyError('Title and shoot date are required');
+      this.actions.notifyError('Title and date are required');
       return;
     }
     const id = this.field('id').value;
     try {
       if (id) {
         await this.api.updateShoot(id, body);
-        this.actions.notify('Shoot updated');
+        this.actions.notify('Entry updated');
       } else {
         await this.api.createShoot(body);
-        this.actions.notify('Shoot added');
+        this.actions.notify('Entry added');
       }
       this.close();
       this.actions.dataChanged();

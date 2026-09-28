@@ -181,10 +181,10 @@ class ShootFilter {
   /**
    * Render a WHERE clause.
    *
-   * @param {{ alias?: string, extraConditions?: string[] }} [options]
-   *        `extraConditions` are parameter-free SQL predicates ANDed to the
-   *        result (used by the dashboard's "next 7 days" widget instead of
-   *        string-surgery on an already built clause).
+   * @param {{ alias?: string, extraConditions?: (string|{ sql: string, params?: unknown[] })[] }} [options]
+   *        `extraConditions` are SQL predicates ANDed to the result; parameter
+   *        arrays are bound after the regular filter criteria (used by the
+   *        dashboard's date windows without interpolating user input).
    * @returns {{ where: string, params: unknown[] }}
    */
   toSql({ alias = 'b', extraConditions = [] } = {}) {
@@ -194,7 +194,10 @@ class ShootFilter {
       if (value === undefined) continue;
       rule.apply(value, { alias, collector });
     }
-    for (const condition of extraConditions) collector.add(condition);
+    for (const condition of extraConditions) {
+      if (typeof condition === 'string') collector.add(condition);
+      else collector.add(condition.sql, condition.params || []);
+    }
     return { where: collector.where, params: collector.params };
   }
 }

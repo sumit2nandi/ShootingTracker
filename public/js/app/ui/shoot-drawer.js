@@ -6,6 +6,7 @@ import { closeOverlay, openOverlay } from '../core/motion.js';
 /* The settle buttons wear the same two glyphs as the dashboard row toggles. */
 const BOX = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.6"/></svg>';
 const TICK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.6" fill="currentColor" stroke="none"/><path d="M8.3 12.2l2.6 2.6 5-5.5" stroke="var(--accent-fill)" stroke-width="2.1" stroke-linecap="round"/></svg>';
+const DETAIL_LOADER = '<div class="detail-loader" role="status"><span class="detail-loader-spinner" aria-hidden="true"></span><span>Loading entry…</span></div>';
 
 /** One key/value row; rows without a value are dropped by the caller. */
 const kvRow = (label, value, attrs = '') =>
@@ -18,7 +19,7 @@ const kvRow = (label, value, attrs = '') =>
  * to edit, refresh or add, so it never reaches into the table or the calendar.
  */
 export class ShootDrawer {
-  constructor({ api, actions, confirm = window.confirm.bind(window), today = () => new Date() }) {
+  constructor({ api, actions, confirm = async () => false, today = () => new Date() }) {
     this.api = api;
     this.actions = actions;
     this.confirm = confirm;
@@ -44,13 +45,13 @@ export class ShootDrawer {
 
   /** Load a shoot and render its detail panel. */
   async showShoot(id) {
-    this.element.innerHTML = '<div class="empty">Loading…</div>';
+    this.element.innerHTML = DETAIL_LOADER;
     this.open();
     let shoot;
     try {
       shoot = await this.api.getShoot(id);
     } catch (error) {
-      this.element.innerHTML = `<div class="empty">Could not load shoot: ${escapeHtml(error.message)}</div>`;
+      this.element.innerHTML = `<div class="empty">Could not load entry: ${escapeHtml(error.message)}</div>`;
       return;
     }
 
@@ -68,7 +69,7 @@ export class ShootDrawer {
   /** The "+N more" panel for a calendar day. */
   showDay(dateKey, shoots) {
     this.element.innerHTML = `
-    ${drawerHead(formatDate(dateKey), `${shoots.length} shoot${shoots.length === 1 ? '' : 's'} on this day`)}
+    ${drawerHead(formatDate(dateKey), `${shoots.length} entr${shoots.length === 1 ? 'y' : 'ies'} on this day`)}
     ${shoots
       .map(
         (shoot) => `
@@ -80,7 +81,7 @@ export class ShootDrawer {
       )
       .join('')}
     <div class="drawer-actions">
-      <button class="btn btn-primary" id="dp-add">+ Add Shoot on ${formatDate(dateKey)}</button>
+      <button class="btn btn-primary" id="dp-add">+ Add Entry on ${formatDate(dateKey)}</button>
       <button class="btn btn-ghost" data-close>Close</button>
     </div>`;
     this.open();
@@ -103,7 +104,7 @@ export class ShootDrawer {
     const hasMoney = fee > 0 || paid > 0; // nothing booked → leave the money rows out
     const detailRows = [
       kvRow('Coordinator', text(shoot.coordinator)),
-      hasMoney ? kvRow('Fee', formatMoney(fee), 'class="td-mono"') : '',
+      hasMoney ? kvRow('Expected Income', formatMoney(fee), 'class="td-mono"') : '',
       hasMoney ? kvRow('Collected', formatMoney(paid), 'class="td-mono" style="color:var(--green)"') : '',
       hasMoney ? kvRow('Balance', formatMoney(Math.max(0, fee - paid)), 'class="td-mono"') : '',
       kvRow('Client', text(shoot.client_name)),
@@ -139,22 +140,22 @@ export class ShootDrawer {
               <button data-pay-id="${payment.id}" title="Delete payment">✕</button>
             </div>`
             )
-            .join('') || `<div class="muted small">${fee ? 'Nothing collected yet.' : 'Set a fee to start collecting.'}</div>`}
+            .join('') || `<div class="muted small">${fee ? 'Nothing collected yet.' : 'Set an expected amount to start collecting.'}</div>`}
         </div>
         <div class="pay-total">Collected <b style="color:var(--green)">${formatMoney(paid)}</b> of ${formatMoney(fee)} (${fee ? Math.round((paid / fee) * 100) : 0}%)</div>
         <div class="quick-actions">
           <button class="btn btn-settle${completed ? ' is-on' : ''}" id="mark-complete" aria-pressed="${completed}"
-                  title="${completed ? 'Completed — tap to move it back to planned' : 'Mark this shoot completed'}">
+                  title="${completed ? 'Completed — tap to move it back to planned' : 'Mark this entry complete'}">
             ${completed ? TICK : BOX}
             ${completed ? 'Completed' : 'Mark Complete'}
           </button>
           <button class="btn btn-settle${settled ? ' is-on' : ''}" id="pay-mark" aria-pressed="${settled}" ${fee ? '' : 'disabled'}
-                  title="${settled ? 'Paid — tap to undo the last payment' : fee ? `Collect ${formatMoney(balance)}` : 'Set a fee first'}">
+                  title="${settled ? 'Paid — tap to undo the last payment' : fee ? `Collect ${formatMoney(balance)}` : 'Set an amount first'}">
             ${settled ? TICK : BOX}
             ${settled ? 'Paid' : 'Mark Paid'}
           </button>
         </div>
-        <div class="muted small pay-hint">${!fee ? 'Set a fee on this shoot first — then it can be marked paid.' : settled ? 'Paid in full — tap Paid again to undo the last payment.' : `Books the remaining ${formatMoney(balance)} as collected today.`}</div>
+        <div class="muted small pay-hint">${!fee ? 'Set an amount for this entry first — then it can be marked paid.' : settled ? 'Paid in full — tap Paid again to undo the last payment.' : `Books the remaining ${formatMoney(balance)} as collected today.`}</div>
       </div>
       <div class="drawer-actions">
         <button class="btn" id="dr-edit">✏️ Edit</button>
@@ -171,7 +172,7 @@ export class ShootDrawer {
       markComplete.disabled = true;
       try {
         await this.api.updateShoot(shoot.id, { status: completed ? 'planned' : 'completed' });
-        this.actions.notify(completed ? 'Shoot moved back to planned' : 'Shoot marked complete');
+        this.actions.notify(completed ? 'Entry moved back to planned' : 'Entry marked complete');
         this.showShoot(shoot.id);
         this.actions.dataChanged({ reloadMeta: false });
       } catch (error) {
@@ -186,10 +187,12 @@ export class ShootDrawer {
     });
 
     $('#dr-delete').addEventListener('click', async () => {
-      if (!this.confirm(`Delete "${shoot.title}"? Its payments will be removed too.`)) return;
+      if (!(await this.confirm(`Delete “${shoot.title}”? Its payments will be removed too.`, {
+        title: 'Delete this entry?', confirmLabel: 'Delete'
+      }))) return;
       try {
         await this.api.deleteShoot(shoot.id);
-        this.actions.notify('Shoot deleted');
+        this.actions.notify('Entry deleted');
         this.close();
         this.actions.dataChanged();
       } catch (error) {
@@ -222,7 +225,9 @@ export class ShootDrawer {
 
     $$('#drawer [data-pay-id]').forEach((button) =>
       button.addEventListener('click', async () => {
-        if (!this.confirm('Remove this payment?')) return;
+        if (!(await this.confirm('This payment will be permanently removed.', {
+          title: 'Remove payment?', confirmLabel: 'Remove'
+        }))) return;
         try {
           await this.api.deletePayment(button.dataset.payId);
           this.actions.notify('Payment removed');

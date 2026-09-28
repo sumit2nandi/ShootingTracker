@@ -11,7 +11,7 @@ import { closeOverlay, openOverlay } from '../core/motion.js';
  * server enforces, mirrored here by disabling the control that would fail.
  */
 export class AccessView {
-  constructor({ api, store, actions, confirm = window.confirm.bind(window) }) {
+  constructor({ api, store, actions, confirm = async () => false }) {
     this.api = api;
     this.store = store;
     this.actions = actions;
@@ -89,7 +89,9 @@ export class AccessView {
 
     $$('#access-list [data-remove]').forEach((button) =>
       button.addEventListener('click', async () => {
-        if (!this.confirm('Remove this person from the allow-list?')) return;
+        if (!(await this.confirm('This person will no longer be able to sign in.', {
+          title: 'Remove access?', confirmLabel: 'Remove'
+        }))) return;
         button.disabled = true;
         try {
           await this.api.removeUser(button.dataset.remove);

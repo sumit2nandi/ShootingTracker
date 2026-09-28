@@ -5,11 +5,10 @@ import { isWrapUpTime, outstandingAmount, zonedNow } from '../domain/wrap-up.js'
 
 /** KPI tiles, charts and breakdowns. Reads data, writes HTML, emits actions. */
 export class DashboardView {
-  constructor({ api, actions, now = () => new Date(), confirm = window.confirm.bind(window) }) {
+  constructor({ api, actions, now = () => new Date() }) {
     this.api = api;
     this.actions = actions;
     this.now = now;
-    this.confirm = confirm;
   }
 
   mount() {
@@ -37,7 +36,10 @@ export class DashboardView {
   /** @param {import('../domain/filter-criteria.js').FilterCriteria} filters */
   async load(filters) {
     const query = filters.toQueryString();
-    const summary = await this.api.dashboard(query);
+    // Use the browser's local date for dashboard date windows. PostgreSQL's
+    // CURRENT_DATE follows the server timezone, which can still be yesterday.
+    const dashboardQuery = [query, `today=${encodeURIComponent(dayKey(this.now()))}`].filter(Boolean).join('&');
+    const summary = await this.api.dashboard(dashboardQuery);
     // With a month selected the earnings chart switches to a per-day view.
     const daily = filters.month ? groupFeesByDay(await this.api.listShoots(query)) : null;
     this.render(summary, daily);
@@ -47,12 +49,12 @@ export class DashboardView {
     const kpi = summary.kpi || {};
     // Unquoted SQL aliases come back lowercased, hence `paidshoots`.
     $('#kpi-row').innerHTML = `
-    <div class="kpi accent" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Total Shoots</div><div class="kpi-value">${kpi.shoots ?? 0}</div><div class="kpi-sub">${kpi.active ?? 0} Planned · ${kpi.completed ?? 0} Completed</div></div>
-    <div class="kpi violet" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Total Fee</div><div class="kpi-value">${formatMoney(kpi.total_fee)}</div><div class="kpi-sub">Booked Earnings</div></div>
+    <div class="kpi accent" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Total Entries</div><div class="kpi-value">${kpi.shoots ?? 0}</div><div class="kpi-sub">${kpi.active ?? 0} Planned · ${kpi.completed ?? 0} Completed</div></div>
+    <div class="kpi violet" data-goto="{}" role="button" tabindex="0"><div class="kpi-label">Expected Income</div><div class="kpi-value">${formatMoney(kpi.total_fee)}</div><div class="kpi-sub">Booked Earnings</div></div>
     <div class="kpi green" data-goto='{"status":"completed"}' role="button" tabindex="0"><div class="kpi-label">Completed</div><div class="kpi-value">${kpi.completed ?? 0}</div><div class="kpi-sub">Of ${kpi.shoots ?? 0} Total</div></div>
-    <div class="kpi green" data-goto='{"paymentStatus":"paid"}' role="button" tabindex="0"><div class="kpi-label">Total Received</div><div class="kpi-value">${formatMoney(kpi.total_paid)}</div><div class="kpi-sub">${kpi.paidshoots ?? 0} Shoots Fully Paid</div></div>
+    <div class="kpi green" data-goto='{"paymentStatus":"paid"}' role="button" tabindex="0"><div class="kpi-label">Total Received</div><div class="kpi-value">${formatMoney(kpi.total_paid)}</div><div class="kpi-sub">${kpi.paidshoots ?? 0} Entries Fully Paid</div></div>
     <div class="kpi" data-goto='{"status":"planned"}' role="button" tabindex="0"><div class="kpi-label">Planned</div><div class="kpi-value">${kpi.active ?? 0}</div><div class="kpi-sub">Still to Come</div></div>
-    <div class="kpi amber" data-goto='{"paymentStatus":"outstanding"}' role="button" tabindex="0"><div class="kpi-label">Outstanding</div><div class="kpi-value">${formatMoney(kpi.outstanding)}</div><div class="kpi-sub">${kpi.outstandingshoots ?? 0} Shoots with a Balance</div></div>`;
+    <div class="kpi amber" data-goto='{"paymentStatus":"outstanding"}' role="button" tabindex="0"><div class="kpi-label">Outstanding</div><div class="kpi-value">${formatMoney(kpi.outstanding)}</div><div class="kpi-sub">${kpi.outstandingshoots ?? 0} Entries with a Balance</div></div>`;
 
     this.#renderEarnings(summary.monthly || [], daily);
     this.#renderStatusDonut(summary.byStatus || []);
@@ -86,7 +88,7 @@ export class DashboardView {
     if (daily) {
       title.textContent = 'Earnings by Day';
       if (!daily.length) {
-        wrap.innerHTML = '<div class="empty">No shoots in this month</div>';
+        wrap.innerHTML = '<div class="empty">No entries in this month</div>';
         range.textContent = '';
         return;
       }
@@ -160,7 +162,7 @@ export class DashboardView {
         ${segments.map((segment) => `<circle cx="80" cy="80" r="${radius}" fill="none" stroke="${segment.color}" stroke-width="22" stroke-dasharray="${segment.dash}" stroke-dashoffset="${segment.offset}"></circle>`).join('')}
       </g>
       <text x="80" y="76" text-anchor="middle" style="fill:var(--text)" font-size="26" font-weight="700">${total}</text>
-      <text x="80" y="97" text-anchor="middle" style="fill:var(--muted)" font-size="11">shoots</text>
+      <text x="80" y="97" text-anchor="middle" style="fill:var(--muted)" font-size="11">entries</text>
     </svg>
     <div class="donut-legend">
       ${rows.map((row) => `<div class="row"><i style="background:${STATUS_COLORS[row.status] || '#888'}"></i>${escapeHtml(statusLabel(row.status))}<span class="n">${row.n}</span></div>`).join('')}
@@ -180,7 +182,7 @@ export class DashboardView {
         .map(
           (row) => `
     <div class="coord-row">
-      <div class="coord-top"><span>${escapeHtml(row.name)}</span><span class="amt">${row.shoots} shoots · ${formatMoney(row.fee)}</span></div>
+      <div class="coord-top"><span>${escapeHtml(row.name)}</span><span class="amt">${row.shoots} entries · ${formatMoney(row.fee)}</span></div>
       <div class="coord-track"><div class="coord-fill" style="width:${Math.max(2, (+row.fee / max) * 100)}%"></div></div>
     </div>`
         )
@@ -200,7 +202,7 @@ export class DashboardView {
   }
 
   /**
-   * The two "what now?" lists — Upcoming Shoots and Needs Attention — are the
+   * The two "what now?" lists — Upcoming Entries and Needs Attention — are the
    * same table: date, title and the two closing actions.
    *
    * A card with nothing in it is noise, so an empty list hides the whole card.
@@ -267,7 +269,7 @@ export class DashboardView {
       </button>
       <button type="button" class="row-btn note${settled ? ' is-on' : ''}" data-act="paid" data-id="${shoot.id}"
               data-amount="${balance}" aria-pressed="${settled}" ${fee ? '' : 'disabled'}
-              title="${settled ? 'Paid — tap to undo' : fee ? `Mark Paid — ${formatMoney(balance)}` : 'Set a fee first'}" aria-label="Mark Paid">
+              title="${settled ? 'Paid — tap to undo' : fee ? `Mark Paid — ${formatMoney(balance)}` : 'Set an amount first'}" aria-label="Mark Paid">
         ${settled ? NOTE_FILLED : NOTE_EMPTY}
       </button>`;
   }
@@ -298,7 +300,7 @@ export class DashboardView {
         this.actions.notify(`Marked ${formatMoney(button.dataset.amount)} as paid`);
       } else {
         await this.api.updateShoot(id, { status: undo ? 'planned' : 'completed' });
-        this.actions.notify(undo ? 'Shoot moved back to planned' : 'Shoot marked complete');
+        this.actions.notify(undo ? 'Entry moved back to planned' : 'Entry marked complete');
       }
       this.actions.dataChanged({ reloadMeta: false });
     } catch (error) {

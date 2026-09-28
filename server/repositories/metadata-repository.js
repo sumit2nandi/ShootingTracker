@@ -65,6 +65,29 @@ class MetadataRepository {
     return result.rows.map((row) => row.title);
   }
 
+  /**
+   * The most recent record for each past title, used to prefill amount and
+   * coordinator when that title is selected for a new entry.
+   *
+   * @returns {Promise<{ title: string, fee: number, coordinator: string|null }[]>}
+   */
+  async titleSuggestions(ownerId) {
+    const result = await this.database.query(
+      `SELECT title, fee, coordinator
+       FROM (
+         SELECT DISTINCT ON (lower(s.title)) s.title, s.fee, c.name AS coordinator, s.updated_at
+         FROM shoots s
+         LEFT JOIN coordinators c ON c.id = s.coordinator_id
+         WHERE s.owner_id = $1 AND s.title IS NOT NULL AND trim(s.title) <> ''
+         ORDER BY lower(s.title), s.updated_at DESC, s.id DESC
+       ) latest
+       ORDER BY updated_at DESC, lower(title)
+       LIMIT 100`,
+      [ownerId]
+    );
+    return result.rows;
+  }
+
   async months(ownerId) {
     const result = await this.database.query(
       'SELECT to_char(shoot_date, \'YYYY-MM\') AS ym FROM shoots WHERE owner_id = $1 GROUP BY 1 ORDER BY 1 DESC',

@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>ShootingTracker</title>
-  <link rel="stylesheet" href="css/app.css?v=35" />
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=5" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=5" />
-  <link rel="apple-touch-icon" href="favicon.png?v=5" />
+  <title>Income Tracker</title>
+  <link rel="stylesheet" href="css/app.css?v=37" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=7" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=7" />
+  <link rel="apple-touch-icon" href="favicon.png?v=7" />
   <!-- the browser paints the address bar / tab strip with this colour, so it follows the theme -->
   <meta name="theme-color" content="#f4f3f9" id="meta-theme-color" />
   <script>
@@ -25,14 +25,14 @@
 </head>
 <body>
   <!-- boot splash: painted before anything else, gone within 1.5s -->
-  <div class="app-loader" id="app-loader" role="status" aria-label="Loading ShootingTracker">
+  <div class="app-loader" id="app-loader" role="status" aria-label="Loading Income Tracker">
     <div class="app-loader-mark">
       <svg class="app-loader-ring" viewBox="0 0 80 80" aria-hidden="true">
         <circle class="ring-track" cx="40" cy="40" r="35" />
         <circle class="ring-arc" cx="40" cy="40" r="35" />
       </svg>
       <span class="app-loader-badge" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H20v16H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3"/><path d="M3 8h17M16 13h4"/><circle cx="16" cy="13" r=".6" fill="currentColor"/></svg>
       </span>
     </div>
   </div>
@@ -40,9 +40,9 @@
   <header class="topbar">
     <div class="brand">
       <span class="brand-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H20v16H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3"/><path d="M3 8h17M16 13h4"/><circle cx="16" cy="13" r=".6" fill="currentColor"/></svg>
       </span>
-      <span class="brand-name">ShootingTracker</span>
+      <span class="brand-name">Income Tracker</span>
     </div>
     <nav class="desktop-tabs" aria-label="Main">
       <button class="tab active" data-view="dashboard">
@@ -54,8 +54,8 @@
         <span>Calendar</span>
       </button>
       <button class="tab" data-view="shoots">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg>
-        <span>Shoots</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><path d="m3 6 1 1 2-2M3 12l1 1 2-2M3 18l1 1 2-2"/></svg>
+        <span>Entries</span>
       </button>
     </nav>
     <div class="top-right">
@@ -66,9 +66,9 @@
       <span id="db-status" class="db-pill" title="Checking database…">
         <span class="dot"></span><span class="db-pill-text">DB…</span>
       </span>
-      <button id="btn-new-shoot" class="btn btn-primary" aria-label="New Shoot">
+      <button id="btn-new-shoot" class="btn btn-primary" aria-label="Add Income Entry">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-        <span class="btn-label">New Shoot</span>
+        <span class="btn-label">Add Entry</span>
       </button>
     </div>
   </header>
@@ -81,7 +81,7 @@
       <div class="filter-group extra"><label>Status</label><select id="f-status"></select></div>
       <div class="filter-group extra"><label>Payment</label><select id="f-payment"><option value="">All Payments</option><option value="paid">Paid</option><option value="partial">Partially Paid</option><option value="unpaid">Unpaid</option><option value="outstanding">Outstanding Balance</option></select></div>
       <div class="filter-group extra"><label>Type</label><select id="f-type"></select></div>
-      <div class="filter-group grow extra"><label>Search</label><input id="f-q" type="search" placeholder="Search shoots…" /></div>
+      <div class="filter-group grow extra"><label>Search</label><input id="f-q" type="search" placeholder="Search entries…" /></div>
     <button id="f-clear" class="btn btn-ghost">Clear</button>
 
     </div>
@@ -96,7 +96,7 @@
   <main id="main">
     <section id="view-dashboard" class="view">
       <div class="card">
-        <div class="card-head"><h3>Upcoming Shoots</h3><span class="muted small">Next 7 Days</span></div>
+        <div class="card-head"><h3>Upcoming</h3><span class="muted small">Next 7 Days</span></div>
         <div id="upcoming-table" class="table-wrap"></div>
       </div>
 
@@ -111,7 +111,7 @@
           <div id="chart-monthly" class="chart-area"></div>
         </div>
         <div class="card">
-          <div class="card-head"><h3>Shoots by Status</h3></div>
+          <div class="card-head"><h3>Entries by Status</h3></div>
           <div id="chart-status" class="donut-wrap"></div>
         </div>
       </div>
@@ -121,7 +121,7 @@
           <div id="list-coordinators"></div>
         </div>
       <div class="card">
-        <div class="card-head"><h3>By Shoot Type</h3></div>
+        <div class="card-head"><h3>Income by Type</h3></div>
         <div id="list-types" class="type-chips"></div>
       </div>
       </div>
@@ -157,23 +157,23 @@
         </div>
       </div>
       <div id="cal-list" class="cal-list hidden"></div>
-      <div class="cal-mobile-note muted small">Tap a day to add a shoot · tap a shoot to open it</div>
+      <div class="cal-mobile-note muted small">Tap a day to add an entry · tap an entry to open it</div>
     </section>
 
     <section id="view-shoots" class="view hidden">
       <div class="card">
         <div class="card-head">
-          <h3>All Shoots</h3>
+          <h3>All Entries</h3>
           <div class="card-head-tools">
             <span class="muted" id="shoots-count"></span>
-            <button id="btn-shoots-reset" class="btn btn-ghost shoots-reset" hidden title="Clear the filters and show every shoot">
+            <button id="btn-shoots-reset" class="btn btn-ghost shoots-reset" hidden title="Clear the filters and show every entry">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4.5V10h5.5"/></svg>
               <span class="btn-label">Show All</span>
             </button>
             <button id="btn-shoots-filter" class="btn btn-ghost icon-btn" aria-label="Show filters" aria-expanded="false" title="Show / hide filters">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6.5 8v5.5l-3 2V13L4 5z"/></svg>
             </button>
-            <button id="btn-export" class="btn btn-ghost" aria-label="Export all data" title="Export all shoots (original calendar CSV format)">
+            <button id="btn-export" class="btn btn-ghost" aria-label="Export all data" title="Export all entries">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
               <span class="btn-label">Export</span>
             </button>
@@ -221,7 +221,7 @@
   <div class="modal-backdrop hidden" id="shoot-modal">
     <div class="modal">
       <div class="modal-head">
-        <h3 id="shoot-modal-title">New Shoot</h3>
+        <h3 id="shoot-modal-title">New Entry</h3>
         <button class="btn popup-close" data-close aria-label="Close" title="Close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
@@ -229,9 +229,9 @@
       <form id="shoot-form" class="form-grid">
         <input type="hidden" name="id" />
         <!-- core fields -->
-        <div class="field span-2"><label>Title *</label><input name="title" required placeholder="Shoot title" autocomplete="off" /></div>
-        <div class="field"><label>Shoot Date *</label><input name="shoot_date" type="date" required /></div>
-        <div class="field"><label>Fee (₹)</label><input name="fee" type="number" min="0" step="0.01" inputmode="numeric" value="0" /></div>
+        <div class="field span-2"><label>Title *</label><input name="title" required placeholder="Entry title" autocomplete="off" /></div>
+        <div class="field"><label>Date *</label><input name="shoot_date" type="date" required /></div>
+        <div class="field"><label>Expected Income (₹)</label><input name="fee" type="number" min="0" step="0.01" inputmode="numeric" /></div>
         <div class="field"><label>Coordinator</label>
           <select name="coordinator" id="sel-coordinator">
             <option value="">— none —</option>
@@ -250,7 +250,7 @@
           <summary>More Details</summary>
           <div class="sub-grid">
             <div class="field"><label>Client</label><input name="client_name" list="dl-clients" placeholder="Client name" /></div>
-            <div class="field"><label>Type</label><input name="shoot_type" list="dl-types" placeholder="wedding, fashion…" /></div>
+            <div class="field"><label>Type</label><input name="shoot_type" list="dl-types" placeholder="services, sales…" /></div>
             <div class="field"><label>End Date</label><input name="end_date" type="date" /></div>
             <div class="field"><label>Start Time</label><input name="start_time" type="time" /></div>
             <div class="field"><label>End Time</label><input name="end_time" type="time" /></div>
@@ -267,7 +267,7 @@
       <datalist id="dl-types"></datalist>
       <div class="modal-foot">
         <button class="btn btn-ghost" data-close>Cancel</button>
-        <button class="btn btn-primary" id="btn-save-shoot">Save Shoot</button>
+        <button class="btn btn-primary" id="btn-save-shoot">Save Entry</button>
       </div>
     </div>
   </div>
@@ -298,6 +298,18 @@
     </div>
   </div>
 
+  <!-- reusable in-app confirmation dialog -->
+  <div class="modal-backdrop confirm-backdrop hidden" id="confirm-modal">
+    <section class="modal confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+      <div class="modal-head"><h3 id="confirm-title">Please confirm</h3></div>
+      <div class="confirm-message" id="confirm-message"></div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirm-accept">Confirm</button>
+      </div>
+    </section>
+  </div>
+
   <!-- detail drawer -->
   <div class="drawer-backdrop hidden" id="drawer-backdrop">
     <aside class="drawer" id="drawer"></aside>
@@ -315,10 +327,10 @@
       <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 4.6h10.8A3.4 3.4 0 0 1 20.8 8v10a3.4 3.4 0 0 1-3.4 3.4H6.6A3.4 3.4 0 0 1 3.2 18V8a3.4 3.4 0 0 1 3.4-3.4zM7.2 1.9h1.4a.7.7 0 0 1 .7.7v3a.7.7 0 0 1-.7.7H7.2a.7.7 0 0 1-.7-.7v-3a.7.7 0 0 1 .7-.7zM15.4 1.9h1.4a.7.7 0 0 1 .7.7v3a.7.7 0 0 1-.7.7h-1.4a.7.7 0 0 1-.7-.7v-3a.7.7 0 0 1 .7-.7zM8 12.45a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3zM12 12.45a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3zM16 12.45a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3z"/></svg>
       <span>Calendar</span>
     </button>
-    <button class="tab" id="tab-shoots" data-view="shoots" title="All Shoots">
-      <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg>
-      <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3zM12 9.7a3.3 3.3 0 1 1 0 6.6 3.3 3.3 0 1 1 0-6.6z"/></svg>
-      <span>Shoots</span>
+    <button class="tab" id="tab-shoots" data-view="shoots" title="All Entries">
+      <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><path d="m3 6 1 1 2-2M3 12l1 1 2-2M3 18l1 1 2-2"/></svg>
+      <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 5h2v2H4zM8 5h13v2H8zM4 11h2v2H4zM8 11h13v2H8zM4 17h2v2H4zM8 17h13v2H8z"/></svg>
+      <span>Entries</span>
     </button>
     <button class="tab tab-profile" id="tab-profile" data-view="profile" title="Profile">
       <span class="profile-logo" id="profile-logo" aria-hidden="true">·</span>
@@ -327,12 +339,12 @@
   </nav>
 
   <!-- …and the primary action beside it, always within thumb reach -->
-  <button class="fab" id="btn-new-shoot-fab" aria-label="New Shoot" title="New Shoot">
+  <button class="fab" id="btn-new-shoot-fab" aria-label="Add Income Entry" title="Add Entry">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
   </button>
 
   <div id="toasts" class="toasts"></div>
 
-  <script type="module" src="js/app/main.js?v=32"></script>
+  <script type="module" src="js/app/main.js?v=36"></script>
 </body>
 </html>

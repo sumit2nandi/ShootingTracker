@@ -16,12 +16,22 @@ export const prefersReducedMotion = () =>
 
 /** Longest exit animation in the stylesheet; the fallback timer outlives it. */
 const EXIT_MS = 200;
+const openOverlays = new Set();
+
+function syncScrollLock() {
+  if (typeof document === 'undefined') return;
+  const locked = openOverlays.size > 0;
+  document.documentElement?.classList.toggle('overlay-open', locked);
+  document.body?.classList.toggle('overlay-open', locked);
+}
 
 /** Show an overlay (scrim + panel); the enter animation lives in the CSS. */
 export function openOverlay(element) {
   if (!element) return;
   element.classList.remove('closing');
   element.classList.remove('hidden');
+  openOverlays.add(element);
+  syncScrollLock();
 }
 
 /**
@@ -32,6 +42,8 @@ export function closeOverlay(element) {
   if (!element || element.classList.contains('hidden') || element.classList.contains('closing')) return;
   if (prefersReducedMotion()) {
     element.classList.add('hidden');
+    openOverlays.delete(element);
+    syncScrollLock();
     return;
   }
 
@@ -42,6 +54,8 @@ export function closeOverlay(element) {
     done = true;
     element.classList.remove('closing');
     element.classList.add('hidden');
+    openOverlays.delete(element);
+    syncScrollLock();
   };
 
   const panel = element.firstElementChild;
