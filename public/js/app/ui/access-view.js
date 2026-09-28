@@ -26,6 +26,11 @@ export class AccessView {
   }
 
   async open() {
+    const form = $('#access-form');
+    if (form) form.reset();            // a half-typed invite does not survive a close
+    this.modal.scrollTop = 0;
+    const sheet = this.modal.firstElementChild;
+    if (sheet) sheet.scrollTop = 0;
     openOverlay(this.modal);
     $('#access-list').innerHTML = '<div class="empty">Loading…</div>';
     await this.refresh();

@@ -35,7 +35,6 @@ class Application {
       user: null,
       meta: { statuses: [], coordinators: [], clients: [], types: [], months: [] },
       filters: FilterCriteria.empty(),
-      viewFilters: {},
       shootsFiltersOpen: false,
       dbOk: null
     });
@@ -106,10 +105,14 @@ class Application {
 
   async start() {
     this.mount();
+    // whatever happens next, the splash never traps the app on screen
+    setTimeout(() => this.#hideLoader(), 8000);
+
     let user;
     try {
       user = await this.api.currentUser();
     } catch {
+      this.#hideLoader();
       return; // the API client already redirected to the sign-in page
     }
     this.store.update({ user });
@@ -117,7 +120,16 @@ class Application {
 
     this.dbStatus.start();
     await this.loadMeta();
-    this.setView('dashboard');
+    await this.setView('dashboard');
+    this.#hideLoader();
+  }
+
+  /** Fade the boot splash out, then take it out of the document entirely. */
+  #hideLoader() {
+    const loader = $('#app-loader');
+    if (!loader || document.body.classList.contains('app-ready')) return;
+    document.body.classList.add('app-ready');
+    setTimeout(() => loader.remove(), 500);
   }
 
   /* ---------------- shared data ---------------- */
@@ -143,25 +155,41 @@ class Application {
 
   /* ---------------- routing ---------------- */
 
-  setView(view) {
-    const state = this.store.get();
-
-    // remember the filters of the tab we are leaving (only two tabs have any)
-    const viewFilters = { ...state.viewFilters };
-    if (FILTERED_VIEWS.has(state.view) && view !== state.view) viewFilters[state.view] = this.filterBar.read();
-    if (view !== 'shoots') this.shoots.setExpandAll(false); // the tile-driven expansion is one-shot
-
-    this.store.update({ view, viewFilters });
+  /**
+   * Show a destination. Every visit starts from scratch — no filters, no
+   * expanded groups and no leftover month from last time — unless the caller
+   * passes criteria on purpose (a dashboard tile drilling into Shoots).
+   *
+   * @param {string} view
+   * @param {{ filters?: import('./domain/filter-criteria.js').FilterCriteria }} [options]
+   */
+  setView(view, { filters = null } = {}) {
+    this.store.update({ view, shootsFiltersOpen: Boolean(filters) });
     $$('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.view === view));
     $$('.view').forEach((section) => section.classList.toggle('hidden', section.id !== `view-${view}`));
 
-    const showFilters =
-      view === 'dashboard' || (view === 'shoots' && this.store.get().shootsFiltersOpen);
-    this.filterBar.setVisible(FILTERED_VIEWS.has(view) && showFilters);
-    this.filterBar.setContext(view);
+    // every month group open only when a tile asked for a specific slice
+    this.shoots.setExpandAll(Boolean(filters));
+    if (view === 'calendar') this.calendar.resetToToday();
 
-    this.#restoreFilters(view);
-    this.refresh(false);
+    this.filterBar.write(filters || FilterCriteria.empty());
+    this.filterBar.setContext(view);
+    this.#syncFilterVisibility(view);
+    this.store.update({ filters: this.filterBar.read() });
+
+    return this.refresh(false);
+  }
+
+  /** The filter bar belongs to the dashboard, and to Shoots when asked for. */
+  #syncFilterVisibility(view = this.store.get().view) {
+    const open = this.store.get().shootsFiltersOpen;
+    const shown = view === 'dashboard' || (view === 'shoots' && open);
+    this.filterBar.setVisible(FILTERED_VIEWS.has(view) && shown);
+    const toggle = $('#btn-shoots-filter');
+    if (toggle) {
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.classList.toggle('active', open);
+    }
   }
 
   /** @param {boolean} reRead read the controls again (false when we just wrote them) */
@@ -172,46 +200,26 @@ class Application {
     return load().catch((error) => this.toaster.error(`${this.store.get().view}: ${error.message}`));
   }
 
-  #restoreFilters(view) {
-    const remembered = this.store.get().viewFilters[view] || FilterCriteria.empty();
-    const filters = new FilterCriteria(remembered);
-    this.filterBar.write(filters);
-    // writing may have dropped values whose option no longer exists
-    this.store.update({ filters: this.filterBar.read() });
-  }
-
   /* ---------------- shoots tab helpers ---------------- */
 
   /** A dashboard tile was clicked: open the Shoots tab already filtered. */
   showShootsFiltered(extra) {
     const current = this.store.get().filters;
-    const filters = new FilterCriteria({ month: current.month, coordinator: current.coordinator, ...extra });
-    this.store.update({
-      viewFilters: { ...this.store.get().viewFilters, shoots: filters },
-      shootsFiltersOpen: true
+    this.setView('shoots', {
+      filters: new FilterCriteria({ month: current.month, coordinator: current.coordinator, ...extra })
     });
-    this.shoots.setExpandAll(true); // every month group open, not just this month
-    $('#btn-shoots-filter').setAttribute('aria-expanded', 'true');
-    $('#btn-shoots-filter').classList.add('active');
-    this.setView('shoots');
   }
 
   toggleShootsFilters() {
-    const open = !this.store.get().shootsFiltersOpen;
-    this.store.update({ shootsFiltersOpen: open });
-    this.filterBar.setVisible(open);
-    $('#btn-shoots-filter').setAttribute('aria-expanded', String(open));
-    $('#btn-shoots-filter').classList.toggle('active', open);
-    if (open) this.store.update({ filters: this.filterBar.read() });
+    this.store.update({ shootsFiltersOpen: !this.store.get().shootsFiltersOpen });
+    this.#syncFilterVisibility();
+    this.store.update({ filters: this.filterBar.read() });
   }
 
   resetShootsFilters() {
     const empty = FilterCriteria.empty();
-    this.store.update({
-      viewFilters: { ...this.store.get().viewFilters, shoots: empty },
-      filters: empty
-    });
     this.filterBar.write(empty);
+    this.store.update({ filters: empty });
     this.shoots.syncResetButton(empty);
     this.refresh(false);
     this.toaster.success('Showing all shoots');

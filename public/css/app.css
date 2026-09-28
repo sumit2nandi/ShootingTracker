@@ -816,6 +816,54 @@ tbody tr:hover { background: var(--surface-2); }
   .fee-bubble { font-size: 10px; padding: 2px 4px; }
 }
 
+/* ---------- boot splash ----------
+   Painted straight from the HTML (before any script runs) so the first frame is
+   the brand rather than a blank page, and removed from the document once the
+   first view has data. */
+.app-loader {
+  position: fixed; inset: 0; z-index: 200;
+  display: grid; place-content: center; justify-items: center; gap: 4px;
+  background: var(--bg); color: var(--text);
+  transition: opacity .38s ease, visibility .38s ease;
+}
+body.app-ready .app-loader { opacity: 0; visibility: hidden; pointer-events: none; }
+.app-loader-mark { position: relative; display: grid; place-items: center; width: 80px; height: 80px; }
+.app-loader-ring { width: 80px; height: 80px; transform: rotate(-90deg); }
+.app-loader-ring .ring-track { fill: none; stroke: var(--line); stroke-width: 4; }
+.app-loader-ring .ring-arc {
+  fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round;
+  /* r = 35 → circumference ≈ 220; a quarter of it sweeps around the track */
+  stroke-dasharray: 55 165; transform-origin: 50% 50%;
+  animation: ring-spin 1.05s cubic-bezier(.6, .1, .4, .9) infinite;
+}
+@keyframes ring-spin { to { transform: rotate(360deg); } }
+.app-loader-badge {
+  position: absolute; width: 46px; height: 46px; border-radius: 15px;
+  display: grid; place-items: center; color: #fff;
+  background: var(--accent-fill); box-shadow: 0 10px 26px rgba(124, 58, 237, .38);
+  animation: badge-breathe 1.9s ease-in-out infinite;
+}
+.app-loader-badge svg { width: 24px; height: 24px; }
+@keyframes badge-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+.app-loader-name {
+  margin: 16px 0 0; font-size: 16px; font-weight: 700; letter-spacing: -.2px;
+  animation: loader-rise .5s .05s both cubic-bezier(.2, .8, .2, 1);
+}
+.app-loader-hint {
+  margin: 2px 0 0; font-size: 12.5px; color: var(--muted);
+  display: inline-flex; align-items: baseline; gap: 1px;
+  animation: loader-rise .5s .12s both cubic-bezier(.2, .8, .2, 1);
+}
+@keyframes loader-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.app-loader-dots { display: inline-flex; gap: 2px; margin-left: 1px; }
+.app-loader-dots i {
+  width: 3px; height: 3px; border-radius: 50%; background: currentColor;
+  animation: dot-fade 1.2s ease-in-out infinite;
+}
+.app-loader-dots i:nth-child(2) { animation-delay: .15s; }
+.app-loader-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes dot-fade { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+
 /* ---------- reduced motion ----------
    One switch for visitors who asked the OS for less movement: everything still
    happens, it just happens at once. The JS helpers check the same query. */
@@ -826,4 +874,7 @@ tbody tr:hover { background: var(--surface-2); }
     transition-duration: .001ms !important;
     scroll-behavior: auto !important;
   }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-loader-ring .ring-arc { stroke-dasharray: 220; opacity: .35; }
 }

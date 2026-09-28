@@ -40,6 +40,12 @@ that adds a shoot from anywhere.
   **Status** and **Payment** columns; the fee itself turns into a **green bubble when paid** and a **red
   bubble when a balance is due**. A **Show All** button appears whenever a filter is applied, and **Export
   (CSV)** lives next to the filter icon in the same header.
+- **Fresh every time** — a tab always opens in its default state: no leftover filters, no expanded month
+  groups, and the calendar back on the current month. Dialogs do the same — the shoot form reopens empty
+  with “More Details” folded away and scrolled to the top. The one deliberate exception is a dashboard
+  tile, which carries its filter into the Shoots tab on purpose.
+- **Boot splash** — a branded loader is painted straight from the HTML (before any script runs) and fades
+  out once the first view has its data.
 - **Motion** — views cross-fade, month groups expand and collapse to their real height, the filter bar
   slides open, and every sheet, dialog and drawer animates both in *and* out (the "+" button raises the
   shoot form, closing it lets the sheet fall away). Anyone whose OS asks for reduced motion gets the same

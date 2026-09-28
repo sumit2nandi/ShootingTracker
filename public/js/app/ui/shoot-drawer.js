@@ -30,6 +30,7 @@ export class ShootDrawer {
   }
 
   open() {
+    this.element.scrollTop = 0;   // never inherit the last visit's scroll
     openOverlay(this.backdrop);
   }
 

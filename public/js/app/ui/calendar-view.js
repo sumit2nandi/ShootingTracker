@@ -105,6 +105,14 @@ export class CalendarView {
     else this.#renderGrid();
   }
 
+  /** Back to the current month — the calendar opens fresh on every visit. */
+  resetToToday() {
+    const now = this.today();
+    this.year = now.getFullYear();
+    this.month = now.getMonth();
+    this.byDate = {};
+  }
+
   /** Move the calendar to the month containing `isoDate`. */
   focus(isoDate) {
     const [year, month] = String(isoDate || '').slice(0, 10).split('-').map(Number);

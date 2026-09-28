@@ -102,6 +102,15 @@ export class ShootForm {
     newInput.hidden = select.value !== NEW_COORDINATOR;
 
     $('#sel-status').value = appStatus(shoot?.status);
+
+    // a second visit must look like the first: extra fields folded away and the
+    // sheet scrolled back to the top
+    const details = $('.more-details');
+    if (details) details.open = false;
+    this.modal.scrollTop = 0;
+    const sheet = this.modal.firstElementChild;
+    if (sheet) sheet.scrollTop = 0;
+
     openOverlay(this.modal);
     setTimeout(() => this.field('title').focus(), 50);
   }
