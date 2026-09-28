@@ -766,6 +766,21 @@ tbody tr:hover { background: var(--surface-2); }
 .access-who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .access-actions { display: flex; gap: 6px; flex: none; }
 .access-actions .btn { padding: 5px 10px; font-size: 12px; }
+.role-select {
+  flex: none;
+  appearance: none;
+  padding: 5px 26px 5px 10px;
+  font-size: 12px;
+  font-weight: 650;
+  font-family: inherit;
+  color: var(--muted);
+  background: var(--surface) var(--select-arrow) no-repeat right 8px center;
+  border: 1px solid var(--line-2);
+  border-radius: var(--pill);
+}
+.role-select.owner { color: var(--violet); border-color: rgba(124, 93, 250, .4); }
+.role-select:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.role-select:disabled { opacity: .55; cursor: not-allowed; }
 .access-add {
   display: grid; grid-template-columns: 1fr 1fr auto; grid-template-areas: "email name add";
   gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line);

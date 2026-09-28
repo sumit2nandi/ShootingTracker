@@ -44,7 +44,7 @@ that adds a shoot from anywhere.
   - monthly earnings bar chart (per-day when a month filter is on),
   - status donut,
   - **Upcoming Shoots** — the next 7 days, plus everything booked for today whatever state it is in. Once
-    it is past **7 pm IST on the day of a shoot**, the row carries two icon toggles: a checkbox for
+    it is past **7 pm IST on that shoot's own date**, the row carries two icon toggles: a checkbox for
     *completed* and a banknote for *paid*. They stay put once ticked — empty outline while the job is
     open, filled green when it is done — and tapping a filled one undoes it, so a mis-tap costs nothing,
   - **Needs Attention** — the same list for work that has slipped (either card hides itself when it has
@@ -200,13 +200,16 @@ consent are both refused with a clear message — a deactivated account can only
 Managing who can sign in — **no code changes and no restart needed**:
 
 - From the app: an owner opens the **Profile** tab → *People with Access* (add as
-  member, activate/deactivate, remove). **Roles cannot be changed from the app** —
-  the UI no longer offers a role, and the API refuses any role in the body
-  (`403 … not changed from the app`), so an owner can neither demote another
-  owner nor promote a member.
+  member, activate/deactivate, remove, and **switch another account's role**
+  between member and owner). Two rules still stand: the signed-in owner's own
+  role has no control (the API refuses a self role patch with
+  `403 … your own role`), and the last active owner cannot be demoted
+  (`409 At least one active owner is required`). New people always join as
+  members; an owner promotes them from the list.
 - From the database: `INSERT INTO app_users (email, name, role) VALUES ('new@example.com', 'New', 'member');`,
-  `UPDATE app_users SET is_active = false WHERE lower(email) = '…';`, and the only
-  way to change a role: `UPDATE app_users SET role = 'owner' WHERE lower(email) = '…';`
+  `UPDATE app_users SET is_active = false WHERE lower(email) = '…';`, or
+  `UPDATE app_users SET role = 'owner' WHERE lower(email) = '…';` — the only
+  way to change *your own* role.
 
 The two original logins are seeded by the first `npm run migrate` (existing databases pick them up on the next
 migration run). Owners can never deactivate or remove the last active owner, and nobody can remove their own

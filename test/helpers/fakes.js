@@ -208,9 +208,8 @@ class FakeUserRepository {
   async update(id, patch) {
     const row = this.rows.find((candidate) => String(candidate.id) === String(id));
     if (!row) return null;
-    // the repository applies only what it can write: no role here either
-    const { role, ...writable } = patch;
-    Object.assign(row, writable);
+    // the repository applies whatever the (upstream-validated) patch carries
+    Object.assign(row, patch);
     return { ...row };
   }
 

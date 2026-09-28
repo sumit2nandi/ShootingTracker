@@ -1,10 +1,10 @@
 /**
- * "Wrap-up time" — the moment a shoot booked for today can be closed out.
+ * "Wrap-up time" — when a shoot can be closed out from the dashboard.
  *
  * The studio works to Indian time, so the rule is written in Asia/Kolkata and
- * not in whatever zone the browser happens to sit in: once it is past 7 pm IST
- * on the day of a shoot, the day's work is done and the shoot can be marked
- * complete (and collected) straight from the dashboard.
+ * not in whatever zone the browser happens to sit in: a shoot can be marked
+ * complete (and collected) from the moment it is past **7 pm IST on that
+ * shoot's own date** — the evening of its day, and every moment after.
  *
  * Pure, with the clock injected, so the rule is unit-testable at any instant.
  */
@@ -31,7 +31,7 @@ export function zonedNow(now = new Date(), timeZone = WRAP_UP_TIME_ZONE) {
 }
 
 /**
- * Is this shoot happening today, with the evening already here?
+ * Has it been past 7 pm IST on this shoot's date?
  *
  * @param {string} shootDate `YYYY-MM-DD`
  * @param {Date} [now]
@@ -39,7 +39,10 @@ export function zonedNow(now = new Date(), timeZone = WRAP_UP_TIME_ZONE) {
 export function isWrapUpTime(shootDate, now = new Date()) {
   if (!shootDate) return false;
   const { date, hour } = zonedNow(now);
-  return String(shootDate).slice(0, 10) === date && hour >= WRAP_UP_HOUR;
+  const shoot = String(shootDate).slice(0, 10);
+  if (shoot < date) return true; // its day — and its 7 pm — has already passed
+  if (shoot > date) return false; // its day (and 7 pm) has not come yet
+  return hour >= WRAP_UP_HOUR; // on its day: from 7 pm onwards
 }
 
 /** What is still to be collected on a shoot (never negative). */

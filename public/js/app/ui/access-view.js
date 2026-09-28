@@ -4,9 +4,11 @@ import { closeOverlay, openOverlay } from '../core/motion.js';
 /**
  * "People with Access" (owners only).
  *
- * The server is the authority on these rules; the view mirrors them by
- * disabling the buttons that would fail, and still surfaces the server's answer
- * when a race slips through.
+ * An owner manages the list from here: add, activate/deactivate, remove, and
+ * switch another account's role between member and owner. The signed-in
+ * owner's own row has no role control (changing one's own role is a database
+ * job), and the last active owner cannot be demoted — the same rules the
+ * server enforces, mirrored here by disabling the control that would fail.
  */
 export class AccessView {
   constructor({ api, store, actions, confirm = window.confirm.bind(window) }) {
@@ -26,6 +28,8 @@ export class AccessView {
   }
 
   async open() {
+    // members never manage access — the entry point is not in their app at all
+    if ((this.store.get().user || {}).role !== 'owner') return;
     const form = $('#access-form');
     if (form) form.reset();            // a half-typed invite does not survive a close
     this.modal.scrollTop = 0;
@@ -54,6 +58,20 @@ export class AccessView {
 
     $('#access-list').innerHTML =
       users.map((user) => this.#rowHtml(user, { me, activeOwners })).join('') || '<div class="empty">Nobody yet.</div>';
+
+    $$('#access-list [data-role]').forEach((select) => {
+      select.addEventListener('change', async () => {
+        select.disabled = true;
+        try {
+          await this.api.updateUser(select.dataset.role, { role: select.value });
+          this.actions.notify('Role updated');
+          await this.refresh();
+        } catch (error) {
+          this.actions.notifyError(error.message);
+          select.disabled = false;
+        }
+      });
+    });
 
     $$('#access-list [data-toggle]').forEach((button) =>
       button.addEventListener('click', async () => {
@@ -87,14 +105,24 @@ export class AccessView {
 
   #rowHtml(user, { me, activeOwners }) {
     const isMe = String(user.email).toLowerCase() === me;
-    const isLastOwner = user.role === 'owner' && user.is_active && activeOwners <= 1;
+    const isOwner = user.role === 'owner';
+    const isLastOwner = isOwner && user.is_active && activeOwners <= 1;
+    // your own role is not a tap away — it is a database-level decision.
+    // everyone else's is.
+    const roleControl = isMe
+      ? `<span class="pill ${isOwner ? 'owner' : 'unpaid'}">${isOwner ? 'Owner' : 'Member'}</span>`
+      : `<select class="role-select${isOwner ? ' owner' : ''}" data-role="${user.id}" aria-label="Role of ${escapeHtml(user.name || user.email)}"
+           ${isLastOwner ? 'disabled title="At least one active owner is required"' : ''}>
+        <option value="member"${isOwner ? '' : ' selected'}>Member</option>
+        <option value="owner"${isOwner ? ' selected' : ''}>Owner</option>
+      </select>`;
     return `
       <div class="access-row${user.is_active ? '' : ' off'}">
         <div class="access-who">
           <b>${escapeHtml(user.name || user.email)}</b>
           <span class="muted small">${escapeHtml(user.email)}${isMe ? ' · you' : ''}</span>
         </div>
-        <span class="pill ${user.role === 'owner' ? 'owner' : 'unpaid'}">${user.role === 'owner' ? 'Owner' : 'Member'}</span>
+        ${roleControl}
         <div class="access-actions">
           <button class="btn btn-ghost" data-toggle="${user.id}" data-active="${user.is_active}"
             ${isLastOwner ? 'disabled title="At least one active owner is required"' : ''}>${user.is_active ? 'Deactivate' : 'Activate'}</button>

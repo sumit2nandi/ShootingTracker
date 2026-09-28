@@ -31,8 +31,8 @@ class AccessService {
   /**
    * Add an account (or reactivate an existing one).
    *
-   * New accounts always arrive as **members**; the `role` a caller might send
-   * is ignored — ownership is a database-level decision, not an app action.
+   * New accounts always arrive as **members** — the `role` a caller might send
+   * is ignored; an owner promotes them later, from the list itself.
    *
    * @param {{ email: string, name?: string }} input
    * @returns {Promise<object>} the created (or reactivated) account
@@ -48,9 +48,9 @@ class AccessService {
   /**
    * Create the profile of a brand-new sign-in (the consent flow).
    *
-   * The account always arrives as a *member* — ownership is granted
-   * deliberately, from "People with Access" — and the first-login tour is
-   * left uncompleted so it plays on their very first visit to the app.
+   * The account always arrives as a *member* — ownership is granted from
+   * "People with Access" — and the first-login tour is left uncompleted so it
+   * plays on their very first visit to the app.
    *
    * @param {{ email: string, name?: string|null }} input
    * @returns {Promise<object>} the created account
@@ -83,7 +83,7 @@ class AccessService {
   async update(id, patch = {}, { actor } = {}) {
     const users = await this.list();
     const target = findById(users, id);
-    AccessPolicy.assertCanUpdate({ users, target, patch });
+    AccessPolicy.assertCanUpdate({ users, target, patch, actor });
 
     const updated = await this.userRepository.update(id, patch);
     if (!updated) throw new NotFoundError();

@@ -86,8 +86,8 @@ class UserRepository {
 
   /**
    * @param {number|string} id
-   * @param {{ name?: string|null, is_active?: boolean }} patch — the role is
-   *        deliberately not updatable here (database-level only)
+   * @param {{ name?: string|null, role?: string, is_active?: boolean }} patch
+   *        — values are validated upstream by {@link AccessPolicy}
    * @returns {Promise<object|null>} the updated row, or null when nothing matched
    */
   async update(id, patch = {}) {
@@ -98,6 +98,7 @@ class UserRepository {
       assignments.push(`${column} = $${params.length}`);
     };
     if (patch.name !== undefined) set('name', (patch.name && String(patch.name).trim()) || null);
+    if (patch.role !== undefined) set('role', patch.role);
     if (patch.is_active !== undefined) set('is_active', Boolean(patch.is_active));
     if (!assignments.length) return null;
 

@@ -296,23 +296,49 @@ function accessServiceWith(rows) {
   return { service, userRepository, userDirectory };
 }
 
-test('a role change is refused without writing first', async () => {
+test('an owner may change another account’s role, both directions', async () => {
   const { service, userRepository } = accessServiceWith([
-    { id: 1, email: 'owner@example.com', role: 'owner' },
-    { id: 2, email: 'member@example.com', role: 'member' }
+    { id: 1, email: 'owner@example.com', role: 'owner', is_active: true },
+    { id: 2, email: 'second@example.com', role: 'owner', is_active: true },
+    { id: 3, email: 'member@example.com', role: 'member', is_active: true }
+  ]);
+
+  // promote a member, with another active owner around
+  const promoted = await service.update(3, { role: 'owner' }, { actor: { email: 'owner@example.com' } });
+  assert.equal(promoted.role, 'owner', 'the promotion is written');
+
+  // …and demote an owner back down
+  const demoted = await service.update(2, { role: 'member' }, { actor: { email: 'owner@example.com' } });
+  assert.equal(demoted.role, 'member', 'the demotion is written');
+
+  // nobody changes their own role
+  await assert.rejects(
+    service.update(1, { role: 'member' }, { actor: { email: 'owner@example.com' } }),
+    /cannot change your own role/
+  );
+  // an unknown role is a validation error
+  await assert.rejects(
+    service.update(3, { role: 'superuser' }, { actor: { email: 'owner@example.com' } }),
+    /role must be one of/
+  );
+
+  const rows = await userRepository.list();
+  assert.equal(rows.find((row) => row.id === 1).role, 'owner', 'the self-patch never reached the row');
+  assert.equal(rows.find((row) => row.id === 3).role, 'owner');
+});
+
+test('demoting the last active owner is refused without writing', async () => {
+  const { service, userRepository } = accessServiceWith([
+    { id: 1, email: 'owner@example.com', role: 'owner', is_active: true },
+    { id: 2, email: 'member@example.com', role: 'member', is_active: true }
   ]);
 
   await assert.rejects(
-    service.update(1, { role: 'member' }, { actor: { email: 'owner@example.com' } }),
-    /not changed from the app/
+    service.update(1, { role: 'member' }, { actor: { email: 'member@example.com' } }),
+    /At least one active owner is required/
   );
-  await assert.rejects(
-    service.update(2, { role: 'owner' }, { actor: { email: 'owner@example.com' } }),
-    /not changed from the app/
-  );
-  const [owner, member] = await userRepository.list();
-  assert.equal(owner.role, 'owner', 'the rows were never touched, so no undo was needed');
-  assert.equal(member.role, 'member');
+  const rows = await userRepository.list();
+  assert.equal(rows.find((row) => row.id === 1).role, 'owner', 'the row was never touched');
 });
 
 test('deactivating the last owner is refused without writing first', async () => {

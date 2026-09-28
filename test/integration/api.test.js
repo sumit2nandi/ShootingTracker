@@ -309,7 +309,7 @@ test('only owners may reach the access endpoints', async () => {
   });
 });
 
-test('an owner cannot change roles through the API, in either direction', async () => {
+test('an owner can switch another account’s role through the API', async () => {
   const { AccessService } = require('../../server/services/access-service');
   const { UserDirectory } = require('../../server/services/user-directory');
   const { FakeUserRepository, noopSchemaInitializer } = require('../helpers/fakes');
@@ -329,20 +329,30 @@ test('an owner cannot change roles through the API, in either direction', async 
   };
 
   await withApp({ services }, async (server) => {
-    const demote = await server.request('/api/users/2', { method: 'PATCH', body: { role: 'member' } });
-    assert.equal(demote.status, 403);
-    assert.match(demote.body.error, /not changed from the app/);
-
+    // signed-in account is owner@example.com (id 1)
     const promote = await server.request('/api/users/3', { method: 'PATCH', body: { role: 'owner' } });
-    assert.equal(promote.status, 403);
+    assert.equal(promote.status, 200);
+    assert.equal(promote.body.user.role, 'owner');
+
+    const demote = await server.request('/api/users/2', { method: 'PATCH', body: { role: 'member' } });
+    assert.equal(demote.status, 200);
+    assert.equal(demote.body.user.role, 'member');
+
+    const selfChange = await server.request('/api/users/1', { method: 'PATCH', body: { role: 'member' } });
+    assert.equal(selfChange.status, 403);
+    assert.match(selfChange.body.error, /your own role/);
+
+    const badRole = await server.request('/api/users/3', { method: 'PATCH', body: { role: 'superuser' } });
+    assert.equal(badRole.status, 400);
+    assert.match(badRole.body.error, /role must be one of/);
 
     const added = await server.request('/api/users', { method: 'POST', body: { email: 'fresh@example.com', role: 'owner' } });
     assert.equal(added.status, 201);
     assert.equal(added.body.user.role, 'member', 'a sent role is ignored — people join as members');
 
     const rows = await userRepository.list();
-    assert.equal(rows.find((row) => row.id === 2).role, 'owner', 'the demotion never reached the row');
-    assert.equal(rows.find((row) => row.id === 3).role, 'member', 'the promotion never reached the row');
+    assert.equal(rows.find((row) => row.id === 2).role, 'member', 'the demotion reached the row');
+    assert.equal(rows.find((row) => row.id === 3).role, 'owner', 'the promotion reached the row');
   });
 });
 

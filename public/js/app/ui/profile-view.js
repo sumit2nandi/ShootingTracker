@@ -6,9 +6,10 @@ import { $, escapeHtml } from '../core/dom.js';
  * It is a view like Dashboard, Calendar and Shoots — the router shows and
  * hides it — so this class only renders the account and wires its actions.
  *
- * A member's profile shows their own details and nothing else. An owner
- * additionally gets the "viewing" switch — whose data to look at — and the
- * People-with-Access management entry.
+ * A member's profile shows their own details and nothing else — the
+ * "People with Access" entry is not hidden for them, it is removed from the
+ * page. An owner additionally gets the "viewing" switch — whose data to look
+ * at — and the People-with-Access management entry.
  */
 export class ProfileView {
   constructor({ api, actions }) {
@@ -43,11 +44,17 @@ export class ProfileView {
     const isOwner = user && user.role === 'owner';
     $('#profile-role').textContent = isOwner ? 'Owner' : 'Member';
     $('#profile-role').classList.toggle('owner', Boolean(isOwner));
-    $('#btn-access').hidden = !isOwner; // managing access is an owner's job
-
     // the viewing switch is an owner's tool; members see their own data only
     $('#viewing-card').hidden = !isOwner;
-    if (!isOwner) return;
+
+    // managing access is an owner's job — for members the entry point is not
+    // just hidden, it is gone from the page
+    const accessButton = $('#btn-access');
+    if (!isOwner) {
+      if (accessButton) accessButton.remove();
+      return;
+    }
+    if (accessButton) accessButton.hidden = false;
 
     const select = $('#viewing-select');
     const me = String((user && user.email) || '').toLowerCase();

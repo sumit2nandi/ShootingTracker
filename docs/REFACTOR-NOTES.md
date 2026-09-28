@@ -59,24 +59,35 @@ without it they stay unowned and a warning is printed).
 account (default `sushmitaghosh0099@gmail.com`), creates it if missing, marks
 tours done, and is idempotent.
 
-**Tests.** `npm test` now covers 157 cases, including the data-scope rules,
-the consent flow and the `viewingAs` passthrough. `scripts/api-test.py` passes
+**Tests.** `npm test` now covers 161 cases, including the data-scope rules,
+the consent flow, the `viewingAs` passthrough and the role-switch guards.
+`scripts/api-test.py` passes
 unmodified (47 checks; its one “test coordinators removed” quirk when running
 against a `seed:demo` database predates this change — the demo and the suite
 use the same coordinator names, and the delete is correctly refused while demo
 shoots still reference them).
 
-## 2026-09 · Roles are database-only; viewing-mode bug fixes
+## 2026-09 · Access rules, viewing mode, wrap-up and roles
 
-- **Roles cannot be changed from the app.** `AccessPolicy.assertCanUpdate`
-  now refuses any patch that carries `role` (owner→member *and*
-  member→owner, and even an owner→owner rewrite) with `403 Roles are not
-  changed from the app…`; `UserRepository.update` no longer accepts the
-  column at all, and `upsert` reactivates/renames an existing account but
-  never re-roles it, so `POST /api/users` always creates a **member** even
-  when the body sends a role. The add form's role selector is gone. Changing
-  a role is a deliberate database job:
-  `UPDATE app_users SET role = 'owner' WHERE lower(email) = '…';`
+- **Owners can switch another account's role (a later pass superseded the
+  earlier database-only rule).** `AccessPolicy.assertCanUpdate` now accepts a
+  `role` patch — `member`↔`owner` — when it targets *another* account, and
+  `UserRepository.update` writes the column again (the value is validated
+  upstream: `400` outside the vocabulary). Two guards remain: a self role
+  patch is `403 … your own role` (one's own role stays a deliberate database
+  job, `UPDATE app_users SET role = '…'`), and a patch that would leave the
+  workspace without an active owner is `409`. New people still always join as
+  **members**; an owner promotes them from the list. The row's role is now a
+  small select in *People with Access* (absent on the signed-in owner's own
+  row, disabled on the last active owner).
+- **The *People with Access* entry is gone from a member's profile.** The
+  button is removed from the page (not just hidden) for non-owners, the
+  modal's `open()` re-checks the role, and the `/api/users` router's
+  `requireOwner` guard already answered members with `403`.
+- **Wrap-up follows the shoot's own date.** `isWrapUpTime` is now "is it past
+  7 pm IST *on this shoot's date*?" rather than "is the shoot today and is it
+  past 7 pm?" — identical for today's and future rows, and it also covers a
+  shoot whose day has already passed.
 - **Shoot detail followed the viewing choice.** `getShoot` was the one read
   that did not send `viewingAs`, so an owner opening a viewed account's shoot
   got `404`. The detail read now carries the choice like every other call —

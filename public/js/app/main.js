@@ -60,6 +60,8 @@ class Application {
       // they land on their own data as always
       newShoot: (dateKey) => this.shootForm.open(null, dateKey),
       editShoot: (shoot) => this.shootForm.open(shoot),
+      // the entry point does not exist in a member's app, and the modal's own
+      // open() re-checks the role — belt and braces
       openAccess: () => this.access.open(),
       setViewingAs: (email) => this.#applyViewing(email),
       dataChanged: (options) => this.dataChanged(options),

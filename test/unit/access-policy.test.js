@@ -26,20 +26,49 @@ test('roles outside the vocabulary fall back to member', () => {
   assert.equal(AccessPolicy.coerceRole('superuser'), 'member');
 });
 
-test('roles are never changed from the app — in either direction', () => {
+test('an owner may switch another account’s role — both directions', () => {
   const users = [owner, secondOwner, member];
-  // owner → member, with another active owner still around…
-  assert.throws(
-    () => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'member' } }),
-    /not changed from the app/
+  const actor = { email: 'second@example.com' };
+  // owner → member, with another active owner still around
+  assert.doesNotThrow(
+    () => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'member' }, actor })
   );
-  // …and member → owner is refused just the same
-  assert.throws(
-    () => AccessPolicy.assertCanUpdate({ users, target: member, patch: { role: 'owner' } }),
-    ForbiddenError
+  // member → owner
+  assert.doesNotThrow(
+    () => AccessPolicy.assertCanUpdate({ users, target: member, patch: { role: 'owner' }, actor })
   );
-  // even an "owner → owner" write is rejected, so the patch cannot smuggle one in
-  assert.throws(() => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'owner' } }), ForbiddenError);
+  // and a no-op rewrite of an owner’s role (by a different account)
+  assert.doesNotThrow(
+    () => AccessPolicy.assertCanUpdate({ users, target: secondOwner, patch: { role: 'owner' }, actor: { email: 'owner@example.com' } })
+  );
+});
+
+test('nobody may change their own role from the app', () => {
+  const users = [owner, secondOwner, member];
+  assert.throws(
+    () => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'member' }, actor: { email: 'OWNER@example.com' } }),
+    /cannot change your own role/
+  );
+  assert.throws(
+    () => AccessPolicy.assertCanUpdate({ users, target: member, patch: { role: 'owner' }, actor: { email: 'member@example.com' } }),
+    /cannot change your own role/
+  );
+});
+
+test('the last active owner cannot be demoted', () => {
+  const users = [owner, member, inactiveOwner];
+  assert.throws(
+    () => AccessPolicy.assertCanUpdate({ users, target: owner, patch: { role: 'member' }, actor: member }),
+    /At least one active owner is required/
+  );
+});
+
+test('a role outside the vocabulary is rejected', () => {
+  const users = [owner, secondOwner, member];
+  assert.throws(
+    () => AccessPolicy.assertCanUpdate({ users, target: member, patch: { role: 'superuser' }, actor: secondOwner }),
+    ValidationError
+  );
 });
 
 test('the last active owner cannot be deactivated', () => {
