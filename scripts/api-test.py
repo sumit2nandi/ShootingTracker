@@ -1,13 +1,22 @@
 #!/usr/bin/env python3
-"""End-to-end API smoke test. Usage: python3 scripts/api-test.py [base_url]"""
-import json, sys, urllib.request, urllib.error, urllib.parse
+"""End-to-end API smoke test.
+
+Usage: python3 scripts/api-test.py [base_url]
+
+Every /api route needs a session, so pass one in:
+    ST_COOKIE=$(node scripts/dev-session.js) python3 scripts/api-test.py
+"""
+import json, os, sys, urllib.request, urllib.error, urllib.parse
 
 BASE = sys.argv[1] if len(sys.argv) > 1 else "http://localhost:3000"
+COOKIE = os.environ.get("ST_COOKIE", "").strip()
 passed, failed = [], []
 
-def call(method, path, body=None, raw=None):
+def call(method, path, body=None, raw=None, cookie=True):
     data = None
     headers = {}
+    if cookie and COOKIE:
+        headers["Cookie"] = COOKIE
     if raw is not None:
         data = raw.encode()
         headers["Content-Type"] = "text/plain"
@@ -32,6 +41,21 @@ def check(name, cond):
 
 print(f"BASE={BASE}\n")
 
+if not COOKIE:
+    print("No ST_COOKIE set — every /api call will be rejected with 401.")
+    print("Run:  ST_COOKIE=$(node scripts/dev-session.js) python3 scripts/api-test.py\n")
+
+print("-- auth gate --")
+s, _ = call("GET", "/api/shoots", cookie=False)
+if s != 401:
+    print("    (is DEV_SIGN_IN_EMAIL set on the server? it makes every request authenticated)")
+check("unauthenticated /api is 401", s == 401)
+s, cfg = call("GET", "/api/auth/config", cookie=False)
+check("auth config is public", s == 200 and "clientId" in (cfg or {}))
+s, me = call("GET", "/api/auth/me")
+check("session identifies the caller", s == 200 and me.get("user", {}).get("email"))
+
+print("\n-- reads --")
 s, h = call("GET", "/api/health")
 print("health:", h)
 check("health ok", s == 200 and h and h.get("ok") is True)
@@ -122,6 +146,20 @@ check("payment removed", str(g4.get("paid_amount")) in ("0", "0.00"))
 call("DELETE", f"/api/shoots/{sid}")
 s, _ = call("GET", f"/api/shoots/{sid}")
 check("shoot deleted (404)", s == 404)
+
+print("\n-- validation / error contract --")
+s, _ = call("DELETE", f"/api/shoots/{sid}")
+check("deleting a missing shoot is 404", s == 404)
+s, _ = call("PUT", f"/api/shoots/{sid}", {"fee": 1})
+check("updating a missing shoot is 404", s == 404)
+s, _ = call("POST", f"/api/shoots/{sid}/payments", {"amount": 10})
+check("payment on a missing shoot is 404", s == 404)
+s, e = call("POST", "/api/shoots", {"client_name": "no title"})
+check("create without a title is 400", s == 400 and "required" in (e or {}).get("error", ""))
+s, e = call("GET", "/api/shoots/not-a-number")
+check("a malformed id is 400, not 500", s == 400)
+s, e = call("POST", "/api/import", {})
+check("import without content is 400", s == 400)
 
 print("\n-- import (API) --")
 html = open("data/sample-sheet.html").read()

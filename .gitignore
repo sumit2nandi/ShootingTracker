@@ -12,3 +12,4 @@ data/upload-*
 data/import-*.sql
 __pycache__/
 public/import-*.sql
+.env.local

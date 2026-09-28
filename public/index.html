@@ -4,12 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ShootingTracker</title>
-  <link rel="stylesheet" href="css/app.css?v=17" />
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=4" />
-  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=4" />
-  <link rel="apple-touch-icon" href="favicon.png?v=4" />
+  <link rel="stylesheet" href="css/app.css?v=28" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=5" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=5" />
+  <link rel="apple-touch-icon" href="favicon.png?v=5" />
   <!-- the browser paints the address bar / tab strip with this colour, so it follows the theme -->
-  <meta name="theme-color" content="#f7f9fc" id="meta-theme-color" />
+  <meta name="theme-color" content="#f4f3f9" id="meta-theme-color" />
   <script>
     // Paint the saved (or system) theme before the first frame — otherwise a dark-mode
     // user gets a white flash on every page load.
@@ -24,6 +24,19 @@
   </script>
 </head>
 <body>
+  <!-- boot splash: painted before anything else, gone within 1.5s -->
+  <div class="app-loader" id="app-loader" role="status" aria-label="Loading ShootingTracker">
+    <div class="app-loader-mark">
+      <svg class="app-loader-ring" viewBox="0 0 80 80" aria-hidden="true">
+        <circle class="ring-track" cx="40" cy="40" r="35" />
+        <circle class="ring-arc" cx="40" cy="40" r="35" />
+      </svg>
+      <span class="app-loader-badge" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      </span>
+    </div>
+  </div>
+
   <header class="topbar">
     <div class="brand">
       <span class="brand-icon">
@@ -33,7 +46,7 @@
     </div>
     <nav class="desktop-tabs" aria-label="Main">
       <button class="tab active" data-view="dashboard">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="9" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="1.5"/><rect x="13.5" y="12" width="7.5" height="9" rx="1.5"/><rect x="3" y="15.5" width="7.5" height="5.5" rx="1.5"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3.3 10.7 12 3.9l8.7 6.8"/><path d="M5.6 9.5V19a1.5 1.5 0 0 0 1.5 1.5h9.8a1.5 1.5 0 0 0 1.5-1.5V9.5"/><path d="M9.7 20.5v-5.1a1.3 1.3 0 0 1 1.3-1.3h2a1.3 1.3 0 0 1 1.3 1.3v5.1"/></svg>
         <span>Dashboard</span>
       </button>
       <button class="tab" data-view="calendar">
@@ -53,48 +66,56 @@
       <span id="db-status" class="db-pill" title="Checking database…">
         <span class="dot"></span><span class="db-pill-text">DB…</span>
       </span>
-      <button id="btn-new-shoot" class="btn btn-primary" aria-label="New shoot">
+      <button id="btn-new-shoot" class="btn btn-primary" aria-label="New Shoot">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-        <span class="btn-label">New shoot</span>
+        <span class="btn-label">New Shoot</span>
       </button>
     </div>
   </header>
 
   <section id="filterbar" class="filterbar" data-for="dashboard">
-    <div class="filter-group"><label>Month</label><select id="f-month"></select></div>
-    <div class="filter-group"><label>Coordinator</label><select id="f-coordinator"></select></div>
-    <div class="filter-group extra"><label>Client</label><select id="f-client"></select></div>
-    <div class="filter-group extra"><label>Status</label><select id="f-status"></select></div>
-    <div class="filter-group extra"><label>Payment</label><select id="f-payment"><option value="">All payments</option><option value="paid">Paid</option><option value="partial">Partially paid</option><option value="unpaid">Unpaid</option><option value="outstanding">Outstanding balance</option></select></div>
-    <div class="filter-group extra"><label>Type</label><select id="f-type"></select></div>
-    <div class="filter-group grow extra"><label>Search</label><input id="f-q" type="search" placeholder="Search shoots…" /></div>
-    <button id="f-clear" class="btn btn-ghost">Clear</button>
+    <div class="filterbar-inner">
+      <div class="filter-group"><label>Month</label><select id="f-month"></select></div>
+      <div class="filter-group"><label>Coordinator</label><select id="f-coordinator"></select></div>
+      <div class="filter-group extra"><label>Client</label><select id="f-client"></select></div>
+      <div class="filter-group extra"><label>Status</label><select id="f-status"></select></div>
+      <div class="filter-group extra"><label>Payment</label><select id="f-payment"><option value="">All Payments</option><option value="paid">Paid</option><option value="partial">Partially Paid</option><option value="unpaid">Unpaid</option><option value="outstanding">Outstanding Balance</option></select></div>
+      <div class="filter-group extra"><label>Type</label><select id="f-type"></select></div>
+      <div class="filter-group grow extra"><label>Search</label><input id="f-q" type="search" placeholder="Search shoots…" /></div>
+      <button id="f-clear" class="btn btn-ghost">Clear</button>
+  
+    </div>
   </section>
 
   <main id="main">
     <section id="view-dashboard" class="view">
       <div class="card">
-        <div class="card-head"><h3>Upcoming shoots</h3><span class="muted small">next 7 days</span></div>
+        <div class="card-head"><h3>Upcoming Shoots</h3><span class="muted small">Next 7 Days</span></div>
         <div id="upcoming-table" class="table-wrap"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h3>Needs Attention</h3><span class="muted small">Overdue &amp; Unpaid</span></div>
+        <div id="attention-table" class="table-wrap"></div>
       </div>
       <div id="kpi-row" class="kpi-row"></div>
       <div class="grid-2">
         <div class="card">
-          <div class="card-head"><h3 id="chart-title">Earnings by month</h3><span class="muted" id="chart-range"></span></div>
+          <div class="card-head"><h3 id="chart-title">Earnings by Month</h3><span class="muted" id="chart-range"></span></div>
           <div id="chart-monthly" class="chart-area"></div>
         </div>
         <div class="card">
-          <div class="card-head"><h3>Shoots by status</h3></div>
+          <div class="card-head"><h3>Shoots by Status</h3></div>
           <div id="chart-status" class="donut-wrap"></div>
         </div>
       </div>
       <div class="grid-2">
         <div class="card">
-          <div class="card-head"><h3>By coordinator</h3></div>
+          <div class="card-head"><h3>By Coordinator</h3></div>
           <div id="list-coordinators"></div>
         </div>
       <div class="card">
-        <div class="card-head"><h3>By shoot type</h3></div>
+        <div class="card-head"><h3>By Shoot Type</h3></div>
         <div id="list-types" class="type-chips"></div>
       </div>
       </div>
@@ -136,12 +157,12 @@
     <section id="view-shoots" class="view hidden">
       <div class="card">
         <div class="card-head">
-          <h3>All shoots</h3>
+          <h3>All Shoots</h3>
           <div class="card-head-tools">
             <span class="muted" id="shoots-count"></span>
             <button id="btn-shoots-reset" class="btn btn-ghost shoots-reset" hidden title="Clear the filters and show every shoot">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 4.5V10h5.5"/></svg>
-              <span class="btn-label">Show all</span>
+              <span class="btn-label">Show All</span>
             </button>
             <button id="btn-shoots-filter" class="btn btn-ghost icon-btn" aria-label="Show filters" aria-expanded="false" title="Show / hide filters">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6.5 8v5.5l-3 2V13L4 5z"/></svg>
@@ -155,13 +176,40 @@
         <div id="shoots-table" class="table-wrap"></div>
       </div>
     </section>
+
+    <section id="view-profile" class="view hidden" aria-labelledby="profile-heading">
+      <div class="card">
+        <div class="card-head"><h3 id="profile-heading">Profile</h3></div>
+        <div class="profile-identity">
+          <span class="profile-avatar" id="profile-avatar" aria-hidden="true">·</span>
+          <div class="profile-who">
+            <b id="profile-name">—</b>
+            <span class="muted small" id="profile-email">—</span>
+          </div>
+          <span class="pill owner" id="profile-role">Member</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Account</h3></div>
+        <div class="profile-actions">
+          <button id="btn-access" class="btn profile-action" title="People with Access" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/><circle cx="10" cy="7.5" r="3.5"/><path d="M20 19v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.5 4.2a3.5 3.5 0 0 1 0 6.6"/></svg>
+            <span>People with Access</span>
+          </button>
+          <button id="btn-signout" class="btn btn-danger profile-action" title="Sign Out">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5M20 12H9M12 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5"/></svg>
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- shoot form modal -->
   <div class="modal-backdrop hidden" id="shoot-modal">
     <div class="modal">
       <div class="modal-head">
-        <h3 id="shoot-modal-title">New shoot</h3>
+        <h3 id="shoot-modal-title">New Shoot</h3>
         <button class="btn popup-close" data-close aria-label="Close" title="Close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
@@ -170,12 +218,12 @@
         <input type="hidden" name="id" />
         <!-- core fields -->
         <div class="field span-2"><label>Title *</label><input name="title" required placeholder="Shoot title" /></div>
-        <div class="field"><label>Shoot date *</label><input name="shoot_date" type="date" required /></div>
+        <div class="field"><label>Shoot Date *</label><input name="shoot_date" type="date" required /></div>
         <div class="field"><label>Fee (₹)</label><input name="fee" type="number" min="0" step="0.01" inputmode="numeric" value="0" /></div>
         <div class="field"><label>Coordinator</label>
           <select name="coordinator" id="sel-coordinator">
             <option value="">— none —</option>
-            <option value="__new__">➕ New coordinator…</option>
+            <option value="__new__">➕ New Coordinator…</option>
           </select>
           <input name="coordinator_new" id="coord-new-input" placeholder="Type new coordinator name" hidden />
         </div>
@@ -187,17 +235,17 @@
         </div>
         <!-- details -->
         <details class="field span-2 more-details">
-          <summary>More details</summary>
+          <summary>More Details</summary>
           <div class="sub-grid">
             <div class="field"><label>Client</label><input name="client_name" list="dl-clients" placeholder="Client name" /></div>
             <div class="field"><label>Type</label><input name="shoot_type" list="dl-types" placeholder="wedding, fashion…" /></div>
-            <div class="field"><label>End date</label><input name="end_date" type="date" /></div>
-            <div class="field"><label>Start time</label><input name="start_time" type="time" /></div>
-            <div class="field"><label>End time</label><input name="end_time" type="time" /></div>
+            <div class="field"><label>End Date</label><input name="end_date" type="date" /></div>
+            <div class="field"><label>Start Time</label><input name="start_time" type="time" /></div>
+            <div class="field"><label>End Time</label><input name="end_time" type="time" /></div>
             <div class="field"><label>Venue</label><input name="venue" placeholder="Hall / studio" /></div>
             <div class="field"><label>Location</label><input name="location" placeholder="City / area" /></div>
-            <div class="field"><label>Contact name</label><input name="contact_name" /></div>
-            <div class="field"><label>Contact phone</label><input name="contact_phone" inputmode="tel" /></div>
+            <div class="field"><label>Contact Name</label><input name="contact_name" /></div>
+            <div class="field"><label>Contact Phone</label><input name="contact_phone" inputmode="tel" /></div>
             <div class="field span-2"><label>Notes</label><textarea name="notes" rows="3"></textarea></div>
           </div>
         </details>
@@ -207,7 +255,7 @@
       <datalist id="dl-types"></datalist>
       <div class="modal-foot">
         <button class="btn btn-ghost" data-close>Cancel</button>
-        <button class="btn btn-primary" id="btn-save-shoot">Save shoot</button>
+        <button class="btn btn-primary" id="btn-save-shoot">Save Shoot</button>
       </div>
     </div>
   </div>
@@ -216,7 +264,7 @@
   <div class="modal-backdrop hidden" id="access-modal">
     <div class="modal">
       <div class="modal-head">
-        <h3 id="access-title">People with access</h3>
+        <h3 id="access-title">People with Access</h3>
         <button class="btn popup-close" data-close aria-label="Close" title="Close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
@@ -246,60 +294,36 @@
     <aside class="drawer" id="drawer"></aside>
   </div>
 
-  <!-- floating bottom tab bar (liquid glass) -->
+  <!-- floating bottom navigation: a solid pill of destinations… -->
   <nav class="tabbar" id="tabs" aria-label="Main">
-    <button class="tab active" data-view="dashboard">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="9" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="1.5"/><rect x="13.5" y="12" width="7.5" height="9" rx="1.5"/><rect x="3" y="15.5" width="7.5" height="5.5" rx="1.5"/></svg>
+    <button class="tab active" data-view="dashboard" title="Dashboard">
+      <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3.3 10.7 12 3.9l8.7 6.8"/><path d="M5.6 9.5V19a1.5 1.5 0 0 0 1.5 1.5h9.8a1.5 1.5 0 0 0 1.5-1.5V9.5"/><path d="M9.7 20.5v-5.1a1.3 1.3 0 0 1 1.3-1.3h2a1.3 1.3 0 0 1 1.3 1.3v5.1"/></svg>
+      <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10.9 3.72Q12 2.85 13.1 3.72L21.1 10.2v8.5a2.4 2.4 0 0 1-2.4 2.4h-4.6v-5.5H9.9v5.5H5.3a2.4 2.4 0 0 1-2.4-2.4v-8.5z"/></svg>
       <span>Dashboard</span>
     </button>
-    <button class="tab" data-view="calendar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M8 2.5v4M16 2.5v4M3 9.5h18"/></svg>
+    <button class="tab" data-view="calendar" title="Calendar">
+      <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M8 2.5v4M16 2.5v4M3 9.5h18"/></svg>
+      <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.6 4.6h10.8A3.4 3.4 0 0 1 20.8 8v10a3.4 3.4 0 0 1-3.4 3.4H6.6A3.4 3.4 0 0 1 3.2 18V8a3.4 3.4 0 0 1 3.4-3.4zM7.2 1.9h1.4a.7.7 0 0 1 .7.7v3a.7.7 0 0 1-.7.7H7.2a.7.7 0 0 1-.7-.7v-3a.7.7 0 0 1 .7-.7zM15.4 1.9h1.4a.7.7 0 0 1 .7.7v3a.7.7 0 0 1-.7.7h-1.4a.7.7 0 0 1-.7-.7v-3a.7.7 0 0 1 .7-.7zM8 12.45a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3zM12 12.45a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3zM16 12.45a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3z"/></svg>
       <span>Calendar</span>
     </button>
-    <button class="tab" data-view="shoots">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg>
+    <button class="tab" data-view="shoots" title="All Shoots">
+      <svg class="icon-outline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      <svg class="icon-filled" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3zM12 9.7a3.3 3.3 0 1 1 0 6.6 3.3 3.3 0 1 1 0-6.6z"/></svg>
       <span>Shoots</span>
     </button>
-    <button class="tab tab-profile" id="tab-profile" aria-haspopup="dialog" aria-expanded="false" title="Profile">
+    <button class="tab tab-profile" id="tab-profile" data-view="profile" title="Profile">
       <span class="profile-logo" id="profile-logo" aria-hidden="true">·</span>
       <span>Profile</span>
     </button>
   </nav>
 
-  <!-- profile menu: the signed-in account, access management and sign out -->
-  <div class="modal-backdrop hidden" id="profile-modal">
-    <div class="modal profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-title">
-      <div class="modal-head">
-        <h3 id="profile-title">Profile</h3>
-        <button class="btn popup-close" data-close aria-label="Close" title="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <div class="profile-body">
-        <div class="profile-identity">
-          <span class="profile-avatar" id="profile-avatar" aria-hidden="true">·</span>
-          <div class="profile-who">
-            <b id="profile-name">—</b>
-            <span class="muted small" id="profile-email">—</span>
-          </div>
-          <span class="pill owner" id="profile-role">Member</span>
-        </div>
-        <div class="profile-actions">
-          <button id="btn-access" class="btn profile-action" title="People with access" hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/><circle cx="10" cy="7.5" r="3.5"/><path d="M20 19v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.5 4.2a3.5 3.5 0 0 1 0 6.6"/></svg>
-            <span>People with access</span>
-          </button>
-          <button id="btn-signout" class="btn btn-danger profile-action" title="Sign out">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 17l5-5-5-5M20 12H9M12 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5"/></svg>
-            <span>Sign out</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- …and the primary action beside it, always within thumb reach -->
+  <button class="fab" id="btn-new-shoot-fab" aria-label="New Shoot" title="New Shoot">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
 
   <div id="toasts" class="toasts"></div>
 
-  <script src="js/app.js?v=15"></script>
+  <script type="module" src="js/app/main.js?v=26"></script>
 </body>
 </html>
