@@ -270,15 +270,18 @@ export class DashboardView {
       </button>`;
   }
 
-  /** Apply — or undo — one of the row toggles. */
+  /**
+   * Apply — or undo — one of the row toggles.
+   *
+   * The glyph flips before the request goes out: a toggle has to answer the tap
+   * straight away. If the server says no, it flips back and says why.
+   */
   async #runWrapUp(button) {
     const id = Number(button.dataset.id);
     const isPayment = button.dataset.act === 'paid';
     const undo = button.classList.contains('is-on');
 
-    // taking money back out of the ledger deletes a record, so it is asked for
-    if (isPayment && undo && !this.confirm('Remove the last payment on this shoot?')) return;
-
+    this.#paintToggle(button, !undo);
     button.disabled = true;
     try {
       if (isPayment && undo) {
@@ -297,9 +300,18 @@ export class DashboardView {
       }
       this.actions.dataChanged({ reloadMeta: false });
     } catch (error) {
+      this.#paintToggle(button, undo); // put it back the way it was
       button.disabled = false;
       this.actions.notifyError(`Could not update: ${error.message}`);
     }
+  }
+
+  /** Swap a row toggle between its empty and filled glyph. */
+  #paintToggle(button, on) {
+    const isPayment = button.dataset.act === 'paid';
+    button.classList.toggle('is-on', on);
+    button.setAttribute('aria-pressed', String(on));
+    button.innerHTML = isPayment ? (on ? NOTE_FILLED : NOTE_EMPTY) : on ? CHECK_FILLED : CHECK_EMPTY;
   }
 }
 

@@ -5,7 +5,7 @@ import { closeOverlay, openOverlay } from '../core/motion.js';
 
 /* The settle buttons wear the same two glyphs as the dashboard row toggles. */
 const BOX = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.6"/></svg>';
-const TICK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.6" fill="currentColor" stroke="none"/><path d="M8.3 12.2l2.6 2.6 5-5.5" stroke="var(--surface)" stroke-width="2.1" stroke-linecap="round"/></svg>';
+const TICK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.6" fill="currentColor" stroke="none"/><path d="M8.3 12.2l2.6 2.6 5-5.5" stroke="var(--accent-fill)" stroke-width="2.1" stroke-linecap="round"/></svg>';
 
 /** One key/value row; rows without a value are dropped by the caller. */
 const kvRow = (label, value, attrs = '') =>
@@ -196,7 +196,6 @@ export class ShootDrawer {
 
     const markPaid = $('#pay-mark');
     markPaid.addEventListener('click', async () => {
-      if (settled && !this.confirm('Remove the last payment on this shoot?')) return;
       markPaid.disabled = true;
       try {
         if (settled) {

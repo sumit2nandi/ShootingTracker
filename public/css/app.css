@@ -586,10 +586,10 @@ tbody tr:hover { background: var(--surface-2); }
 .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
 .btn-settle {
   width: 100%; justify-content: center; padding: 10px 12px;
-  color: var(--green); background: var(--green-soft); border-color: var(--green-line); box-shadow: none;
+  color: var(--accent); background: var(--accent-soft); border-color: var(--accent-line); box-shadow: none;
 }
-.btn-settle:hover:not(:disabled) { color: var(--green); background: var(--green-soft); border-color: var(--green); }
-.btn-settle.is-on { color: #fff; background: var(--green); border-color: var(--green); }
+.btn-settle:hover:not(:disabled) { color: var(--accent); background: var(--accent-soft-2); border-color: var(--accent); }
+.btn-settle.is-on { color: #fff; background: var(--accent-fill); border-color: var(--accent-fill); box-shadow: var(--accent-fill-glow); }
 .btn-settle.is-on:hover { filter: brightness(1.06); color: #fff; }
 .btn-settle:disabled { color: var(--muted); background: var(--surface-2); border-color: var(--line); }
 .btn-settle svg { width: 16px; height: 16px; flex: none; }

@@ -22,8 +22,8 @@ that adds a shoot from anywhere.
 - **Earnings** — a per-shoot **payments ledger**. Collected amount, balance and a derived
   `paid / partial / unpaid` status are computed from the ledger, not hand-typed. In the shoot
   drawer, **Mark Complete** and **Mark Paid** sit side by side under the ledger as a matching pair: one
-  closes the shoot, the other books whatever is still due on the fee in a single tap. Both turn solid once
-  done and both can be tapped again to undo.
+  closes the shoot, the other books whatever is still due on the fee in a single tap. Both turn solid violet once
+  done and both can be tapped again to undo — no dialog, the toggle answers the tap immediately.
 - **Dashboard** — six KPI cards in count/amount pairs (total shoots, total fee · completed, total received · planned, outstanding) plus:
   - monthly earnings bar chart (per-day when a month filter is on),
   - status donut,
