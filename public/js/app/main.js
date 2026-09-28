@@ -15,6 +15,7 @@ import { ShootingTrackerApi } from './data/shooting-tracker-api.js';
 import { FilterCriteria } from './domain/filter-criteria.js';
 import { buildExportCsv, downloadText } from './domain/csv-export.js';
 import { Toaster } from './ui/toaster.js';
+import { ConfirmDialog } from './ui/confirm-dialog.js';
 import { DatabaseStatus } from './ui/database-status.js';
 import { FilterBar } from './ui/filter-bar.js';
 import { DashboardView } from './ui/dashboard-view.js';
@@ -46,6 +47,8 @@ class Application {
     });
 
     this.toaster = new Toaster();
+    this.confirmDialog = new ConfirmDialog();
+    const confirm = (...args) => this.confirmDialog.ask(...args);
     this.theme = new ThemeController();
     this.api = new ShootingTrackerApi({
       client: new ApiClient({ onUnauthorized: () => window.location.replace('/') })
@@ -78,9 +81,9 @@ class Application {
     this.dashboard = new DashboardView({ api: this.api, actions });
     this.calendar = new CalendarView({ api: this.api, actions });
     this.shoots = new ShootsView({ api: this.api, actions });
-    this.drawer = new ShootDrawer({ api: this.api, actions });
+    this.drawer = new ShootDrawer({ api: this.api, actions, confirm });
     this.shootForm = new ShootForm({ api: this.api, actions });
-    this.access = new AccessView({ api: this.api, store: this.store, actions });
+    this.access = new AccessView({ api: this.api, store: this.store, actions, confirm });
     this.profile = new ProfileView({ api: this.api, actions });
     this.dbStatus = new DatabaseStatus({ api: this.api, store: this.store });
 
@@ -99,6 +102,7 @@ class Application {
   /* ---------------- wiring ---------------- */
 
   mount() {
+    this.confirmDialog.mount();
     this.theme.start();
     this.theme.onChange((theme) => this.#applyThemeChrome(theme));
     this.#applyThemeChrome(this.theme.current);
@@ -112,7 +116,7 @@ class Application {
     $('#btn-export').addEventListener('click', () => this.exportCsv());
     $('#viewing-banner-back')?.addEventListener('click', () => this.#applyViewing(null));
     document.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || !$('#confirm-modal').classList.contains('hidden')) return;
       this.shootForm.close();
       this.drawer.close();
       this.access.close();

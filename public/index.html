@@ -4,8 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Income Tracker</title>
-  <link rel="stylesheet" href="css/app.css?v=35" />
-  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=6" />
+  <link rel="stylesheet" href="css/app.css?v=36" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg?v=7" />
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=7" />
+  <link rel="apple-touch-icon" href="favicon.png?v=7" />
   <!-- the browser paints the address bar / tab strip with this colour, so it follows the theme -->
   <meta name="theme-color" content="#f4f3f9" id="meta-theme-color" />
   <script>
@@ -229,7 +231,7 @@
         <!-- core fields -->
         <div class="field span-2"><label>Title *</label><input name="title" required placeholder="Entry title" autocomplete="off" /></div>
         <div class="field"><label>Date *</label><input name="shoot_date" type="date" required /></div>
-        <div class="field"><label>Expected Income (₹)</label><input name="fee" type="number" min="0" step="0.01" inputmode="numeric" value="0" /></div>
+        <div class="field"><label>Expected Income (₹)</label><input name="fee" type="number" min="0" step="0.01" inputmode="numeric" /></div>
         <div class="field"><label>Coordinator</label>
           <select name="coordinator" id="sel-coordinator">
             <option value="">— none —</option>
@@ -296,6 +298,18 @@
     </div>
   </div>
 
+  <!-- reusable in-app confirmation dialog -->
+  <div class="modal-backdrop confirm-backdrop hidden" id="confirm-modal">
+    <section class="modal confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+      <div class="modal-head"><h3 id="confirm-title">Please confirm</h3></div>
+      <div class="confirm-message" id="confirm-message"></div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-ghost" id="confirm-cancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirm-accept">Confirm</button>
+      </div>
+    </section>
+  </div>
+
   <!-- detail drawer -->
   <div class="drawer-backdrop hidden" id="drawer-backdrop">
     <aside class="drawer" id="drawer"></aside>
@@ -331,6 +345,6 @@
 
   <div id="toasts" class="toasts"></div>
 
-  <script type="module" src="js/app/main.js?v=33"></script>
+  <script type="module" src="js/app/main.js?v=34"></script>
 </body>
 </html>

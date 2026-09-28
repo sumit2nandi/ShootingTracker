@@ -18,7 +18,7 @@ const kvRow = (label, value, attrs = '') =>
  * to edit, refresh or add, so it never reaches into the table or the calendar.
  */
 export class ShootDrawer {
-  constructor({ api, actions, confirm = window.confirm.bind(window), today = () => new Date() }) {
+  constructor({ api, actions, confirm = async () => false, today = () => new Date() }) {
     this.api = api;
     this.actions = actions;
     this.confirm = confirm;
@@ -186,7 +186,9 @@ export class ShootDrawer {
     });
 
     $('#dr-delete').addEventListener('click', async () => {
-      if (!this.confirm(`Delete "${shoot.title}"? Its payments will be removed too.`)) return;
+      if (!(await this.confirm(`Delete “${shoot.title}”? Its payments will be removed too.`, {
+        title: 'Delete this entry?', confirmLabel: 'Delete'
+      }))) return;
       try {
         await this.api.deleteShoot(shoot.id);
         this.actions.notify('Entry deleted');
@@ -222,7 +224,9 @@ export class ShootDrawer {
 
     $$('#drawer [data-pay-id]').forEach((button) =>
       button.addEventListener('click', async () => {
-        if (!this.confirm('Remove this payment?')) return;
+        if (!(await this.confirm('This payment will be permanently removed.', {
+          title: 'Remove payment?', confirmLabel: 'Remove'
+        }))) return;
         try {
           await this.api.deletePayment(button.dataset.payId);
           this.actions.notify('Payment removed');

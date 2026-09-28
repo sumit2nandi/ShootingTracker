@@ -532,11 +532,22 @@ tbody tr:hover { background: var(--surface-2); }
 }
 .modal-head h3 { color: var(--text); text-transform: none; font-size: 16px; letter-spacing: 0; }
 .modal-head { border-bottom: 1px solid var(--line); }
+.confirm-backdrop { z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+.confirm-dialog { width: min(430px, 100%); max-width: 430px; max-height: 90vh; margin: auto; border-radius: 18px; animation: confirm-pop .16s ease; }
+.confirm-backdrop.closing .confirm-dialog { animation: confirm-pop-out .16s ease forwards; }
+.confirm-message { padding: 18px; color: var(--text); font-size: 14px; line-height: 1.5; }
+@keyframes confirm-pop { from { transform: scale(.97); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes confirm-pop-out { from { transform: scale(1); opacity: 1; } to { transform: scale(.97); opacity: 0; } }
 #shoot-form { padding: 14px 18px 8px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
 .field { display: flex; flex-direction: column; gap: 5px; position: relative; }
 .field.span-2 { grid-column: span 2; }
 .field label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 650; }
+.field.prefilled label { color: var(--accent-strong); }
+.field.prefilled label::after { content: ' · AUTO-FILLED'; font-size: 9px; letter-spacing: .35px; }
+.field.prefilled > input, .field.prefilled > select, .field.prefilled > textarea {
+  border-color: var(--accent); background-color: var(--accent-soft); box-shadow: 0 0 0 2px var(--accent-soft);
+}
 /* the title field's past-title suggestions (a hand-rolled list — datalists
    do not fire for inputs inside this modal's display:none life) */
 .field-suggest {
@@ -606,7 +617,8 @@ tbody tr:hover { background: var(--surface-2); }
 .drawer-status { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .drawer .section { margin-top: 18px; }
 .drawer .section h4 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); font-weight: 650; }
-.kv { display: grid; grid-template-columns: 104px 1fr; gap: 6px 12px; font-size: 13.5px; }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; font-size: 13.5px; }
+.kv .k { white-space: nowrap; }
 .kv-lead { padding: 10px 12px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; }
 .kv-lead .k { font-weight: 600; color: var(--text); }
 .kv .k { color: var(--muted); }

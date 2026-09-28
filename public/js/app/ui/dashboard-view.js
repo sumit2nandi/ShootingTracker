@@ -5,11 +5,10 @@ import { isWrapUpTime, outstandingAmount, zonedNow } from '../domain/wrap-up.js'
 
 /** KPI tiles, charts and breakdowns. Reads data, writes HTML, emits actions. */
 export class DashboardView {
-  constructor({ api, actions, now = () => new Date(), confirm = window.confirm.bind(window) }) {
+  constructor({ api, actions, now = () => new Date() }) {
     this.api = api;
     this.actions = actions;
     this.now = now;
-    this.confirm = confirm;
   }
 
   mount() {

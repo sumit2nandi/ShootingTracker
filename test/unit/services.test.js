@@ -227,7 +227,11 @@ test('metadata offers the viewed account’s own values, coordinators and titles
       distinctClients: call(['acme']),
       distinctTypes: call(['wedding']),
       months: call(['2026-04']),
-      pastTitles: call(['Amritsar wedding', 'Mumbai product shoot'])
+      pastTitles: call(['Amritsar wedding', 'Mumbai product shoot']),
+      titleSuggestions: call([
+        { title: 'Amritsar wedding', fee: 25000, coordinator: 'Riya Saha' },
+        { title: 'Mumbai product shoot', fee: 12000, coordinator: null }
+      ])
     }
   });
 
@@ -237,7 +241,8 @@ test('metadata offers the viewed account’s own values, coordinators and titles
   assert.deepEqual(meta.coordinators, [{ id: 7, name: 'Riya Saha' }], 'coordinators come from the account’s own shoots');
   assert.deepEqual(meta.clients, ['acme']);
   assert.deepEqual(meta.titles, ['Amritsar wedding', 'Mumbai product shoot'], 'past titles feed the title suggestions');
-  assert.ok(seenOwners.length === 5 && seenOwners.every((owner) => owner === 9), 'every list is scoped to the viewed account');
+  assert.deepEqual(meta.titleSuggestions[0], { title: 'Amritsar wedding', fee: 25000, coordinator: 'Riya Saha' });
+  assert.ok(seenOwners.length === 6 && seenOwners.every((owner) => owner === 9), 'every list is scoped to the viewed account');
 });
 
 /* ---------------- data scope ---------------- */
