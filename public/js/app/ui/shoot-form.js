@@ -16,7 +16,11 @@ export class ShootForm {
   }
 
   mount() {
-    $('#btn-new-shoot').addEventListener('click', () => this.open(null));
+    // two entries to the same form: the header button on desktop, the floating
+    // action button on phones
+    $$('#btn-new-shoot, #btn-new-shoot-fab').forEach((button) =>
+      button.addEventListener('click', () => this.open(null))
+    );
     $('#btn-save-shoot').addEventListener('click', () => this.save());
     $$('#shoot-modal [data-close]').forEach((button) => button.addEventListener('click', () => this.close()));
     this.modal.addEventListener('click', (event) => {

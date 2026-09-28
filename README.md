@@ -3,10 +3,11 @@
 A self-hosted, **mobile-first** tool to **track every shoot**, with a **filterable earnings dashboard**
 and a **calendar linked to each shoot** — all backed by **PostgreSQL** (your Aiven `defaultdb`).
 
-Built with a small **Node.js + Express + `pg`** API and a dependency-free frontend (vanilla JS, no build
-step), so it runs anywhere Node runs. Professional **light and dark themes** (one tap in the top-right
-corner, remembered per browser), with a floating **liquid-glass bottom tab bar** that carries the views
-and the profile.
+Built with a small **Node.js + Express + `pg`** API and a dependency-free frontend (ES modules, no build
+step), so it runs anywhere Node runs. A **violet material theme** in **light and dark** (one tap in the
+top-right corner, remembered per browser): solid surfaces, soft elevation, fully rounded controls, and a
+floating **navigation pill** — the current view rides a lifted disc — next to a circular **action button**
+that adds a shoot from anywhere.
 
 ---
 
@@ -33,15 +34,17 @@ and the profile.
   the neighbouring months are dimmed, and every shoot is shown on its date (multi-day shoots span their
   range) as a status-coloured chip. The legend mirrors those chips and counts the statuses in the month on
   screen. Tap a shoot → detail drawer; tap a day → add a shoot on that date. A list view is one tap away.
-- **Mobile-first UI** — responsive layout, bottom-sheet forms/drawers, safe-area insets, and a floating glass
-  tab bar (Dashboard / Calendar / Shoots / Profile). The **All shoots** table goes edge-to-edge on phones and drops its
+- **Mobile-first UI** — responsive layout, bottom-sheet forms/drawers, safe-area insets, and a floating
+  navigation pill (Dashboard / Calendar / Shoots / Profile) with a violet **floating action button** beside
+  it for “new shoot”. The **All shoots** table goes edge-to-edge on phones and drops its
   **Status** and **Payment** columns; the fee itself turns into a **green bubble when paid** and a **red
   bubble when a balance is due**. A **Show all** button appears whenever a filter is applied, and **Export
   (CSV)** lives next to the filter icon in the same header.
 - **Light / dark theme** — the toggle sits in the **top-right corner** (moon ⇄ sun). The choice is stored in
   the browser, follows the operating system until you pick a side, and is applied before the first paint, so
-  there is no white flash on load. Every surface — cards, tables, calendar, drawer, pills and the glass tab
-  bar — is themed from one set of CSS custom properties.
+  there is no white flash on load. Every surface — cards, tables, calendar, drawer, pills, the navigation
+  pill and the action button — is themed from one set of CSS custom properties in `public/css/app.css`
+  (palette, radii, elevation and the navigation metrics), so a re-skin is a token edit, not a hunt.
 - **Profile in the bottom tab bar** — the signed-in account and **Sign out** live behind the **Profile** entry
   of the bottom tab bar (a profile logo with the account's initial), not in the top bar. The sheet shows the
   name, email and role, and owners also reach **People with access** from it.

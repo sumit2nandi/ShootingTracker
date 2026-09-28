@@ -4,12 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>ShootingTracker</title>
-  <link rel="stylesheet" href="css/app.css?v=17" />
+  <link rel="stylesheet" href="css/app.css?v=18" />
   <link rel="icon" type="image/svg+xml" href="favicon.svg?v=4" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png?v=4" />
   <link rel="apple-touch-icon" href="favicon.png?v=4" />
   <!-- the browser paints the address bar / tab strip with this colour, so it follows the theme -->
-  <meta name="theme-color" content="#f7f9fc" id="meta-theme-color" />
+  <meta name="theme-color" content="#f4f3f9" id="meta-theme-color" />
   <script>
     // Paint the saved (or system) theme before the first frame — otherwise a dark-mode
     // user gets a white flash on every page load.
@@ -246,7 +246,7 @@
     <aside class="drawer" id="drawer"></aside>
   </div>
 
-  <!-- floating bottom tab bar (liquid glass) -->
+  <!-- floating bottom navigation: a solid pill of destinations… -->
   <nav class="tabbar" id="tabs" aria-label="Main">
     <button class="tab active" data-view="dashboard">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="9" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="5.5" rx="1.5"/><rect x="13.5" y="12" width="7.5" height="9" rx="1.5"/><rect x="3" y="15.5" width="7.5" height="5.5" rx="1.5"/></svg>
@@ -265,6 +265,11 @@
       <span>Profile</span>
     </button>
   </nav>
+
+  <!-- …and the primary action beside it, always within thumb reach -->
+  <button class="fab" id="btn-new-shoot-fab" aria-label="New shoot" title="New shoot">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
 
   <!-- profile menu: the signed-in account, access management and sign out -->
   <div class="modal-backdrop hidden" id="profile-modal">
@@ -300,6 +305,6 @@
 
   <div id="toasts" class="toasts"></div>
 
-  <script type="module" src="js/app/main.js?v=16"></script>
+  <script type="module" src="js/app/main.js?v=17"></script>
 </body>
 </html>

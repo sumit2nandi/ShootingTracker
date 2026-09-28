@@ -1,111 +1,116 @@
-/* ============ ShootingTracker — professional light theme ============ */
+/* ============ ShootingTracker — violet material theme (light + dark) ============ */
 :root {
-  --bg: #f7f9fc;
+  /* ---- palette ----------------------------------------------------------
+     Violet on a light lavender canvas. Solid material surfaces: colour and
+     elevation do the work, no translucency, no gradients on chrome. */
+  --bg: #f4f3f9;
   --surface: #ffffff;
-  --surface-2: #f9fafc;
-  --line: #e8edf4;
-  --line-2: #d9e1eb;
-  --text: #1a2b45;
-  --muted: #64748b;
-  --accent: #2563eb;
-  --accent-strong: #1d4ed8;
-  --accent-soft: rgba(37, 99, 235, .08);
+  --surface-2: #f5f4f9;
+  --line: #ecebf3;
+  --line-2: #dedce9;
+  --text: #16151d;
+  --muted: #6b6a7d;
+  --accent: #7c3aed;
+  --accent-strong: #6423d7;
+  --accent-soft: rgba(124, 58, 237, .09);
   --green: #15803d;
-  --green-soft: #ecf7f0;
+  --green-soft: #eaf7ef;
   --amber: #b45309;
   --amber-soft: #fdf4e7;
-  --red: #dc2626;
-  --red-soft: #fdecec;
+  --red: #e11d48;
+  --red-soft: #fdecef;
   --cyan: #0e7490;
   --cyan-soft: #e9f6fa;
-  --slate-soft: #f1f4f9;
-  --radius: 14px;
-  --shadow-sm: 0 1px 2px rgba(16, 35, 64, .04), 0 1px 3px rgba(16, 35, 64, .03);
-  --shadow-md: 0 4px 14px rgba(16, 35, 64, .07), 0 1px 3px rgba(16, 35, 64, .04);
-  --shadow-lg: 0 16px 44px rgba(16, 35, 64, .14);
-  --shadow-up: 0 -6px 16px rgba(23, 35, 58, .06);
+  --slate-soft: #f1f0f7;
+
+  /* ---- shape: material radii, from chips to sheets ---- */
+  --radius: 18px;
+  --radius-sm: 12px;
+  --radius-lg: 24px;
+  --pill: 999px;
+
+  /* ---- elevation: soft, tinted with the brand rather than pure black ---- */
+  --shadow-sm: 0 1px 2px rgba(23, 18, 52, .04), 0 2px 6px rgba(23, 18, 52, .04);
+  --shadow-md: 0 4px 14px rgba(23, 18, 52, .08), 0 2px 4px rgba(23, 18, 52, .04);
+  --shadow-lg: 0 24px 60px rgba(23, 18, 52, .18);
+  --shadow-up: 0 -6px 16px rgba(23, 18, 52, .06);
+  --focus-ring: 0 0 0 3px rgba(124, 58, 237, .16);
 
   /* everything chrome-ish is a variable so the theme toggle only swaps values:
-     the sticky bars, the glass tab bar, the modal scrim and the select arrow */
-  --topbar-bg: rgba(255, 255, 255, .92);
-  --filterbar-bg: rgba(255, 255, 255, .85);
-  --scrim: rgba(23, 35, 58, .4);
-  --glass-bg: linear-gradient(180deg,
-    rgba(255, 255, 255, .58) 0%, rgba(255, 255, 255, .30) 55%, rgba(255, 255, 255, .24) 100%);
-  --glass-solid: rgba(255, 255, 255, .94);
-  --glass-border: rgba(255, 255, 255, .5);
-  --glass-sheen: linear-gradient(118deg,
-    rgba(255, 255, 255, .78) 0%, rgba(255, 255, 255, .10) 28%, rgba(255, 255, 255, 0) 52%,
-    rgba(255, 255, 255, .08) 78%, rgba(255, 255, 255, .58) 100%);
-  --glass-glow: radial-gradient(130% 90% at 50% 128%, rgba(255, 255, 255, .5), rgba(255, 255, 255, 0) 62%);
-  --glass-hover: rgba(255, 255, 255, .45);
-  --glass-inset: inset 0 1px 0 rgba(255, 255, 255, .85);
-  --glass-shadow: 0 18px 44px rgba(18, 38, 72, .16), 0 6px 16px rgba(18, 38, 72, .09), 0 1px 2px rgba(18, 38, 72, .05);
-  --accent-fill: var(--accent);            /* solid brand blue: buttons, today marker */
-  --accent-fill-hover: var(--accent-strong);
-  --accent-fill-glow: 0 2px 8px rgba(37, 99, 235, .28);
-  --accent-soft-2: #e0e9fd;
-  --accent-glow: rgba(37, 99, 235, .5);
-  --brand-grad: linear-gradient(135deg, var(--accent), #4f8cff);
-  --violet: #7c3aed;
-  --planned-text: #47596e;                 /* the grey "Planned" pill */
-  --planned-line: #d7dfe9;
-  --cell-dim: var(--surface-2);            /* days spilling in from a neighbouring month */
-  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2367788f' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+     the sticky bars, the floating navigation, the scrim and the select arrow */
+  --topbar-bg: #ffffff;
+  --filterbar-bg: #ffffff;
+  --scrim: rgba(23, 18, 52, .42);
+
+  /* floating navigation: a solid pill, a lifted disc under the current tab and
+     a filled circular action button beside it */
+  --nav-bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  --nav-h: 64px;
+  --fab-size: 60px;
+  --nav-bg: #ffffff;
+  --nav-shadow: 0 10px 30px rgba(23, 18, 52, .14), 0 2px 8px rgba(23, 18, 52, .06);
+  --nav-chip: #ffffff;
+  --nav-chip-shadow: 0 8px 20px rgba(76, 29, 149, .18), 0 0 0 1px rgba(76, 29, 149, .05);
+
+  --accent-fill: var(--accent);            /* solid brand violet: buttons, FAB, today marker */
+  --accent-fill-hover: #6d28d9;
+  --accent-fill-glow: 0 2px 10px rgba(124, 58, 237, .32);
+  --accent-soft-2: #ede9fe;
+  --accent-glow: rgba(124, 58, 237, .45);
+  --brand-grad: linear-gradient(135deg, #7c3aed, #a855f7);
+  --violet: #9333ea;
+  --planned-text: #4b4a5e;                 /* the grey "Planned" pill */
+  --planned-line: #dcdae7;
+  --cell-dim: #faf9fd;                     /* days spilling in from a neighbouring month */
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b6a7d' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
 /* ============ dark theme ============
    Same layout, same components — only the tokens above change. `data-theme` is
    set on <html> before first paint by the inline script in index.html. */
 :root[data-theme="dark"] {
-  --bg: #0b1220;
-  --surface: #111a2c;
-  --surface-2: #17233c;
-  --line: #1f2b45;
-  --line-2: #2c3b58;
-  --text: #e8eefb;
-  --muted: #93a1b8;
-  --accent: #7aa7ff;
-  --accent-strong: #aec9ff;
-  --accent-soft: rgba(122, 167, 255, .14);
+  --bg: #0d0b14;
+  --surface: #17141f;
+  --surface-2: #1e1a2b;
+  --line: #272239;
+  --line-2: #352e4b;
+  --text: #ece9f7;
+  --muted: #9e9ab4;
+  --accent: #a78bfa;
+  --accent-strong: #c4b5fd;
+  --accent-soft: rgba(167, 139, 250, .14);
   --green: #4ade80;
   --green-soft: rgba(74, 222, 128, .12);
   --amber: #fbbf24;
   --amber-soft: rgba(251, 191, 36, .12);
-  --red: #f87171;
-  --red-soft: rgba(248, 113, 113, .14);
+  --red: #fb7185;
+  --red-soft: rgba(251, 113, 133, .14);
   --cyan: #22d3ee;
   --cyan-soft: rgba(34, 211, 238, .12);
-  --slate-soft: #1a2540;
+  --slate-soft: #221d33;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4), 0 1px 3px rgba(0, 0, 0, .3);
   --shadow-md: 0 4px 14px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .3);
-  --shadow-lg: 0 16px 44px rgba(0, 0, 0, .6);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, .6);
   --shadow-up: 0 -6px 16px rgba(0, 0, 0, .35);
-  --topbar-bg: rgba(13, 20, 36, .86);
-  --filterbar-bg: rgba(13, 20, 36, .8);
-  --scrim: rgba(3, 7, 18, .62);
-  --glass-bg: linear-gradient(180deg,
-    rgba(28, 40, 68, .82) 0%, rgba(18, 27, 47, .68) 55%, rgba(14, 21, 38, .64) 100%);
-  --glass-solid: rgba(17, 26, 44, .96);
-  --glass-border: rgba(148, 177, 255, .18);
-  --glass-sheen: linear-gradient(118deg,
-    rgba(148, 177, 255, .16) 0%, rgba(148, 177, 255, .04) 28%, rgba(148, 177, 255, 0) 52%,
-    rgba(148, 177, 255, .03) 78%, rgba(148, 177, 255, .12) 100%);
-  --glass-glow: radial-gradient(130% 90% at 50% 128%, rgba(120, 160, 255, .16), rgba(120, 160, 255, 0) 62%);
-  --glass-hover: rgba(148, 177, 255, .12);
-  --glass-inset: inset 0 1px 0 rgba(255, 255, 255, .07);
-  --glass-shadow: 0 18px 44px rgba(0, 0, 0, .5), 0 6px 16px rgba(0, 0, 0, .35), 0 1px 2px rgba(0, 0, 0, .3);
-  --accent-fill: #2f5ed3;
-  --accent-fill-hover: #3d6fe0;
-  --accent-fill-glow: 0 2px 8px rgba(47, 94, 211, .45);
-  --accent-soft-2: rgba(122, 167, 255, .24);
-  --accent-glow: rgba(122, 167, 255, .45);
-  --brand-grad: linear-gradient(135deg, #3358b8, #5b8def);
-  --violet: #a78bfa;
-  --planned-text: #b7c7db;
-  --planned-line: #2c3b58;
-  --cell-dim: #0c1424;
-  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2393a1b8' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+  --focus-ring: 0 0 0 3px rgba(167, 139, 250, .22);
+  --topbar-bg: #12101a;
+  --filterbar-bg: #12101a;
+  --scrim: rgba(5, 3, 12, .66);
+  --nav-bg: #1b1729;
+  --nav-shadow: 0 10px 30px rgba(0, 0, 0, .55), 0 2px 8px rgba(0, 0, 0, .4);
+  --nav-chip: #2a2340;
+  --nav-chip-shadow: 0 8px 20px rgba(0, 0, 0, .45), 0 0 0 1px rgba(167, 139, 250, .18);
+  --accent-fill: #7c3aed;
+  --accent-fill-hover: #8b5cf6;
+  --accent-fill-glow: 0 2px 10px rgba(124, 58, 237, .5);
+  --accent-soft-2: rgba(167, 139, 250, .22);
+  --accent-glow: rgba(167, 139, 250, .45);
+  --brand-grad: linear-gradient(135deg, #7c3aed, #a855f7);
+  --violet: #c084fc;
+  --planned-text: #b9b4cd;
+  --planned-line: #352e4b;
+  --cell-dim: #100d1a;
+  --select-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239e9ab4' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 
 * { box-sizing: border-box; }
@@ -131,14 +136,13 @@ code { background: var(--surface-2); border: 1px solid var(--line); padding: 1px
   display: flex; align-items: center; gap: 12px;
   padding: 11px 20px; padding-top: calc(11px + env(safe-area-inset-top));
   border-bottom: 1px solid var(--line);
-  background: var(--topbar-bg); backdrop-filter: blur(14px) saturate(1.4);
-  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  background: var(--topbar-bg);
   position: sticky; top: 0; z-index: 40;
 }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15.5px; white-space: nowrap; color: var(--text); }
 .brand-icon {
   width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
-  background: var(--brand-grad); color: #fff; box-shadow: var(--shadow-sm);
+  background: var(--accent-fill); color: #fff; box-shadow: var(--accent-fill-glow);
 }
 .brand-icon svg { width: 17px; height: 17px; }
 .brand-name { letter-spacing: -.2px; }
@@ -159,7 +163,7 @@ code { background: var(--surface-2); border: 1px solid var(--line); padding: 1px
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   background: var(--surface); color: var(--text); border: 1px solid var(--line-2);
-  padding: 8px 14px; border-radius: 10px; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  padding: 8px 16px; border-radius: var(--pill); font-size: 13.5px; font-weight: 600; cursor: pointer;
   transition: all .15s; white-space: nowrap; box-shadow: var(--shadow-sm);
 }
 .btn:hover { border-color: var(--accent); color: var(--accent-strong); background: var(--accent-soft); }
@@ -172,21 +176,23 @@ code { background: var(--surface-2); border: 1px solid var(--line); padding: 1px
 .btn-danger:hover { background: var(--red-soft); border-color: var(--red); }
 .btn-link { background: none; border: 0; color: var(--accent); cursor: pointer; font-size: inherit; padding: 0; font-weight: 600; }
 .btn-link:hover { text-decoration: underline; }
-.icon-btn { padding: 8px; }
+.icon-btn { padding: 9px; border-radius: 50%; }
 .icon-btn svg { width: 17px; height: 17px; }
 .btn svg { width: 15px; height: 15px; }
-@media (max-width: 480px) { .btn-label { display: none; } #btn-new-shoot { padding: 8px 10px; } }
+@media (max-width: 480px) { .btn-label { display: none; } }
+/* on phones the floating action button is the way to add a shoot */
+@media (max-width: 767px) { #btn-new-shoot { display: none; } }
 
 input, select, textarea {
   background: var(--surface); border: 1px solid var(--line-2); color: var(--text);
-  padding: 9px 11px; border-radius: 10px; font-size: 14px; font-family: inherit; width: 100%;
+  padding: 10px 13px; border-radius: var(--radius-sm); font-size: 14px; font-family: inherit; width: 100%;
   appearance: none;
 }
 select {
   background-image: var(--select-arrow);
   background-repeat: no-repeat; background-position: right 11px center; padding-right: 30px; cursor: pointer;
 }
-input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, .14); }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
 
 /* ---------- filter bar ---------- */
 .filterbar {
@@ -196,7 +202,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .filter-group { display: flex; flex-direction: column; gap: 3px; flex: 1 1 120px; min-width: 105px; }
 .filter-group.grow { flex: 2 1 160px; }
 .filter-group label { font-size: 11px; letter-spacing: .1px; color: var(--muted); font-weight: 650; }
-.filter-group select, .filter-group input { padding: 7px 9px; font-size: 13px; border-radius: 9px; }
+.filter-group select, .filter-group input { padding: 8px 11px; font-size: 13px; border-radius: 10px; }
 #f-clear { padding: 7px 12px; font-size: 12.5px; }
 /* dashboard keeps only Month + Coordinator filters */
 #filterbar[data-for="dashboard"] .filter-group.extra,
@@ -240,10 +246,10 @@ main { padding: 16px 16px calc(110px + env(safe-area-inset-bottom)); max-width: 
 .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
 .bar-pair { display: flex; align-items: flex-end; gap: 2px; height: 152px; width: 100%; justify-content: center; }
 .bar { width: 45%; max-width: 24px; border-radius: 4px 4px 0 0; transition: height .35s ease; position: relative; }
-.bar.fee { background: linear-gradient(180deg, #5b8def, var(--accent)); }
+.bar.fee { background: linear-gradient(180deg, #a78bfa, var(--accent)); }
 .bar.paid { background: linear-gradient(180deg, #4ade80, #16a34a); }
 .bar:hover { filter: brightness(1.08); }
-.bar-col:hover .bar.fee { background: linear-gradient(180deg, #6f9bf3, var(--accent-strong)); }
+.bar-col:hover .bar.fee { background: linear-gradient(180deg, #b79dfc, var(--accent-strong)); }
 /* the amount sits above every bar at all times — no hover, no click */
 .bar-val {
   font-size: 9px; line-height: 1; font-weight: 650; color: var(--muted); letter-spacing: -.2px;
@@ -266,8 +272,8 @@ main { padding: 16px 16px calc(110px + env(safe-area-inset-bottom)); max-width: 
 .coord-list { display: flex; flex-direction: column; gap: 12px; }
 .coord-row .coord-top { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 5px; gap: 8px; }
 .coord-row .coord-top .amt { color: var(--muted); white-space: nowrap; }
-.coord-track { height: 8px; border-radius: 4px; background: var(--slate-soft); overflow: hidden; }
-.coord-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #7c3aed, var(--accent)); }
+.coord-track { height: 8px; border-radius: var(--pill); background: var(--slate-soft); overflow: hidden; }
+.coord-fill { height: 100%; border-radius: var(--pill); background: linear-gradient(90deg, #a855f7, var(--accent)); }
 
 /* type chips */
 .type-chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -311,7 +317,7 @@ tbody tr:hover { background: var(--surface-2); }
 .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .pill.planned { color: var(--planned-text); background: var(--slate-soft); border-color: var(--planned-line); }
 .pill.completed { color: var(--green); background: var(--green-soft); border-color: rgba(21, 128, 61, .3); }
-.pill.owner { color: var(--accent-strong); background: var(--accent-soft); border-color: rgba(37, 99, 235, .3); }
+.pill.owner { color: var(--accent-strong); background: var(--accent-soft); border-color: rgba(124, 58, 237, .28); }
 .pill.paid { color: var(--green); background: var(--green-soft); }
 .pill.partial { color: var(--amber); background: var(--amber-soft); }
 .pill.unpaid { color: var(--muted); background: var(--slate-soft); }
@@ -334,7 +340,7 @@ tbody tr:hover { background: var(--surface-2); }
 .legend-n { font-size: 10.5px; font-weight: 700; color: var(--muted); background: var(--slate-soft); border-radius: 999px; padding: 1px 6px; }
 .legend-empty { font-size: 12px; color: var(--muted); font-style: italic; }
 /* month grid — cells share their edges, exactly like Google Calendar (no gaps) */
-.cal-frame { border: 1px solid var(--line-2); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.cal-frame { border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; background: var(--surface); }
 .cal-head-row { display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 1px solid var(--line-2); background: var(--surface-2); }
 .cal-dow { font-size: 11.5px; letter-spacing: .3px; color: var(--muted); text-align: center; padding: 7px 6px; font-weight: 650; box-shadow: inset -1px 0 0 var(--line); }
 .cal-dow:last-child { box-shadow: none; }
@@ -376,8 +382,8 @@ tbody tr:hover { background: var(--surface-2); }
 .cal-more { font-size: 10.5px; color: var(--accent-strong); cursor: pointer; padding: 1px 6px; font-weight: 650; border-radius: 5px; align-self: flex-start; }
 .cal-more:hover { background: var(--accent-soft); }
 /* calendar view toggle */
-.cal-viewtoggle { display: flex; gap: 3px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
-.cal-viewtoggle .btn { padding: 5px 12px; font-size: 12.5px; border-radius: 8px; }
+.cal-viewtoggle { display: flex; gap: 3px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--pill); padding: 3px; }
+.cal-viewtoggle .btn { padding: 5px 13px; font-size: 12.5px; border-radius: var(--pill); }
 .cal-viewtoggle .btn.active { background: var(--surface); color: var(--accent-strong); box-shadow: var(--shadow-sm); }
 /* calendar list view */
 .cal-list { display: flex; flex-direction: column; gap: 8px; }
@@ -403,12 +409,12 @@ tbody tr:hover { background: var(--surface-2); }
 .cl-title { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cl-fee { margin-left: auto; flex: none; font-size: 13px; font-weight: 650; }
 /* shoots-tab filter toggle */
-#btn-shoots-filter.active { color: var(--accent-strong); background: var(--accent-soft); border-color: rgba(37, 99, 235, .35); }
+#btn-shoots-filter.active { color: var(--accent-strong); background: var(--accent-soft); border-color: rgba(124, 58, 237, .3); }
 /* the right-hand controls of the All shoots card head stay grouped together */
 .card-head-tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .shoots-reset {
   color: var(--accent-strong); background: var(--accent-soft);
-  border-color: rgba(37, 99, 235, .35); padding: 5px 11px; font-size: 12.5px; border-radius: 9px;
+  border-color: rgba(124, 58, 237, .3); padding: 5px 13px; font-size: 12.5px; border-radius: var(--pill);
 }
 .shoots-reset:hover { background: var(--accent-soft-2); border-color: var(--accent); color: var(--accent-strong); }
 .shoots-reset svg { width: 14px; height: 14px; }
@@ -543,55 +549,57 @@ tbody tr:hover { background: var(--surface-2); }
   .desktop-tabs .tab.active::after { display: none; }
 }
 
-/* ---------- floating bottom tab bar (liquid glass, mobile only) ---------- */
+/* ---------- floating bottom navigation (solid material) ----------
+   A pill of destinations with the current one lifted onto its own disc, and a
+   filled circular action button beside it, so the primary action on a phone is
+   always within thumb reach. Both are opaque: material surfaces, not glass. */
 .tabbar {
   position: fixed;
-  bottom: max(12px, env(safe-area-inset-bottom));
-  left: 50%; transform: translateX(-50%);
-  display: flex; gap: 4px;
-  width: min(430px, calc(100vw - 24px));
-  padding: 7px;
-  isolation: isolate;
-  /* a thin pane of glass: mostly see-through, tint only at the top and bottom */
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.06);
-  backdrop-filter: blur(28px) saturate(200%) brightness(1.06);
-  border: 1px solid var(--glass-border);
-  border-radius: 24px;
-  box-shadow:
-    var(--glass-shadow),
-    var(--glass-inset),
-    inset 0 -1px 0 var(--glass-border);
+  bottom: var(--nav-bottom);
+  left: 14px;
+  right: calc(14px + var(--fab-size) + 10px);   /* leaves the action button its corner */
+  display: flex; align-items: stretch; gap: 2px;
+  padding: 6px;
+  background: var(--nav-bg);
+  border-radius: var(--pill);
+  box-shadow: var(--nav-shadow);
+  isolation: isolate;   /* keeps the lifted disc (z-index: -1) inside this bar */
   z-index: 50;
 }
-.tabbar::before {
-  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
-  background: var(--glass-sheen);
-}
-/* light pooling under the bottom edge, the way a thick pane refracts */
-.tabbar::after {
-  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
-  background: var(--glass-glow);
-}
-/* where backdrop-filter is missing the pane would be see-through, so go opaque */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .tabbar { background: var(--glass-solid); }
-}
 .tabbar .tab {
-  flex: 1; position: relative;
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  background: none; border: 0; color: var(--muted);
-  font-size: 11px; font-weight: 600; padding: 8px 4px 7px;
-  border-radius: 16px; cursor: pointer; transition: color .18s, background .18s, transform .12s;
+  position: relative; flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-height: calc(var(--nav-h) - 12px); padding: 6px 2px;
+  background: none; border: 0; border-radius: var(--pill);
+  overflow: visible;   /* the lifted disc is allowed to break out of the button box */
+  font-size: 10.5px; font-weight: 650; line-height: 1; letter-spacing: -.1px; white-space: nowrap;
+  color: var(--muted); cursor: pointer;
+  transition: color .18s ease, transform .12s ease;
+  -webkit-tap-highlight-color: transparent;
 }
-.tabbar .tab svg { width: 21px; height: 21px; transition: transform .18s; }
-.tabbar .tab:hover { color: var(--text); background: var(--glass-hover); }
+.tabbar .tab svg { width: 22px; height: 22px; transition: transform .22s cubic-bezier(.2, .8, .2, 1); }
+/* the disc marking the current destination: a raised circle that breaks out of
+   the pill's top edge, the way a selected item lifts off a material surface */
+.tabbar .tab::before {
+  content: ""; position: absolute; z-index: -1;
+  left: 50%; top: 50%; width: 68px; height: 68px; margin: -38px 0 0 -34px;
+  border-radius: 50%; background: var(--nav-chip); box-shadow: var(--nav-chip-shadow);
+  opacity: 0; transform: scale(.5);
+  transition: opacity .18s ease, transform .26s cubic-bezier(.2, .8, .2, 1);
+}
+.tabbar .tab.active, .tabbar .tab.is-open { color: var(--accent); }
+.tabbar .tab.active::before, .tabbar .tab.is-open::before { opacity: 1; transform: none; }
+.tabbar .tab.active svg, .tabbar .tab.is-open svg { transform: translateY(-1px); }
+/* the selected destination reads as filled, the way material marks a choice */
+.tabbar .tab.active svg { fill: currentColor; fill-opacity: .16; }
+.tabbar .tab:not(.active):not(.is-open):hover { color: var(--text); }
 .tabbar .tab:active { transform: scale(.96); }
-.tabbar .tab.active, .tabbar .tab.is-open { color: var(--accent-strong); background: var(--accent-soft); box-shadow: var(--glass-inset); }
-.tabbar .tab.active svg { transform: translateY(-1px); }
-.tabbar .tab.active::after {
-  content: ""; position: absolute; top: 3px; width: 14px; height: 3px; border-radius: 2px;
-  background: var(--accent); opacity: .9; box-shadow: 0 0 8px var(--accent-glow);
+.tabbar .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
+/* a destination can flag itself: <button class="tab" data-badge="NEW"> */
+.tabbar .tab[data-badge]::after {
+  content: attr(data-badge); position: absolute; top: 1px; left: 50%; transform: translateX(3px);
+  background: var(--red); color: #fff; font-size: 8px; font-weight: 800; letter-spacing: .5px;
+  line-height: 1; padding: 3px 5px; border-radius: 6px; box-shadow: 0 2px 6px rgba(225, 29, 72, .35);
 }
 /* the profile entry carries an avatar instead of an icon */
 .tabbar .tab-profile .profile-logo {
@@ -599,12 +607,40 @@ tbody tr:hover { background: var(--surface-2); }
   display: grid; place-items: center;
   font-size: 11px; font-weight: 700; line-height: 1; color: #fff;
   background: var(--brand-grad); box-shadow: var(--shadow-sm);
-  transition: transform .18s;
+  transition: transform .22s cubic-bezier(.2, .8, .2, 1);
 }
 .tabbar .tab.is-open .profile-logo { transform: translateY(-1px); }
+
+/* the floating action button: the one filled, always-visible primary action */
+.fab {
+  position: fixed; z-index: 51;
+  right: 14px;
+  bottom: calc(var(--nav-bottom) + (var(--nav-h) - var(--fab-size)) / 2);
+  width: var(--fab-size); height: var(--fab-size);
+  display: grid; place-items: center;
+  background: var(--accent-fill); color: #fff;
+  border: 0; border-radius: 50%; cursor: pointer;
+  box-shadow: 0 10px 24px rgba(124, 58, 237, .4), 0 2px 6px rgba(23, 18, 52, .16);
+  transition: transform .16s cubic-bezier(.2, .8, .2, 1), background .16s ease, box-shadow .2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.fab svg { width: 26px; height: 26px; }
+.fab:hover { background: var(--accent-fill-hover); transform: translateY(-2px); box-shadow: 0 14px 30px rgba(124, 58, 237, .46), 0 3px 8px rgba(23, 18, 52, .18); }
+.fab:active { transform: scale(.93); }
+.fab:focus-visible { outline: 3px solid var(--accent-soft-2); outline-offset: 3px; }
+
+/* narrow phones: shrink the disc so it never crowds its neighbours */
+@media (max-width: 360px) {
+  .tabbar { left: 10px; right: calc(10px + var(--fab-size) + 8px); }
+  .tabbar .tab { font-size: 9.5px; }
+  .tabbar .tab::before { width: 58px; height: 58px; margin: -33px 0 0 -29px; }
+  .fab { right: 10px; }
+}
 @media (min-width: 768px) {
-  .tabbar { width: min(540px, calc(100vw - 32px)); padding: 8px; gap: 6px; }
-  .tabbar .tab { padding: 9px 4px 8px; }
+  /* desktop keeps the pill centred; the top bar already carries "New shoot" */
+  .tabbar { left: 50%; right: auto; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); padding: 7px; gap: 4px; }
+  .tabbar .tab { font-size: 11px; }
+  .fab { display: none; }
   main { padding-bottom: calc(104px + env(safe-area-inset-bottom)); }
 }
 
@@ -613,7 +649,7 @@ tbody tr:hover { background: var(--surface-2); }
 @media (min-width: 640px) { .toasts { bottom: calc(96px + env(safe-area-inset-bottom)); } }
 .toast {
   background: var(--surface); border: 1px solid var(--line-2); color: var(--text);
-  padding: 11px 16px; border-radius: 11px; box-shadow: var(--shadow-md); font-size: 13.5px;
+  padding: 11px 16px; border-radius: var(--radius-sm); box-shadow: var(--shadow-md); font-size: 13.5px;
   animation: toastin .2s ease; max-width: min(340px, calc(100vw - 32px)); font-weight: 500;
 }
 @keyframes toastin { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -682,7 +718,7 @@ body.profile-open .tabbar { z-index: 70; }
 
 
 /* ---------- grouped shoots table ---------- */
-.shoot-month { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin: 0 0 10px; background: var(--surface); }
+.shoot-month { border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; margin: 0 0 10px; background: var(--surface); }
 .shoot-month > summary { display: flex; align-items: center; gap: 10px; list-style: none; cursor: pointer; padding: 12px 14px; background: var(--surface-2); color: var(--text); font-weight: 700; }
 .shoot-month > summary::-webkit-details-marker { display: none; }
 .shoot-month > summary::before { content: ""; width: 7px; height: 7px; border-right: 1.7px solid var(--muted); border-bottom: 1.7px solid var(--muted); transform: rotate(-45deg); transition: transform .15s; }
