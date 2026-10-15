@@ -95,7 +95,8 @@ class AnalyticsRepository {
       SELECT COALESCE(NULLIF(coordinator,''), 'Unassigned') AS name,
              COUNT(*)::int AS shoots,
              COALESCE(SUM(fee),0)::numeric AS fee,
-             COALESCE(SUM(paid_amount),0)::numeric AS paid
+             COALESCE(SUM(paid_amount),0)::numeric AS paid,
+             COALESCE(AVG(fee),0)::numeric AS avg_fee
       FROM base b ${where}
       GROUP BY 1 ORDER BY fee DESC LIMIT 25`,
       params

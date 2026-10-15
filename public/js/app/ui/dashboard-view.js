@@ -182,7 +182,7 @@ export class DashboardView {
         .map(
           (row) => `
     <div class="coord-row">
-      <div class="coord-top"><span>${escapeHtml(row.name)}</span><span class="amt">${row.shoots} entries · ${formatMoney(row.paid)}</span></div>
+      <div class="coord-top"><span>${escapeHtml(row.name)}</span><span class="amt">${row.shoots} entries · ${formatMoney(row.paid)} · avg ${formatMoney(row.avg_fee)}</span></div>
       <div class="coord-track"><div class="coord-fill" style="width:${Math.max(2, (+row.paid / max) * 100)}%"></div></div>
     </div>`
         )
