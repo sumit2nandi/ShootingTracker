@@ -108,7 +108,7 @@ export class DashboardView {
     }
 
     title.textContent = 'Earnings by Month';
-    const months = (monthly || []).slice(-12).reverse().map((row) => ({ ym: row.ym, fee: +row.fee }));
+    const months = (monthly || []).slice(-12).reverse().map((row) => ({ ym: row.ym, fee: +row.paid }));
     if (!months.length) {
       wrap.innerHTML = '<div class="empty">No data for this filter</div>';
       range.textContent = '';
@@ -175,15 +175,15 @@ export class DashboardView {
       wrap.innerHTML = '<div class="empty">No data for this filter</div>';
       return;
     }
-    const max = Math.max(...list.map((row) => +row.fee), 1);
+    const max = Math.max(...list.map((row) => +row.paid), 1);
     wrap.innerHTML =
       '<div class="coord-list">' +
       list
         .map(
           (row) => `
     <div class="coord-row">
-      <div class="coord-top"><span>${escapeHtml(row.name)}</span><span class="amt">${row.shoots} entries · ${formatMoney(row.fee)}</span></div>
-      <div class="coord-track"><div class="coord-fill" style="width:${Math.max(2, (+row.fee / max) * 100)}%"></div></div>
+      <div class="coord-top"><span>${escapeHtml(row.name)}</span><span class="amt">${row.shoots} entries · ${formatMoney(row.paid)}</span></div>
+      <div class="coord-track"><div class="coord-fill" style="width:${Math.max(2, (+row.paid / max) * 100)}%"></div></div>
     </div>`
         )
         .join('') +
@@ -343,7 +343,7 @@ function groupFeesByDay(shoots) {
   const byDay = {};
   for (const shoot of shoots) {
     const key = String(shoot.shoot_date).slice(0, 10);
-    byDay[key] = (byDay[key] || 0) + (+shoot.fee || 0);
+    byDay[key] = (byDay[key] || 0) + (+shoot.paid_amount || 0);
   }
   return Object.entries(byDay)
     .sort((a, b) => (a[0] < b[0] ? -1 : 1))
